@@ -4,9 +4,9 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          :
-#   Date            : 2023-03-04
-#   Version         : 1.0.0
+#   Arxivs          : 2023-03-04 (1.0.0) - creation
+#   Date            : 2023-03-16 (1.1.0) - cleaning + {string2binary,binary2decimal}
+#   Version         : 1.1.0
 #   Licence         : cc-by-nc-sa
 #                     Attribution - Non-Commercial - Share Alike 4.0 International
 # 
@@ -114,13 +114,11 @@ def merge_data_folders(saving, deletion=True):
     for folder in folders:
         if folder[0:5] == 'data-':
             folders_tmp.append(folder)
-
-    folders = sorted(folders_tmp, key=sort_key)
-            
-    folders         = sorted(folders_tmp,key=sort_key)
-    Nfolders        = len(folders)
-    merge_folder    = saving["merge_path"][-(4+4+2+2+3):] # 4 for 'data' and '2023', 2 for 'yy', 'mm', 'dd', 3*1 for '-'
-    folders_to_delete = []
+   
+    folders             = sorted(folders_tmp,key=sort_key)
+    Nfolders            = len(folders)
+    merge_folder        = saving["merge_path"][-(4+4+2+2+3):] # 4 for 'data' and '2023', 2 for 'yy', 'mm', 'dd', 3*1 for '-'
+    folders_to_delete   = []
     
     for k in range(Nfolders):
         if (merge_folder in folders[k]) & (merge_folder != folders[k]):
@@ -181,6 +179,19 @@ def move_files_to_folder():
                 # ================================================ #
                 # ================================================ #
 
+def find_string(pattern, mystring):
+    
+    pattern_ind     = [0,0]
+    pattern_ind[0]  = mystring.find(pattern)
+    Nchars          = len(pattern)
+    pattern_ind[1]  = pattern_ind[0]+Nchars
+    
+    return pattern_ind
+
+                # ================================================ #
+                # ================================================ #
+                # ================================================ #
+
                 
 # https://stackoverflow.com/questions/25341945/check-if-string-has-date-any-format
 def is_date(string, fuzzy=False):
@@ -196,20 +207,6 @@ def is_date(string, fuzzy=False):
     
     except ValueError:
         return False
-    
-                # ================================================ #
-                # ================================================ #
-                # ================================================ #
-                
-def find_string(pattern, mystring):
-    
-    pattern_ind     = [0,0]
-    pattern_ind[0]  = mystring.find(pattern)
-    Nchars          = len(pattern)
-    pattern_ind[1]  = pattern_ind[0]+Nchars
-    
-    return pattern_ind
-    
                 
             # ================================================ #
             # ================================================ #
@@ -280,11 +277,12 @@ def my_tensor(size,device='cpu',dtype=torch.float32,requires_grad=False):
             # ================================================ #
 
 def are_same_tensors(tenseur1, tenseur2):
-    # Vérifie si les formes des deux tenseurs sont identiques
+
     if tenseur1.shape == tenseur2.shape:
-        # Utilise torch.all pour vérifier si tous les éléments sont égaux
-        identiques = torch.all(tenseur1 == tenseur2).item() == 1
-        return identiques
+
+        sameOnes = torch.all(tenseur1 == tenseur2).item() == 1
+        return sameOnes
+    
     else:
         return False
     
@@ -294,14 +292,7 @@ def are_same_tensors(tenseur1, tenseur2):
             
             
 def save2mat(tx,fibre,rx,saving):
-    '''
-    if "minibatch" in rx:
-        del(rx["minibatch_real"])
-    if "minibatch_out" in rx:
-        del(rx["minibatch_out"])
-    del(rx["sig"])
-    del(rx["sig_cplx"])
-    '''
+
     
     name        = saving["filename"]+".mat"
     save_dict   = {
@@ -542,6 +533,8 @@ def what(input):
 # GPT
 def array2csv(input, filename, columns):
     dataFrame = pd.DataFrame(input, columns=columns)
+    dataFrame.fillna(0, inplace=True)
+    dataFrame.replace([np.inf, -np.inf], 0, inplace=True)
     dataFrame.to_csv(filename + '.csv', index=False)
 
             # ================================================ #
@@ -728,7 +721,7 @@ def init_dict():
     rx          = dict()
     saving      = dict()
     flags       = dict()
-    
+
     for field_name in ["mod","Nsps","Rs","nu","Ntaps",'linewidth']:
         tx[field_name] = 0
         
@@ -738,14 +731,14 @@ def init_dict():
     
     fibre['ThetasLaw'] = {}
         
-    for field_name in ["SNRdB","BatchLen","N_lrhalf","Nframes","FrameRndRot","Nmax_SymbFrame"]:
+    for field_name in ["SNRdB","BatchLen","N_lrhalf","Nframes","FrameRndRot","Nmax_SymbFrame","mimo"]:
         rx[field_name] = 0
-    rx["Frame"]     = 0
-    
         
-    # frame s.a. lr = lr/2. (N_lrhalf >= Nframes) => lr_scheduler OFF 
+    rx["Frame"]             = 0
+    tx["RoffOff"]           = 0.1                   # roll-off factor
+    tx["Nsps"]              = 2                     # oversampling factor (Shannon Coefficient) in samples per symbol
+    tx["nu"]                = 0                     # [0] [0.0270955] [0.0872449] [0.1222578]
     rx["N_lrhalf"]          = 170
-
 
     saving['root_path'] = matlab.PWD(show = False)
     saving['merge_path']= saving['root_path']+'/data-'+str(date.today())
@@ -765,13 +758,16 @@ def init_dict():
 
 # ChatGPT
 def sort_dict_by_keys(input_dict):
-    # Triez les clés du dictionnaire en ordre alphabétique
-    sorted_keys = sorted(input_dict.keys())
-    
-    # Créez un nouveau dictionnaire trié en utilisant les clés triées
+
+    sorted_keys = sorted(input_dict.keys(), key=lambda x: x.lower())
     sorted_dict = {key: input_dict[key] for key in sorted_keys}
     
     return sorted_dict
+
+
+            # ================================================ #
+            # ================================================ #
+            # ================================================ #
 
 def KEYS(dict):
     for key in dict.keys():
@@ -822,12 +818,8 @@ def import_data(Nsps = 2, scale = 1):
             
     gen.plot_const_2pol(data['tx_real'],"tx")
     gen.plot_const_2pol(data['rx_real'],"rx")
-        
-    
-    
+
     return data
-
-
 
             # ================================================ #
             # ================================================ #
@@ -838,7 +830,7 @@ def deg2rad(myangle,*varargin):
     out_angle = myangle*pi/180
     
     if len(varargin) == 1:
-        out_angle = np.round(out_angle,varargin[0])
+        out_angle = round(out_angle,varargin)
         
     return out_angle
 
@@ -847,10 +839,38 @@ def deg2rad(myangle,*varargin):
             # ================================================ #
             # ================================================ #
 
-
 def rad2deg(myangle,*varargin):
 
     out_angle = myangle*180/pi
     
     if len(varargin) == 1:
-        out_angle = np.round(out_angle,varargin[0])
+        out_angle = round(out_angle,varargin)
+        
+        
+            # ================================================ #
+            # ================================================ #
+            # ================================================ #
+        
+        
+        
+def string_to_binary(input_string):
+    binary_string = ""
+    for char in input_string:
+        # Convertir chaque caractère en binaire et ajouter à la chaîne résultante
+        binary_char = format(ord(char), '08b')  # Convertir le caractère en binaire sur 8 bits
+        binary_string += binary_char
+    return binary_string
+
+            # ================================================ #
+            # ================================================ #
+            # ================================================ #
+            
+def binary_to_decimal(binary_string):
+    decimal_number = 0
+    power = len(binary_string) - 1
+    for bit in binary_string:
+        if bit == '1':
+            decimal_number += 2 ** power
+        power -= 1
+    return decimal_number
+
