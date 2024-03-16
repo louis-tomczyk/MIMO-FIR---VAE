@@ -4,9 +4,9 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          :
-#   Date            : 2023-03-04
-#   Version         : 1.0.0
+#   Arxivs          : 2023-03-04 (1.0.0) - creation
+#   Date            : 2023-03-16 (1.0.1) - cleaning
+#   Version         : 1.0.1
 #   Licence         : cc-by-nc-sa
 #                     Attribution - Non-Commercial - Share Alike 4.0 International
 # 
@@ -35,19 +35,17 @@
 # ---------------------------------------------
 # %%
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
 import lib_misc as misc
 import lib_txhw as txhw
+import lib_general as gen
 
 pi = np.pi
 
-
 #%%
-
 def get_constellation(tx,rx):
     
     # définition des paramètres pour chaque constellation
@@ -86,7 +84,7 @@ def get_constellation(tx,rx):
     N_amps          = int(np.sqrt(len(constellation.real)))         # number of ASK levels
     amps            = misc.my_tensor(constellation.real[::N_amps])   # amplitude levels
     sc              = torch.min(np.abs(amps))                       # scaling factor for having lowest level equal 1
-    nu              = 1
+    nu              = tx["nu"]
     nu_sc           = tx["nu"]/sc**2                                # re-scaled shaping factor
 
     # probabilities of the amlitude levels
@@ -204,8 +202,8 @@ def rrcfir(tx):
     t       = np.arange(-tx["NSymbTaps"]/2 +1/tx["Nsps"], tx["NSymbTaps"]/2, 1/tx["Nsps"])
     
     # filter = num/den
-    den     = pi*t*(1-(4*tx["RoffOff"]*t)**2)
-    num     = np.sin(pi*t*(1-tx["RoffOff"])) + 4*tx["RoffOff"]*t*np.cos(pi*t*(1+tx["RoffOff"]))
+    den     = pi*t*(1-(4*tx["RollOff"]*t)**2)
+    num     = np.sin(pi*t*(1-tx["RollOff"])) + 4*tx["RollOff"]*t*np.cos(pi*t*(1+tx["RollOff"]))
     
     # avoiding division by zero
     # 1/ find   where den == 0
@@ -220,10 +218,10 @@ def rrcfir(tx):
     
     # particular values of the RRC
     i0      = np.where(t==0)[0]
-    ipm     = np.where(np.abs(t)==1/4/tx["RoffOff"])[0]
-    h0      = 1 + tx["RoffOff"]*(4/pi - 1)
-    hpm     = tx["RoffOff"]/np.sqrt(2)*((1+2/pi)*np.sin(pi/4/tx["RoffOff"])
-                                     +(1-2/pi)*np.cos(pi/4/tx["RoffOff"]))
+    ipm     = np.where(np.abs(t)==1/4/tx["RollOff"])[0]
+    h0      = 1 + tx["RollOff"]*(4/pi - 1)
+    hpm     = tx["RollOff"]/np.sqrt(2)*((1+2/pi)*np.sin(pi/4/tx["RollOff"])
+                                     +(1-2/pi)*np.cos(pi/4/tx["RollOff"]))
 
     h       = np.insert(h,i0-1,h0)
     h       = np.insert(h,ipm[0],hpm)
@@ -268,12 +266,11 @@ def transmitter(tx,rx):
             tx      = txhw.load_ase(tx)
             tx      = txhw.load_phase_noise(tx)
         
-        
     elif tx["mode"] == "ext":
         tx["Nsamp"] = tx["sig_real"].shape[2]
     
     tx              = misc.sort_dict_by_keys(tx)
     
-    # gen.plot_const_2pol(tx['sig_real'],"tx")
+    # gen.plot_const_2pol(tx['sig_cplx'],"tx")
     return tx
 
