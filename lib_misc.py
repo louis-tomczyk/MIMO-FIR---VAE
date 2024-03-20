@@ -5,8 +5,8 @@
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Arxivs          : 2023-03-04 (1.0.0) - creation
-#   Date            : 2023-03-16 (1.1.0) - cleaning + {string2binary,binary2decimal}
-#   Version         : 1.1.0
+#   Date            : 2023-03-20 (1.1.0) - set_Nsymbols
+#   Version         : 1.0.0
 #   Licence         : cc-by-nc-sa
 #                     Attribution - Non-Commercial - Share Alike 4.0 International
 # 
@@ -46,6 +46,7 @@ from datetime import date
 from datetime import datetime
 import scipy.io as io
 import csv
+import sys
 
 import xml.etree.ElementTree as ET
 from dateutil.parser import parse
@@ -53,7 +54,7 @@ from tkinter import filedialog
 
 
 import lib_general as gen
-import lib_matlab as matlab
+import lib_matlab as mat
 
 pi = np.pi
 
@@ -246,7 +247,6 @@ def compare_dictionnaries(dict1,dict2):
 
     return keys_unequal
 
-   
     
             # ================================================ #
             # ================================================ #
@@ -343,14 +343,23 @@ def linspace(start,end,numel,axis = "col"):
 def create_xml_file(tx,fibre,rx,saving):
     
     sections    = ["TX","CHANNEL","RX"]
-    TX          = ["mod", "Nsps", "Rs","Ntaps",'linewidth',"SNRdB"]
-    CHANNEL     = ["TauPMD", "TauCD", "kind","law"]
-    RX          = ["Nframes", "BatchLen", "frameThetaChange", "NSymbFrame","SNR"]
+    
+    if tx['nu'] != 0:
+        TX          = ["mod","nu","Nsps", "Rs","Ntaps",'dnu',"SNRdB"]
+    else:
+        TX          = ["mod", "Nsps", "Rs","Ntaps",'dnu',"SNRdB"]        
+
+    CHANNEL     = ["PMD", "CD", "kind","law"]
+    RX          = ["mimo",'lr',"Nframes", "BatchLen", "frameThetaChange", "NSymbFrame","SNR"]
     fields_list = [TX, CHANNEL, RX]
     
-    saving_list = ['Rs','mod','linewidth',"SNRdB","TauCD","TauPMD",'kind','law',"NSymbFrame","BatchLen","Ntaps"]
-    CHANNELpar  = [np.round(fibre["TauPMD"]*1e12,0),
-                   fibre["TauCD"],
+    if tx['nu'] != 0:
+        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu',"SNRdB","CD","PMD",'kind','law',"NSymbFrame","BatchLen","Ntaps"]
+    else:
+        saving_list = ["mimo",'lr','Rs','mod','dnu',"SNRdB","CD","PMD",'kind','law',"NSymbFrame","BatchLen","Ntaps"] 
+        
+    CHANNELpar  = [np.round(fibre["PMD"]*1e12,0),
+                   fibre["CD"],
                    fibre["ThetasLaw"]["kind"],
                    fibre["ThetasLaw"]["law"]]
     
@@ -390,25 +399,26 @@ def create_xml_file(tx,fibre,rx,saving):
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['mode']*180/np.pi,0))
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['high']*180/np.pi,0))
 
-            
-    elif fibre["ThetasLaw"]["kind"] == "func":
         
-        if fibre["ThetasLaw"]["law"] == "lin":
-            saving_list.insert(6,'Slope')
-            CHANNEL.append('Slope')            
-            CHANNELpar.append(np.round(fibre["ThetasLaw"]['Slope']*180/np.pi,0))
-            # rx["FrameRndRot"] = 0
+
+    tx["Ntaps"] = 2*tx['NSymbTaps']+1
+
 
     TXpar       = [tx["mod"],
                    tx["Nsps"],
                    int(tx["Rs"]*1e-9),
                    tx["Ntaps"],
-                   int(tx["linewidth"]*1e-3),
+                   int(tx["dnu"]*1e-3),
                    tx["SNRdB"]]
+    
+    if tx["nu"] != 0:
+        TXpar.insert(1, tx['nu'])
     
 
     
-    RXpar       = [rx["Nframes"],
+    RXpar       = [rx['mimo'],
+                   rx['lr']*1000,
+                   rx["Nframes"],
                    rx["BatchLen"],
                    rx["FrameRndRot"],
                    np.round(rx["NSymbFrame"]*1e-3,2),
@@ -551,6 +561,96 @@ def list2vector(input,axis = 'col'):
     return array
 
 
+                        # ================================================ #
+                        # ================================================ #
+                        # ================================================ #
+                        
+def plot_2y_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
+    
+    
+    directory_path = saving["root_path"]
+    # Vérifier si le répertoire existe
+    if not os.path.exists(directory_path):
+        raise FileNotFoundError(f"Le répertoire '{directory_path}' n'existe pas.")
+
+    # Liste des fichiers CSV dans le répertoire
+    csv_files = [file for file in os.listdir(directory_path) if file.endswith(".csv")]
+
+    # Parcourir tous les fichiers CSV dans le répertoire
+    for csv_file in csv_files:
+        csv_path = os.path.join(directory_path, csv_file)
+
+        # Extraire les valeurs des mots-clés du nom du fichier
+        values, keywords = extract_values_from_filename(csv_file)
+
+        # Charger le fichier CSV en utilisant pandas
+        df = pd.read_csv(csv_path)
+
+        # Extraire les données d'itération, de perte (loss) et de SNR
+        iterations  = df[xaxis]
+        loss        = df[yaxis_left]
+        snr         = df[yaxis_right]
+        
+        if len(varargin) == 1:
+            iterations  = iterations[varargin[0]:]
+            loss        = loss[varargin[0]:]
+            snr         = snr[varargin[0]:]
+
+        # Créer la figure
+        fig, ax1 = plt.subplots(figsize=(10, 6.1423))
+
+        # Tracer loss en fonction d'itération sur l'axe gauche
+        ax1.plot(iterations, loss, color='tab:blue',linestyle='dashed',linewidth = 2)
+        ax1.set_xlabel(xaxis)
+        ax1.set_ylabel(yaxis_left   , color='tab:blue')
+        # ax1.set_ylim(-1200, 700)
+        ax1.tick_params(axis='y', labelcolor='tab:blue')
+        
+        # Créer un axe Y droit pour le SNR
+        ax2 = ax1.twinx()
+
+        # Tracer SNR en fonction d'itération sur l'axe droit
+        ax2.plot(iterations, snr, color='tab:red')
+        # ax2.set_ylabel(yaxis_right, color='tab:red')
+        ax2.set_ylabel('$\Delta \Theta$ [deg]', color='tab:red')
+        # ax2.set_ylim(0, 40)
+        ax2.tick_params(axis='y', labelcolor='tab:red')
+        
+        mytext  = ''.join(["{}:{} - ".format(key,values[key]) for key in keywords if key in values])
+        
+        text_lim = 45
+        
+        if len(mytext)>text_lim:
+
+            mytext2 = mytext[text_lim:]
+            mytext  = mytext[:text_lim]
+ 
+            if len(mytext2)>text_lim:
+    
+                mytext3 = mytext2[text_lim+11:]
+                mytext2 = mytext2[:text_lim+11]
+            
+            pos_mytext  = 0.25#len(mytext)/50
+            pos_mytext2 = 0.25#len(mytext2)/50            
+            pos_mytext3 = 0.25#len(mytext3)/50
+            
+        plt.text(0.5-pos_mytext, 1, mytext, fontsize=14, transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext2, 0.95, mytext2, fontsize=14, transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext3, 0.9, mytext3, fontsize=14, transform=plt.gcf().transFigure)
+            
+        # tmp     = len(mytext)/200
+        # plt.text(0.5-tmp, 0.95, mytext, fontsize=14, transform=plt.gcf().transFigure)
+        
+        # Sauvegarder la figure en format image
+        if type(extensions) == list:
+            for extension in extensions:
+                output_file = os.path.splitext(csv_file)[0] + '.'+ extension
+                plt.savefig(output_file, bbox_inches='tight')
+        else:
+            output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
+            plt.savefig(output_file, bbox_inches='tight')
+            
+            
             
             # ================================================ #
             # ================================================ #
@@ -722,25 +822,27 @@ def init_dict():
     saving      = dict()
     flags       = dict()
 
-    for field_name in ["mod","Nsps","Rs","nu","Ntaps",'linewidth']:
+    fibre['ThetasLaw']  = dict()
+    tx["PhiLaw"]        = dict()
+
+    for field_name in ["mod","Nsps","Rs","nu","Ntaps",'dnu']:
         tx[field_name] = 0
         
-    #for field_name in ["channel",'TauPMD','TauCD','phiIQ','theta1','theta_std']:
-    for field_name in ['TauPMD','TauCD','phiIQ']:
+    #for field_name in ["channel",'PMD','CD','phiIQ','theta1','theta_std']:
+    for field_name in ['PMD','CD','phiIQ']:
         fibre[field_name] = 0
     
-    fibre['ThetasLaw'] = {}
         
     for field_name in ["SNRdB","BatchLen","N_lrhalf","Nframes","FrameRndRot","Nmax_SymbFrame","mimo"]:
         rx[field_name] = 0
         
     rx["Frame"]             = 0
-    tx["RoffOff"]           = 0.1                   # roll-off factor
+    tx["RollOff"]           = 0.1                   # roll-off factor
     tx["Nsps"]              = 2                     # oversampling factor (Shannon Coefficient) in samples per symbol
     tx["nu"]                = 0                     # [0] [0.0270955] [0.0872449] [0.1222578]
     rx["N_lrhalf"]          = 170
 
-    saving['root_path'] = matlab.PWD(show = False)
+    saving['root_path'] = mat.PWD(show = False)
     saving['merge_path']= saving['root_path']+'/data-'+str(date.today())
 
     tx      = sort_dict_by_keys(tx)
@@ -873,4 +975,104 @@ def binary_to_decimal(binary_string):
             decimal_number += 2 ** power
         power -= 1
     return decimal_number
+
+            # ================================================ #
+            # ================================================ #
+            # ================================================ #
+
+def set_Nsymbols(tx,fibre,rx):
+
+    rx["NSymbFrame"]        = int(fibre['DeltaThetaC']**2/4*tx['Rs']/fibre['fpol'])   # number of symbols having the same polarisation state
+    rx["BatchLen"]          = int(tx['DeltaPhiC']**2/4*tx['Rs']/tx['dnu'])         # number of symbols having more or less the same phase
+    
+    tx['NSymbFrame']        = rx["NSymbFrame"]
+    tx["Nconv"]             = rx["NSymbFrame"]+tx["Ntaps"]+1
+    tx["Nsamp_up"]          = tx["Nsps"]*(tx["Nconv"]-1)+1
+    tx["Nsamp_gross"]       = tx["Nsamp_up"]-(tx["Ntaps"]-1)
+    
+    flag = 0
+    
+    if "SymbScale" not in rx:
+        flag            = flag + 10
+        rx["SymbScale"] = 100
+    
+
+    if rx["BatchLen"] > rx["NSymbFrame"]:
+         sys.exit("ERROR --- BatchLen > NSymbFrame")
+         
+         
+         
+    if rx["BatchLen"] > 1000:
+         print('WARNING --- BatchLen = {}> 1,000'.format(rx['BatchLen']))
+    
+    
+    
+    if rx['BatchLen']%5 != 0:
+        flag            = flag +1
+        NsymbAdded      = 5-rx['BatchLen']%5
+        rx['BatchLen']  = int(rx['BatchLen'] + NsymbAdded)
+        
+        print('Nphi = BatchLen = {}'.format(rx["BatchLen"]))
+        
+        
+        
+    if rx['NSymbFrame']%rx["BatchLen"] != 0:
+        print('WARNING --- NSymbFrame % BatchLen = {} != 0'.format(rx['NSymbFrame']%rx["BatchLen"]))  
+
+        flag                = flag +1
+        NsymbRemoved        = rx['NSymbFrame']%rx["BatchLen"]
+        rx['NSymbFrame']    = int(rx['NSymbFrame'] - NsymbRemoved)
+
+        print('Npol = NsymbFrame = {}'.format(rx["NSymbFrame"]))
+        
+        
+        
+    if rx["NSymbFrame"] > 5e4:
+        print('WARNING --- NSymbFrame = {} > 50,000'.format(rx['NSymbFrame']))  
+ 
+        flag                = flag +1        
+        rx["NSymbFrame"]    = int(rx["NSymbFrame"]/rx["SymbScale"])
+        rx['BatchLen']      = int(rx['BatchLen']/rx["SymbScale"])
+        
+        print('Npol = NsymbFrame = {}'.format(rx["NSymbFrame"]))
+        print('Nphi = BatchLen = {}'.format(rx["BatchLen"]))
+        
+        
+
+    if rx['NSymbFrame']%100 != 0:
+        print('WARNING --- NSymbFrame%100 = {} != 0'.format(rx['NSymbFrame']%100))
+        
+        flag                = flag +1
+        NsymbAdded          = 100-rx['NSymbFrame']%100
+        rx['NSymbFrame']    = int(rx['NSymbFrame'] + NsymbAdded)
+        
+        print('Npol = NsymbFrame = {}'.format(rx["NSymbFrame"]))     
+        
+        
+        
+    if rx['NSymbFrame']%rx["BatchLen"] != 0:
+        print('WARNING --- NSymbFrame%100 = {} != 0'.format(rx['NSymbFrame']%100))
+        
+        flag                = flag +1
+        NsymbRemoved        = rx['NSymbFrame']%rx["BatchLen"]
+        rx['NSymbFrame']    = int(rx['NSymbFrame'] - NsymbRemoved)
+        
+        print('Npol = NsymbFrame = {}'.format(rx["NSymbFrame"]))
+        
+    if flag != 0:
+        tx['dnu']       = int(tx['DeltaPhiC']**2 * tx['Rs']/4/rx["BatchLen"]/rx["SymbScale"])
+        fibre['fpol']   = int(fibre['DeltaThetaC']**2 * tx['Rs']/4/rx["NSymbFrame"]/rx["SymbScale"])
+        
+        print('\n\n\n\n\n\n\n set-Nsymbols sum up:')
+        print('symb scale           = {}'.format(rx["SymbScale"]))
+        print('Npol = NsymbFrame    = {}'.format(rx["NSymbFrame"]))
+        print('Nphi = BatchLen      = {}'.format(rx["BatchLen"]))
+        print('Npol/Nphi            = {}'.format(rx["NSymbFrame"]/rx["BatchLen"]))
+        print("fpol                 = {}".format(fibre['fpol']))
+        print('dnu                  = {}'.format(tx['dnu']))
+        print('\n'*3)
+
+              
+    return tx,fibre,rx
+
 
