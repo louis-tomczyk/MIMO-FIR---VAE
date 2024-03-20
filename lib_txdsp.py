@@ -5,7 +5,8 @@
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Arxivs          : 2023-03-04 (1.0.0) - creation
-#   Date            : 2023-03-16 (1.0.1) - cleaning
+#                     2023-03-16 (1.0.1) - cleaning
+#   Date            : 2023-03-16 (1.0.2) - cleaning
 #   Version         : 1.0.1
 #   Licence         : cc-by-nc-sa
 #                     Attribution - Non-Commercial - Share Alike 4.0 International
@@ -151,10 +152,10 @@ def data_generation(tx,rx):
     #   ]
 
     #1 data arrays parameters
-    # Nconv = NSymbFrame + some extra symbols necessary for
-    # edges management
-    tx["Nconv"]     = rx["NSymbFrame"]+tx["Ntaps"]+1
-    tx["Nsamp_up"]  = tx["Nsps"]*(tx["Nconv"]-1)+1
+    # # Nconv = NSymbFrame + some extra symbols necessary for
+    # # edges management
+    # tx["Nconv"]     = rx["NSymbFrame"]+tx["Ntaps"]+1
+    # tx["Nsamp_up"]  = tx["Nsps"]*(tx["Nconv"]-1)+1
     
     #2 data generation
     # draw randomly amplitude values from AMPS using the law 
@@ -163,7 +164,7 @@ def data_generation(tx,rx):
     
     data            = np.random.default_rng().choice(tx["amps"],
                                                      (2*tx["Npolars"],tx["Nconv"]),
-                                                     p=tx["prob_amps"])
+                                                     p=np.round(tx["prob_amps"],5))
     data_I          = data[0::tx["Npolars"],:] # skip using '::<number of rows to skip>
     data_Q          = data[1::tx["Npolars"],:]
 
@@ -240,17 +241,18 @@ def rrcfir(tx):
 # ============================================================================================ #
 def data_shaping(tx):
 
-    # The "valid" mode for convolution already shrinks the length
-    tx["Nsamp_rx_tmp"]  = tx["Nsamp_up"]-(tx["Ntaps"]-1) # = 10,377-13+1=10,365
+    # # The "valid" mode for convolution already shrinks the length
+    # tx["Nsamp_gross"]  = tx["Nsamp_up"]-(tx["Ntaps"]-1) # = 10,377-13+1=10,365
 
     # 0 == pol H ------- 1 == pol V
-    tx["sig_cplx"]      = np.zeros((tx["Npolars"],tx["Nsamp_rx_tmp"] ),dtype=np.complex128)
+    tx["sig_cplx"]      = np.zeros((tx["Npolars"],tx["Nsamp_gross"] ),dtype=np.complex128)
     tx["sig_cplx"][0,:] = np.convolve(tx["sig_cplx_up"][0,:], tx["h_pulse"], mode = 'valid')
     tx["sig_cplx"][1,:] = np.convolve(tx["sig_cplx_up"][1,:], tx["h_pulse"], mode = 'valid')
 
     tx                  = misc.sort_dict_by_keys(tx)
     
     return tx
+
 
 # ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------
@@ -261,16 +263,21 @@ def transmitter(tx,rx):
         tx          = rrcfir(tx)
         tx          = data_shaping(tx)
         
+            
         if rx["Frame"] == rx["FrameRndRot"]:
             print('loading ASE and Phase Noise at TX\n')
             tx      = txhw.load_ase(tx)
-            tx      = txhw.load_phase_noise(tx)
+            tx      = txhw.load_phase_noise(tx,rx)
         
     elif tx["mode"] == "ext":
         tx["Nsamp"] = tx["sig_real"].shape[2]
     
     tx              = misc.sort_dict_by_keys(tx)
     
-    # gen.plot_const_2pol(tx['sig_cplx'],"tx")
+    # if rx['Frame'] == 0:
+    #     import time
+    #     gen.plot_const_2pol(tx['sig_cplx'],"tx")
+    #     time.sleep(5)
+    #     plt.show()
     return tx
 
