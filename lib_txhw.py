@@ -4,9 +4,9 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          :
-#   Date            : 2023-03-04
-#   Version         : 1.0.0
+#   Arxivs          : 2023-03-04 (1.0.0) - creation
+#   Date            : 2023-03-20 (1.1.0) - gen_phase_noise
+#   Version         : 1.1.0
 #   Licence         : cc-by-nc-sa
 #                     Attribution - Non-Commercial - Share Alike 4.0 International
 # 
@@ -56,8 +56,10 @@ def load_ase(tx):
     tx["P_tx_noise"]= tx["P_tx_sig"]/2/SNR
     sigma_n         = np.sqrt(tx["P_tx_noise"]*tx["Nsps"])
     
-    randn_I         = np.random.randn(tx["Npolars"],tx["Nsamp_rx_tmp"])
-    randn_Q         = np.random.randn(tx["Npolars"],tx["Nsamp_rx_tmp"])
+    randn_I         = np.random.randn(tx["Npolars"],tx["Nsamp_gross"])
+    randn_Q         = np.random.randn(tx["Npolars"],tx["Nsamp_gross"])
+    
+    
     randn_IQ        = randn_I+1j*randn_Q
     Noise           = sigma_n*randn_IQ    
     tx["sig_cplx"]  = tx["sig_cplx"] + Noise
@@ -65,28 +67,29 @@ def load_ase(tx):
     # misc.plot_const_1pol(tx["sig_cplx"][0],'ase laoding')
     
     # conversion into desired sizes : we remove the excess symbols
-    THI             = np.real(tx["sig_cplx"][0][:tx["Nsamp_rx_tmp"]])
-    THQ             = np.imag(tx["sig_cplx"][0][:tx["Nsamp_rx_tmp"]])
-    TVI             = np.real(tx["sig_cplx"][1][:tx["Nsamp_rx_tmp"]])
-    TVQ             = np.imag(tx["sig_cplx"][1][:tx["Nsamp_rx_tmp"]])
+    # THI             = np.real(tx["sig_cplx"][0][:tx["Nsamp_net"]])
+    # THQ             = np.imag(tx["sig_cplx"][0][:tx["Nsamp_net"]])
+    # TVI             = np.real(tx["sig_cplx"][1][:tx["Nsamp_net"]])
+    # TVQ             = np.imag(tx["sig_cplx"][1][:tx["Nsamp_net"]])
+    
+    THI             = np.real(tx["sig_cplx"][0][:tx["Nsamp_gross"]])
+    THQ             = np.imag(tx["sig_cplx"][0][:tx["Nsamp_gross"]])
+    TVI             = np.real(tx["sig_cplx"][1][:tx["Nsamp_gross"]])
+    TVQ             = np.imag(tx["sig_cplx"][1][:tx["Nsamp_gross"]])
     
     tx["sig_real"]  = misc.my_tensor(np.array([[THI,THQ],[TVI,TVQ]]))
     
     return tx
 
+#%%
 # =============================================================================
-# rx_load_ase
 # =============================================================================
 
-def load_phase_noise(tx):
+def load_phase_noise(tx,rx):
 
-    tx['VAR_Phase']     = np.sqrt(2*np.pi*tx['linewidth']/tx['fs'])
-    tx['PhaseNoise']    = np.zeros((2,tx['Nsamp_rx_tmp'])) 
-    
-    noise_tmp               = np.random.normal(0,tx['VAR_Phase'],tx['Nsamp_rx_tmp'])
-    tx['PhaseNoise'][0,:]   = np.cumsum(noise_tmp)
-    tx['PhaseNoise'][1,:]   = np.cumsum(noise_tmp)
-    tx["sig_cplx"]          = np.multiply(tx["sig_cplx"],np.exp(1j*2*np.pi*tx['PhaseNoise']))
+        
+    tx["DeltaPhi"]  = np.diff(tx["PhaseNoise"])    
+    tx["sig_cplx"]  = np.multiply(tx["sig_cplx"],np.exp(1j*2*np.pi*tx['PhaseNoise'][:,:,rx['Frame']]))
 
     
     # plt.figure()
@@ -94,12 +97,52 @@ def load_phase_noise(tx):
     # plt.plot(tx['PhaseNoise'][1])
     # misc.plot_const_2pol(tx["sig_cplx"],'phase noise laoding')
     
-    # conversion into desired sizes : we remove the excess symbols
-    THI             = np.real(tx["sig_cplx"][0][:tx["Nsamp_rx_tmp"]])
-    THQ             = np.imag(tx["sig_cplx"][0][:tx["Nsamp_rx_tmp"]])
-    TVI             = np.real(tx["sig_cplx"][1][:tx["Nsamp_rx_tmp"]])
-    TVQ             = np.imag(tx["sig_cplx"][1][:tx["Nsamp_rx_tmp"]])
+
+    
+    THI             = np.real(tx["sig_cplx"][0][:tx["Nsamp_gross"]])
+    THQ             = np.imag(tx["sig_cplx"][0][:tx["Nsamp_gross"]])
+    TVI             = np.real(tx["sig_cplx"][1][:tx["Nsamp_gross"]])
+    TVQ             = np.imag(tx["sig_cplx"][1][:tx["Nsamp_gross"]])
     
     tx["sig_real"]  = misc.my_tensor(np.array([[THI,THQ],[TVI,TVQ]]))
+    tx              = misc.sort_dict_by_keys(tx)
     
+    return tx
+
+
+
+#%%
+# =============================================================================
+# =============================================================================
+def gen_phase_noise(tx,rx):
+    
+    if 'PhiLaw' not in tx:
+        tx["PhiLaw"] = dict()
+
+    if "kind" not in tx["PhiLaw"]:
+        tx["PhiLaw"]["kind"]    = "Rwalk"
+        tx["PhiLaw"]["law"]     = "linewidth"
+        
+    tx["PhaseNoise"]            = np.zeros((2,tx["Nsamp_gross"], rx['Nframes']))
+    
+    for k in range(rx['FrameRndRot'],rx['Nframes']):
+        
+        if tx["PhiLaw"]['kind']         == 'Rwalk':
+            if tx["PhiLaw"]["law"]      == "linewidth":
+                tx['VAR_Phase']         = np.sqrt(2*np.pi*tx['dnu']/tx['fs'])
+                
+                noise_tmp               = np.random.normal(0,tx['VAR_Phase'],tx["Nsamp_gross"])    
+                tx['PhaseNoise'][0,:,k] = np.cumsum(noise_tmp)
+                tx['PhaseNoise'][1,:,k] = np.cumsum(noise_tmp)
+        else:
+            if tx["PhiLaw"]["law"]      == "lin":
+                PhiStart                = tx["PhiLaw"]["Start"]
+                PhiEnd                  = tx["PhiLaw"]["End"]
+                tx["PhiLaw"]["slope"]   = (PhiEnd-PhiStart)/tx["Nsamp_gross"]
+                tx["PhaseNoise"][0,:,k] = np.linspace(PhiStart,PhiEnd,tx["Nsamp_gross"])
+                tx["PhaseNoise"][1,:,k] = np.linspace(PhiStart,PhiEnd,tx["Nsamp_gross"])
+    
+    
+    
+    tx                          = misc.sort_dict_by_keys(tx)
     return tx
