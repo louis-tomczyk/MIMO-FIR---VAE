@@ -4,11 +4,15 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          :
-#   Date            : 2023-03-04
-#   Version         : 1.0.0
-#   Licence         : cc-by-nc-sa
-#                     Attribution - Non-Commercial - Share Alike 4.0 International
+#   Arxivs          : 2021-09-29 (1.0.0)
+#                   : 2023-08-17 (1.0.1)
+#                   : 2024-04-24 (1.0.2)
+#   Date            : 2024-04-24 (1.1.0)    [NEW] numel
+#   Version         : 1.1.0
+#   Licence         : GNU GPLv2
+#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CANNOT: sublicense - hold liable
+#                       MUST:   include original - disclose source - include copyright - state changes - include license
 # 
 # ----- Main idea -----
 # ----- INPUTS -----
@@ -32,45 +36,55 @@
 #   Type                :
 #   Web Address         :
 # ---------------------------------------------
-# %%
 
 
+
+#%% ===========================================================================
+# --- LIBRARIES ---
+# =============================================================================
 import os
 import pwd
 import stat
 import sys
+import inspect
 from datetime import datetime
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 
+#%% ===========================================================================
+# --- CONTENTS
+# =============================================================================
+# - cd
+# - clc
+# - clear_all
+# - imagesc
+# - inputname
+# - linspace
+# - ls_l
+# - numel           (1.1.0)
+# - PWD
+# - repmat
+# =============================================================================
 
-            # ================================================ #
-            # ================================================ #
-            # ================================================ #
 
-def PWD(show = True):
-    if show == True:
-        print(os.getcwd())
-    return os.getcwd()
-    
-            # ================================================ #
-            # ================================================ #
-            # ================================================ #
-            
+#%% ===========================================================================
+# --- FUNCTIONS ---
+# =============================================================================
+
+
+#%%
 def cd(path):
     return os.chdir(path)
 
-            # ================================================ #
-            # ================================================ #
-            # ================================================ #
+#%%
 
 # CHATGPT
 def clc():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-            # ================================================ #
-            # ================================================ #
-            # ================================================ #
+#%%
 
 # CHATGPT
 def clear_all():
@@ -84,10 +98,40 @@ def clear_all():
             del main_vars[var_name]
 
 
+#%%
 
-            # ================================================ #
-            # ================================================ #
-            # ================================================ #
+# CHATGPT
+def imagesc(matrix, cmap='viridis', interpolation='nearest', origin='upper', aspect='auto'):
+    plt.imshow(matrix, cmap=cmap, interpolation=interpolation, origin=origin, aspect=aspect)
+    plt.colorbar()
+    plt.show()
+
+
+#%%
+
+def inputname(var):
+    current_frame = inspect.currentframe()
+    caller_frame = inspect.getouterframes(current_frame)[1]
+    caller_locals = caller_frame.frame.f_locals
+    
+    for name, value in caller_locals.items():
+        if id(value) == id(var):
+            return name
+    
+    return None
+
+
+#%%
+def linspace(start,end,numel,axis = "col"):
+
+    array = np.linspace(start,end,numel)
+    array = array[:,np.newaxis]
+    if axis != "col":
+        array = array.transpose()
+    
+    return array
+
+#%%
 
 # CHATGPT
 def ls_l(path="."):
@@ -103,6 +147,28 @@ def ls_l(path="."):
         
         print(f"{permissions} {owner} {size} {modification_time} {file}")
 
-            # ================================================ #
-            # ================================================ #
-            # ================================================ #
+
+
+#%%
+def numel(x):
+    numel   = 1
+    shape   = np.shape(x)
+
+    for k in range(len(shape)):
+        numel = numel*shape[k]
+
+    return numel
+
+
+#%%
+
+def PWD(show = True):
+    if show == True:
+        print(os.getcwd())
+    return os.getcwd()
+
+
+#%%
+def repmat(input,shape):
+    
+    return np.tile(input,[int(shape[k]) for k in range(len(shape))])
