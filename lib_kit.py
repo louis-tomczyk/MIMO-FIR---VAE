@@ -7,7 +7,7 @@
 #   Arxivs          : 2024-03-04 (1.0.0) - creation
 #                   : 2024-04-01 (1.1.0) - cleaning
 #   Date            : 2024-05-22 (1.1.1) - CMA --- use of numpy instead of torch, saves memory & time
-#   Version         : 1.1.0
+#   Version         : 1.1.1
 #   Licence         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
