@@ -1,45 +1,64 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : louis tomczyk
+#   Author          : Louis Tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2024-03-04 (1.0.0)    creation
-#                   : 2024-04-01 (1.1.1)    [NEW] plot_fir
-#                   : 2024-04-03 (1.2.0)    plot_const_2pol
-#                                           [NEW] show_fir_central_tap
-#                   : 2024-04-07 (1.2.1)    plot_const_1d, plot_const_2d
-#                   : 2024-05-21 (1.3.0)    [NEW] plot_decisions, plot_xcorr_2x2
-#                   : 2024-05-21 (1.3.1)    plot_loss_cma --- y = -y if mean(y[0:10])<0
-#                   : 2024-05-24 (1.4.0)    plot_const_1pol --- cplx to real processing
-#                                           [NEW] plot_const_2pol_2sig
-#   Date            : 2024-05-24 (1.4.1)    plot_const_2pol_2sig, plot_const_1/2pol (Npoints max)
-#   Version         : 1.4.1
-#   Licence         : GNU GPLv2
+#   Version         : 1.5.0
+#   Date            : 2024-06-06
+#   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
-#
+
+# ----- CHANGELOG -----
+#   1.0.0 (2024-03-04) - creation
+#   1.1.1 (2024-04-01) - [NEW] plot_fir
+#   1.2.0 (2024-04-03) - plot_const_2pol
+#                      - [NEW] show_fir_central_tap
+#   1.2.1 (2024-04-07) - plot_const_1d, plot_const_2d
+#   1.3.0 (2024-05-21) - [NEW] plot_decisions, plot_xcorr_2x2
+#   1.3.1 (2024-05-21) - plot_loss_cma --- y = -y if mean(y[0:10])<0
+#   1.4.0 (2024-05-24) - plot_const_1pol --- cplx to real processing
+#                      - [NEW] plot_const_2pol_2sig
+#   1.4.1 (2024-05-24) - plot_const_2pol_2sig, plot_const_1/2pol (Npoints max)
+#   1.5.0 (2024-06-06) - Naps -> NsampTaps, plot_const_1/2pol
+#                      - [REMOVED] plot_const_1/2pol(_2sig), plot_phases
+#                      - [NEW] plot_constellations, to replace the removed ones
+
+# ----- MAIN IDEA -----
+#   Library for plotting functions in (optical) telecommunications
+
 # ----- BIBLIOGRAPHY -----
-#   Articles/Books
-#   Authors             :
-#   Title               :
-#   Jounal/Editor       :
-#   Volume - N°         :
-#   Date                :
-#   DOI/ISBN            :
-#   Pages               :
-#  ----------------------
-#   Functions           :
-#   Author              :
-#   Author contact      :
-#   Affiliation         :
-#   Date                :
-#   Title of program    :
-#   Code version        :
-#   Type                :
-#   Web Address         :
+#   Articles/Books:
+#   Authors             : 
+#   Title               : 
+#   Journal/Editor      : 
+#   Volume - N°         : 
+#   Date                : 
+#   DOI/ISBN            : 
+#   Pages               : 
+
+#   Functions:
+#   [C1] Author         : Vincent Lauinger
+#       Contact         : vincent.lauinger@kit.edu
+#       Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#       Date            : 2022-06-15
+#       Program Title   : 
+#       Code Version    : 
+#       Type            : Source code
+#       Web Address     : https://github.com/kit-cel/vae-equalizer
+
+#   [C2] Authors        : Jingtian Liu, Élie Awwad, Louis Tomczyk
+#       Contact         : elie.awwad@telecom-paris.fr
+#       Affiliation     : Télécom Paris, COMELEC, GTO
+#       Date            : 2024-04-27
+#       Program Title   : 
+#       Code Version    : 3.0
+#       Type            : Source code
+#       Web Address     : 
 # ---------------------------------------------
+
 
 #%% =============================================================================
 # --- CONTENTS ---
@@ -67,6 +86,7 @@ import numpy as np
 import torch
 import lib_misc as misc
 import lib_matlab as mb
+
 
 pi                              = np.pi
 fig_width                       = 10
@@ -96,8 +116,8 @@ def fir_2Dto3D(rx):
         fir = rx
     
     # if len(fir.shape)
-    Ntaps       = len(fir.transpose())
-    tmp         = np.zeros((2,2,Ntaps),dtype = complex)
+    NsampTaps       = len(fir.transpose())
+    tmp         = np.zeros((2,2,NsampTaps),dtype = complex)
     
     tmp[0,0,:]    = fir[0,:] # HH
     tmp[0,1,:]    = fir[1,:] # VH
@@ -118,8 +138,8 @@ def fir_3Dto2D(rx):
         fir         = fir.detach().numpy()
     
     fir_shape   = fir.shape
-    Ntaps       = fir_shape[-1]
-    tmp         = np.zeros(4,Ntaps)
+    NsampTaps       = fir_shape[-1]
+    tmp         = np.zeros(4,NsampTaps)
     
     tmp[0,:]    = fir[0,0,:]
     tmp[1,:]    = fir[0,1,:]
@@ -128,244 +148,104 @@ def fir_3Dto2D(rx):
     
     return tmp
 
-
-
-#%%
-
-def plot_const_1pol(sig,norm = 0,*varargin):
-
-    if type(sig) == torch.Tensor:
-        sig = sig.detach().numpy()
+#%% plot_const_2pol + plot_const_2pol + plot_const_2pol_2sig + ChatGPT
+def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', title = ''):
+    def process_signal(sig):
+        if type(sig) == torch.Tensor:
+            sig = sig.detach().numpy()
+            
+        if np.isrealobj(sig) == 0:
+            polHI = np.real(sig[0]).flatten()
+            polHQ = np.imag(sig[0]).flatten()
+            polVI = np.real(sig[1]).flatten() if len(sig) > 1 else None
+            polVQ = np.imag(sig[1]).flatten() if len(sig) > 1 else None
+        else:
+            if sig.shape[0] != 2:
+                polHI = sig[0].flatten()
+                polHQ = sig[1].flatten()
+                polVI = sig[2].flatten() if sig.shape[0] > 2 else None
+                polVQ = sig[3].flatten() if sig.shape[0] > 2 else None
+            else:
+                polHI = sig[0][0].flatten()
+                polHQ = sig[0][1].flatten()
+                polVI = sig[1][0].flatten() if sig.shape[0] > 1 else None
+                polVQ = sig[1][1].flatten() if sig.shape[0] > 1 else None
+        return polHI, polHQ, polVI, polVQ       
         
-    # should be kept if SIG is not at 1 sample per symbol
-    Nsps    = 2
-    Nmax    = int(5e3)
-    
-    if np.isrealobj(sig) == 0:
-        polHI   = np.real(sig[0::Nsps])
-        polHQ   = np.imag(sig[0::Nsps])
 
-    else:
-        polHI   = sig[0]
-        polHQ   = sig[1]
-        polVI   = sig[2]
-        polVQ   = sig[3]
+    def truncate_and_normalize(polHI, polHQ, polVI, polVQ):
+        Nmax = int(5e3)
+        if polHI is not None and len(polHI) > Nmax:
+            polHI = polHI[:Nmax]
+            polHQ = polHQ[:Nmax]
+            if polVI is not None:
+                polVI = polVI[:Nmax]
+                polVQ = polVQ[:Nmax]
 
-    if norm == 1:
-        M1HI         = np.mean(abs(polHI)**2)
-        M1HQ         = np.mean(abs(polHQ)**2)
-    
-        MMM         = np.sqrt(max([M1HI,M1HQ]))
-    else:
-        MMM         = 1
+        if norm == 1:
+            M1HI = np.mean(abs(polHI)**2)
+            M1HQ = np.mean(abs(polHQ)**2)
+            M1VI = np.mean(abs(polVI)**2) if polVI is not None else 0
+            M1VQ = np.mean(abs(polVQ)**2) if polVQ is not None else 0
+            MMM = np.sqrt(max([M1HI, M1HQ, M1VI, M1VQ]))
+        else:
+            MMM = 1
 
-    polHInorm   = polHI/MMM
-    polHQnorm   = polHQ/MMM
+        polHInorm = polHI / MMM
+        polHQnorm = polHQ / MMM
+        polVInorm = polVI / MMM if polVI is not None else None
+        polVQnorm = polVQ / MMM if polVQ is not None else None
+        return polHInorm, polHQnorm, polVInorm, polVQnorm
+
+    def plot_subplot(polar, polHInorm, polHQnorm, polVInorm, polVQnorm, color, label):
+        fontsize = 12
+        if polar.lower() == 'h' or polar.lower() == 'both':
+            plt.subplot(1, 2, 1)
+            plt.scatter(polHInorm[0::sps], polHQnorm[0::sps], c=color, label=label)
+            plt.xlabel("In Phase", fontsize=fontsize)
+            plt.ylabel("Quadrature", fontsize=fontsize)
+            if title.lower != '':
+                plt.title('polH ' + title, fontsize=fontsize)
+            plt.gca().set_aspect('equal', adjustable='box')
+
+        if (polar.lower() == 'v' or polar.lower() == 'both') and polVInorm is not None and polVQnorm is not None:
+            if polar == 'both':
+                plt.subplot(1, 2, 2)
+            else:
+                plt.subplot(1, 1, 1)
+            plt.scatter(polVInorm[0::sps], polVQnorm[0::sps], c=color, label=label)
+            plt.xlabel("In Phase", fontsize=fontsize)
+            plt.ylabel("Quadrature", fontsize=fontsize)
+            if title.lower != '':
+                plt.title('polV ' + title, fontsize=fontsize)
+            plt.gca().set_aspect('equal', adjustable='box')
+
+    sig1_data = process_signal(sig1)
+    sig2_data = process_signal(sig2) if sig2 is not None else (None, None, None, None)
+
+    pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm = truncate_and_normalize(*sig1_data)
+    pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm = truncate_and_normalize(*sig2_data) if sig2 is not None else (None, None, None, None)
 
     plt.figure()
 
-    plt.scatter(polHInorm[0::Nsps], polHQnorm[0::Nsps],c='black')
-    # plt.xlim(-2.5, 2.5)
-    # plt.ylim(-2.5, 2.5)
-    plt.xlabel("in phase")
-    plt.ylabel("quadrature")
-    
-    if len(varargin) == 1:
-        plt.title('polH ' + varargin[0])
-        
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.show()
-        
-    
-#%%
-def plot_const_2pol(sig,norm = 0,*varargin):
-    
-    if type(sig) == torch.Tensor:
-        sig = sig.detach().numpy()
-        
-        
-    # should be kept if SIG is not at 1 sample per symbol
-    Nsps    = 2
-    Nmax    = int(5e3)
-    
-    if np.isrealobj(sig) == 0:
-        polHI   = np.real(sig[0])
-        polHQ   = np.imag(sig[0])
-        polVI   = np.real(sig[1])
-        polVQ   = np.imag(sig[1])
-
+    if polar.lower() == 'both':
+        plt.subplot(1, 2, 1)
     else:
-        polHI   = sig[0]
-        polHQ   = sig[1]
-        polVI   = sig[2]
-        polVQ   = sig[3]
-        
-    if norm == 1:
-        M1HI         = np.mean(abs(polHI)**2)
-        M1HQ         = np.mean(abs(polHQ)**2)
-        M1VI         = np.mean(abs(polVI)**2)
-        M1VQ         = np.mean(abs(polVQ)**2)
-    
-        MMM         = np.sqrt(max([M1HI,M1HQ,M1VI,M1VQ]))
-    else:
-        MMM         = 1
-        
-    if mb.numel(polHI)>Nmax:
-        polHI = polHI[0:Nmax]
-        polHQ = polHQ[0:Nmax]
-        polVI = polVI[0:Nmax]
-        polVQ = polVQ[0:Nmax]
+        plt.subplot(1, 1, 1)
 
-    polHInorm   = polHI/MMM
-    polHQnorm   = polHQ/MMM
-    polVInorm   = polVI/MMM
-    polVQnorm   = polVQ/MMM
+    plot_subplot(polar, pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm, 'black', labels[0] if labels else None)
 
-    plt.figure()
-    
-    ### ------- SUBPLOT 1
-    plt.subplot(1,2,1)
-    plt.scatter(polHInorm[0::Nsps], polHQnorm[0::Nsps],c='black')
-    
-    # if len(varargin) == 2:
-    #     if varargin[1]['mod'].lower() == "64qam":
-    #         plt.xlim(-2.5,2.5)
-    #         plt.ylim(-2.5,2.5)
-    #     else:
-    #         plt.xlim(-2.5, 2.5)
-    #         plt.ylim(-2.5, 2.5)
-    # else:
-    #     plt.xlim(-2.5, 2.5)
-    #     plt.ylim(-2.5, 2.5)
-        
-    plt.xlabel("in phase")
-    plt.ylabel("quadrature")
-    
-    if len(varargin) !=0:
-        plt.title('polH ' + varargin[0])
-    plt.gca().set_aspect('equal', adjustable='box')
-        
-    ### ------- SUBPLOT 2
-    plt.subplot(1,2,2)
-    plt.scatter(polVInorm[0::Nsps], polVQnorm[0::Nsps],c='black')
-    
-    # if len(varargin) == 2:
-    #     if varargin[1]['mod'].lower() == "64qam":
-    #         plt.xlim(-2.5,2.5)
-    #         plt.ylim(-2.5,2.5)
-    #     else:
-    #         plt.xlim(-2.5, 2.5)
-    #         plt.ylim(-2.5, 2.5)
-    # else:
-    #     plt.xlim(-2.5, 2.5)
-    #     plt.ylim(-2.5, 2.5)
-        
-    plt.xlabel("in phase")
-    
-    if len(varargin) != 0:
-        plt.title('polV '+varargin[0])
-    plt.gca().set_aspect('equal', adjustable='box')
-
-    plt.show()
-    
-#%%
-def plot_const_2pol_2sig(sig1,sig2,labels,norm = 0,*varargin):
-
-    if type(sig1) == torch.Tensor:
-        sig1 = sig1.detach().numpy()
-
-    if type(sig2) == torch.Tensor:
-        sig2 = sig2.detach().numpy()
-
-    
-    # should be kept if SIG is not at 1 sample per symbol
-    Nsps    = 2
-    Nmax    = int(5e3)
-    
-    if np.isrealobj(sig1) == 0:
-        pol1HI   = np.real(sig1[0]).flatten()
-        pol1HQ   = np.imag(sig1[0]).flatten()
-        pol1VI   = np.real(sig1[1]).flatten()
-        pol1VQ   = np.imag(sig1[1]).flatten()
-
-    else:
-        pol1HI   = sig1[0].flatten()
-        pol1HQ   = sig1[1].flatten()
-        pol1VI   = sig1[2].flatten()
-        pol1VQ   = sig1[3].flatten()
-        
-    if np.isrealobj(sig2) == 0:
-        pol2HI   = np.real(sig2[0]).flatten()
-        pol2HQ   = np.imag(sig2[0]).flatten()
-        pol2VI   = np.real(sig2[1]).flatten()
-        pol2VQ   = np.imag(sig2[1]).flatten()
-
-    else:
-        pol2HI   = sig2[0].flatten()
-        pol2HQ   = sig2[1].flatten()
-        pol2VI   = sig2[2].flatten()
-        pol2VQ   = sig2[3].flatten()
-        
-    if mb.numel(pol1HI)>Nmax:
-        pol1HI = pol1HI[0:Nmax]
-        pol1HQ = pol1HQ[0:Nmax]
-        pol1VI = pol1VI[0:Nmax]
-        pol1VQ = pol1VQ[0:Nmax]
-
-        pol2HI = pol2HI[0:Nmax]
-        pol2HQ = pol2HQ[0:Nmax]
-        pol2VI = pol2VI[0:Nmax]
-        pol2VQ = pol2VQ[0:Nmax]
-
-    if norm == 1:
-        M1HI         = np.mean(abs(pol1HI)**2)
-        M1HQ         = np.mean(abs(pol1HQ)**2)
-        M1VI         = np.mean(abs(pol1VI)**2)
-        M1VQ         = np.mean(abs(pol1VQ)**2)
-    
-        MMM         = np.sqrt(max([M1HI,M1HQ,M1VI,M1VQ]))
-    else:
-        MMM         = 1
-
-    pol1HInorm   = pol1HI/MMM
-    pol1HQnorm   = pol1HQ/MMM
-    pol1VInorm   = pol1VI/MMM
-    pol1VQnorm   = pol1VQ/MMM
-
-    pol2HInorm   = pol2HI/MMM
-    pol2HQnorm   = pol2HQ/MMM
-    pol2VInorm   = pol2VI/MMM
-    pol2VQnorm   = pol2VQ/MMM
-
-    plt.figure()
-
-    ### ------- SUBPLOT 1
-    plt.subplot(1,2,1)
-    plt.scatter(pol1HInorm[0::Nsps], pol1HQnorm[0::Nsps],c='black',label=labels[0])
-    plt.scatter(pol2HInorm[0::Nsps], pol2HQnorm[0::Nsps],c='blue',label=labels[1])
-
-    plt.xlabel("in phase")
-    plt.ylabel("quadrature")
-
-    if len(varargin) !=0:
-        plt.title('polH ' + varargin[0])
-    plt.gca().set_aspect('equal', adjustable='box')
-
-    ### ------- SUBPLOT 2
-    plt.subplot(1,2,2)
-    plt.scatter(pol1VInorm[0::Nsps], pol1VQnorm[0::Nsps],c='black',label=labels[0])
-    plt.scatter(pol2VInorm[0::Nsps], pol2VQnorm[0::Nsps],c='blue',label=labels[1])
-
-
-    plt.xlabel("in phase")
-
-    if len(varargin) != 0:
-        plt.title('polV '+varargin[0])
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.legend()
+    if sig2 is not None:
+        if polar == 'both':
+            plt.subplot(1, 2, 2)
+        else:
+            plt.subplot(1, 1, 1)
+        plot_subplot(polar, pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm, 'blue', labels[1] if labels else None)
+        plt.legend()
 
     plt.show()
 
+    
 #%%
 def plot_decisions(t,r,Nplots):
     
@@ -400,7 +280,7 @@ def plot_decisions(t,r,Nplots):
 def plot_fir(rx,*varargin):
 
     if type(rx) == dict:
-        Ntaps = max(rx['h_est'].shape)
+        NsampTaps = max(rx['h_est'].shape)
 
         if len(rx["h_est"].shape) == 4:
             rx      = real2complex_fir(rx)
@@ -412,16 +292,16 @@ def plot_fir(rx,*varargin):
     else:
         myfir2 = np.abs(rx)
         if len(rx.shape) == 1:
-            Ntaps       = len(rx.shape)
-            myfir       = np.zeros((4,Ntaps))
+            NsampTaps   = len(rx.shape)
+            myfir       = np.zeros((4,NsampTaps))
             myfir[0,:]  = myfir2
             myfir[3,:]  = myfir2            
         else:
-            Ntaps       = max(myfir2.shape)
+            NsampTaps   = max(myfir2.shape)
             myfir       = myfir2
 
 
-    Taps = np.linspace(1,Ntaps,Ntaps)-round(Ntaps/2)-1
+    Taps = np.linspace(1,NsampTaps,NsampTaps)-round(NsampTaps/2)-1
     plt.figure()
     
     
@@ -579,7 +459,6 @@ def plot_loss_cma(rx,flags,saving,keyword,what):
 
 
 #%%
-
 def plot_losses(Losses,OSNRdBs,title):
     
         # Création de la grille de sous-graphiques avec une résolution DPI élevée
@@ -606,25 +485,6 @@ def plot_losses(Losses,OSNRdBs,title):
         plt.savefig(title,dpi=400,format = 'png')
         
         
-
-#%%
-
-def plot_phases(tx,rx):
-
-    tmpTX   = tx["phisBatch"][rx['FrameChannel']:,:]
-    tmpRX   = rx["phases_est_mat"][rx['FrameChannel']:,:]
-    
-    tmpTX   = np.unwrap(np.reshape(tmpTX,(-1,1)).squeeze())*180/pi
-    tmpRX   = np.unwrap(np.reshape(tmpRX,(-1,1)).squeeze())*180/pi
-    
-
-    plt.plot(tmpTX,label = "TX")
-    plt.plot(tmpRX,label = "RX")
-    plt.legend()
-    plt.title(rx['title phases'])
-    plt.show()
-    
-    
 
 #%%
 
@@ -701,8 +561,8 @@ def real2complex_fir(rx):
     h_21    = h_21_I+1j*h_21_Q
     h_22    = h_22_I+1j*h_22_Q
     
-    Ntaps                   = max(rx['h_est'].shape)
-    rx['h_est_cplx']        = np.zeros((4,Ntaps)).astype(dtype=complex)
+    NsampTaps                   = max(rx['h_est'].shape)
+    rx['h_est_cplx']        = np.zeros((4,NsampTaps)).astype(dtype=complex)
     
     rx['h_est_cplx'][0,:]   = h_11.detach().numpy()
     rx['h_est_cplx'][1,:]   = h_12.detach().numpy()

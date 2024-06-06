@@ -1,42 +1,45 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : louis tomczyk
+#   Author          : Louis Tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2021-09-29 (1.0.0)
-#                   : 2023-08-17 (1.0.1)
-#                   : 2024-04-24 (1.0.2)
-#   Date            : 2024-04-24 (1.1.0)    [NEW] numel
 #   Version         : 1.1.0
-#   Licence         : GNU GPLv2
+#   Date            : 2024-05-24
+#   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
-# 
-# ----- Main idea -----
-# ----- INPUTS -----
-# ----- BIBLIOGRAPHY -----
-#   Articles/Books
-#   Authors             : 
-#   Title               :
-#   Jounal/Editor       : 
-#   Volume - N°         : 
-#   Date                :
-#   DOI/ISBN            :
-#   Pages               :
-#  ----------------------
-#   Functions           : 
-#   Author              : 
-#   Author contact      : 
-#   Affiliation         :
-#   Date                : 
-#   Title of program    : 
-#   Code version        : 
-#   Type                :
-#   Web Address         :
-# ---------------------------------------------
 
+# ----- CHANGELOG -----
+#   1.0.0 (2021-09-29) - creation
+#   1.0.1 (2023-08-17) - updates
+#   1.0.2 (2024-04-24) - enhancements
+#   1.1.0 (2024-05-24) - [NEW] numel
+
+# ----- MAIN IDEA -----
+#   This module provides numerical utilities and functions for matrix operations.
+
+# ----- BIBLIOGRAPHY -----
+#   Articles/Books:
+#   [A1] Authors        : 
+#       Title           : 
+#       Journal/Editor  : 
+#       Volume - N°     : 
+#       Date            : 
+#       DOI/ISBN        : 
+#       Pages           : 
+
+#   Functions:
+#   [C1] Author         : 
+#       Contact         : 
+#       Affiliation     : 
+#       Date            : 
+#       Program Title   : 
+#       Code Version    : 
+#       Web Address     : 
+# ---------------------------------------------
+# %%
 
 
 #%% ===========================================================================
@@ -50,6 +53,7 @@ import inspect
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
+from lib_misc import KEYS as keys
 
 
 

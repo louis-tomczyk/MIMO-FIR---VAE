@@ -1,43 +1,46 @@
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : louis tomczyk
+#   Author          : Louis Tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2023-03-13 : 1.0.0 - phase noise added
-#                   : 2023-04-02 : 1.1.1 - phase/pol dynamics
-#                   : 2023-04-19 : 1.2.0 - residual chromatic dispersion
-#                                        - Fpol Law Linear
-#   Date            : 2024-05-30 : 1.3.0 - cleaning, pcs table,
-#   Version         : 1.3.0
+#   Version         : 1.3.2
+#   Date            : 2024-06-06
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
-# 
-# ----- Main idea -----
-# ----- INPUTS ----- 
+#
+# ----- CHANGELOG -----
+#   1.0.0 (2023-03-13) - phase noise added
+#   1.1.1 (2023-04-02) - phase/pol dynamics
+#   1.2.0 (2023-04-19) - residual chromatic dispersion, Fpol Law Linear
+#   1.3.0 (2024-05-27) - cleaning, pcs table
+#   1.3.1 (2024-06-04) - blind/pilot aided
+#   1.3.2 (2024-06-06) - blind/pilot aided
+#
+# ----- MAIN IDEA -----
+#   Simulation of an end-to-end linear optical telecommunication system
+#
 # ----- BIBLIOGRAPHY -----
-#   Articles/Books
-#   Authors             : [A0] Vincent LAUINGER
-#   Title               : Blind Equalization and Channel Estimation in Coherent Optical
-#                         Communications Using Variational Autoencoders
-#   Jounal/Editor       : J-SAC
-#   Volume - N°         : 40-9
-#   Date                : 2022-11
-#   DOI/ISBN            : 10.1109/JSAC.2022.3191346
-#   Pages               : 2529 - 2539
-#  ---------------------- 
-#   Functions           : 
-#   Author              : [C3] Vincent LAUINGER
-#   Author contact      : vincent.lauinger@kit.edu
-#   Affiliation         : Communications Engineering Lab (CEL)
-#                           Karlsruhe Institute of Technology (KIT)
-#   Date                : 2022-06-15
-#   Title of program    : 
-#   Code version        : 
-#   Web Address         : https://github.com/kit-cel/vae-equalizer
+#   Articles/Books:
+#   [A1] Authors         : Vincent Lauinger
+#        Title           : Blind Equalization and Channel Estimation in Coherent Optical Communications Using Variational Autoencoders
+#        Journal/Editor  : J-SAC
+#        Volume - N°     : 40-9
+#        Date            : 2022-11
+#        DOI/ISBN        : 10.1109/JSAC.2022.3191346
+#        Pages           : 2529 - 2539
+#
+#   Functions:
+#   [C1] Author          : Vincent Lauinger
+#        Contact         : vincent.lauinger@kit.edu
+#        Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#        Date            : 2022-06-15
+#        Program Title   : 
+#        Code Version    : 
+#        Type            : Source code
+#        Web Address     : https://github.com/kit-cel/vae-equalizer
 # ---------------------------------------------
-
 
 
 #%% ===========================================================================
@@ -49,7 +52,7 @@ mb.clear_all()
 import numpy as np
 import torch
 import lib_misc as misc
-from lib_misc import KEYS
+from lib_matlab import clc
 import lib_txdsp as txdsp
 import processing as process
 import matplotlib.pyplot as plt
@@ -64,6 +67,7 @@ if device == "cuda": torch.cuda.init()
 torch.set_default_dtype(torch.float32)
 
 pi = np.pi
+clc()
 
 #%% ===========================================================================
 # --- PARAMETERS ---
@@ -105,14 +109,22 @@ tx['flag_phase_noise']          = 1
 #   4               0.133375
 # -----------------------------------------------------------------------------
 
-tx["mod"]                       = '64QAM'               # modulation format:  {4,16,64}QAM
-tx["nu"]                        = .0254                # for PCS: exp(-nu*|x|^2)/sum(exp(-nu*|xi|^2))
+tx["mod"]                       = '16QAM'               # modulation format:  {4,16,64}QAM
+tx["nu"]                        = 0.0254                # for PCS: exp(-nu*|x|^2)/sum(exp(-nu*|xi|^2))
 tx['PhaseNoise_mode']           = "batch-wise"          # {samp-wise, batch-wise}
 
+
+# pilots mangement
+rx['mode']                      = 'pilots'         # {blind, pilots}
+tx["mod_pilots"]                = '4QAM'                # modulation format:  {4,16,64}QAM
+tx['Percentage_pilots_overhead']   = 3                     # percentage
+
+
 # RX
+
 rx['SNRdB']                     = 25
 rx["lr"]                        = 5e-4
-rx["mimo"]                      = "cma"                 # {cma,vae}
+rx["mimo"]                      = "vae"                 # {cma,vae}
 
 tx['DeltaPhiC']                 = 1e-1                  # [rad]
 fibre['DeltaThetaC']            = np.pi/35              # [rad]
@@ -136,12 +148,11 @@ fibre['D_SI']                    = fibre['D']*1e-6                              
 wavelength                      = 1550 *1e-9                                    # [m]
 c                               = 299792458                                     # [m/s]
 
-nSymbResCD                      = 1
+nSymbResCD                      = 0
 beta2                           = -wavelength**2/2/pi/c*fibre['D_SI']           # [s²/rad/m]
 fibre['DistRes_SI']             = nSymbResCD/(tx["Rs"]**2)/abs(beta2)/2/pi      # [m]
 fibre['DistProp_SI']            = 1e4                                           # [m]
 fibre['tauCD']                  = np.sqrt(2*pi*fibre['DistRes_SI']*abs(beta2))  # differential group delay [s]
-# or equivalently: fibre["tauCD"] = nSymbResCD/tx['Rs']
 fibre['tauPMD']                 = fibre['PMD_SI']*np.sqrt(fibre['DistProp_SI']) # PMD induced delay [s]
 
 
@@ -182,8 +193,9 @@ else:
 # =============================================================================
 def process_data(npol,nphi,tx,fibre,rx):
 
-    print(paramPOL[:,npol])
-
+    for k in range(len(paramPOL)):
+        print("{}".format(paramPOL[k,npol]))
+        
     if len(paramPOL) == 3:      # linear evolution
         RangeTheta                      = paramPOL[1,npol] - paramPOL[0,npol]
         SlopeTheta                      = paramPOL[2,npol]
@@ -202,6 +214,7 @@ def process_data(npol,nphi,tx,fibre,rx):
 
 
     tx["dnu"]                           = paramPHI[nphi]    # [Hz]
+    
     tx,fibre, rx                        = txdsp.set_Nsymbols(tx,fibre,rx)
 
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving)[2:-4]
@@ -248,3 +261,12 @@ for npol in range(len(paramPOL[0])):
 
 misc.move_files_to_folder()
 misc.merge_data_folders(saving)
+
+
+
+
+
+
+
+
+

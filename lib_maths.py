@@ -1,41 +1,46 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : louis tomczyk
+#   Author          : Louis Tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2024-03-04 (1.0.0) - creation
-#                   : 2024-03-28 (1.1.0) - [NEW] inverse 3D matrix
-#                   : 2024-04-01 (1.2.1) - [NEW] test_unitarity / test_unitarity3d
-#   Date            : 2024-05-27 (1.2.2) - [NEW] get_power
-#   Version         : 1.2.1
-#   Licence         : GNU GPLv2
+#   Version         : 1.2.2
+#   Date            : 2024-05-27
+#   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
-# 
-# ----- Main idea -----
-# ----- INPUTS -----
+
+# ----- CHANGELOG -----
+#   1.0.0 (2024-03-04) - creation
+#   1.1.0 (2024-03-28) - [NEW] inverse 3D matrix
+#   1.2.1 (2024-04-01) - [NEW] test_unitarity / test_unitarity3d
+#   1.2.2 (2024-05-27) - [NEW] get_power
+
+# ----- MAIN IDEA -----
+#   This module provides utilities for matrix inversion and testing unitarity.
+
 # ----- BIBLIOGRAPHY -----
-#   Articles/Books
-#   Authors             : 
-#   Title               :
-#   Jounal/Editor       : 
-#   Volume - N°         : 
-#   Date                :
-#   DOI/ISBN            :
-#   Pages               :
-#  ----------------------
-#   Functions           : 
-#   Author              : 
-#   Author contact      : 
-#   Affiliation         :
-#   Date                :
-#   Title of program    : 
-#   Code version        : 
-#   Type                :
-#   Web Address         :
+#   Articles/Books:
+#   [A1] Authors        : 
+#       Title           : 
+#       Journal/Editor  : 
+#       Volume - N°     : 
+#       Date            : 
+#       DOI/ISBN        : 
+#       Pages           : 
+
+#   Functions:
+#   [C1] Author         : 
+#       Contact         : 
+#       Affiliation     : 
+#       Date            : 
+#       Program Title   : 
+#       Code Version    : 
+#       Web Address     : 
 # ---------------------------------------------
+# %%
+
 
 #%%
 # =============================================================================

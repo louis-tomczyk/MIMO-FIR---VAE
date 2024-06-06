@@ -4,38 +4,39 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2023-03-04
-#                   : 2024-04-21 (1.0.1) set_thetas:    if 'theta_in' not in fibre["ThetasLaw"]
-#                   : 2024-04-24 (1.0.2) set_thetas:    as 04-21
-#                                        propagation:   awgn
-#   Date            : 2024-05-27 (1.0.3) simulate dispersion:    C/PM-D ---> tauC/PM-D
 #   Version         : 1.0.3
-#   Licence         : GNU GPLv2
+#   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
 #
+# ----- CHANGELOG -----
+#   1.0.0 (2023-03-04) - creation
+#   1.0.1 (2024-04-21) - set_thetas: if 'theta_in' not in fibre["ThetasLaw"]
+#   1.0.2 (2024-04-24) - set_thetas: as 04-21, propagation: awgn
+#   1.0.3 (2024-05-27) - simulate dispersion: C/PM-D ---> tauC/PM-D
+#
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
-#   Authors             : 
+#   Authors             :
 #   Title               :
-#   Jounal/Editor       : 
-#   Volume - N°         : 
+#   Journal/Editor      :
+#   Volume - N°         :
 #   Date                :
 #   DOI/ISBN            :
 #   Pages               :
 #  ----------------------
-#   Functions           :
-#   Author              : [C1] Vincent LAUINGER
-#   Author contact      : vincent.lauinger@kit.edu
-#   Affiliation         : Communications Engineering Lab (CEL)
-#                           Karlsruhe Institute of Technology (KIT)
-#   Date                : 2022-06-15
-#   Title of program    : 
-#   Code version        : 
-#   Type                : source code
-#   Web Address         : https://github.com/kit-cel/vae-equalizer
+#   Functions
+#   [C1] Author          : Vincent Lauinger
+#        Contact         : vincent.lauinger@kit.edu
+#        Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#        Date            : 2022-06-15
+#        Program Title   : 
+#        Code Version    : 
+#        Type            : Source code
+#        Web Address     : https://github.com/kit-cel/vae-equalizer
 # ---------------------------------------------
+# %%
 
 
 
@@ -46,6 +47,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import lib_misc as misc
+from lib_misc import KEYS as keys
 import lib_rxhw as rxhw
 import lib_prop as prop
 import lib_general as gen

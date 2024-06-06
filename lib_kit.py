@@ -1,46 +1,53 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : louis tomczyk
+#   Author          : Louis Tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2024-03-04 (1.0.0) - creation
-#                   : 2024-04-01 (1.1.0) - cleaning
-#   Date            : 2024-05-22 (1.1.1) - CMA --- use of numpy instead of torch, saves memory & time
-#   Version         : 1.1.1
-#   Licence         : GNU GPLv2
+#   Version         : 1.1.2
+#   Date            : 2024-06-06
+#   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
 #
+# ----- CHANGELOG -----
+#   1.0.0 (2024-03-04) - creation
+#   1.1.0 (2024-04-01) - cleaning
+#   1.1.1 (2024-05-22) - CMA, use of numpy instead of torch, saves memory & time
+#   1.1.2 (2024-06-06) - [REMOVED] init_dict, moved to misc
+#
+# ----- MAIN IDEA -----
+#   Library for CMA equalizer in (optical) telecommunications
+#
 # ----- BIBLIOGRAPHY -----
-#   Articles/Books
-#   Authors             : [A1] Avi CACIULARU
-#   Title               : Blind Channel Equalization Using Variational Autoencoders
-#   Jounal/Editor       : ICC
-#   Volume - N°         : 
-#   Date                : May 2018
-#   DOI/ISBN            : 10.1109/ICCW.2018.8403666 
-#   Pages               :
-#  ----------------------
-#   Authors             : [A2] Junho CHO
-#   Title               : Probabilistic Constellation Shaping for Optical Fiber Communications
-#   Jounal/Editor       : JLT
-#   Volume - N°         : 37-6
-#   Date                : March 2019
-#   DOI/ISBN            : 10.1109/JLT.2019.2898855
-#   Pages               :
-#  ----------------------
-#   Functions           :
-#   Author              : [C3] Vincent LAUINGER
-#   Author contact      : vincent.lauinger@kit.edu
-#   Affiliation         : Communications Engineering Lab (CEL)
-#                           Karlsruhe Institute of Technology (KIT)
-#   Date                : 2022-06-15
-#   Title of program    : 
-#   Code version        : 
-#   Web Address         : https://github.com/kit-cel/vae-equalizer
+#   Articles/Books:
+#   [A1] Authors        : Avi Caciularu
+#       Title           : Blind Channel Equalization Using Variational Autoencoders
+#       Journal/Editor  : ICC
+#       Volume - N°     : 
+#       Date            : May 2018
+#       DOI/ISBN        : 10.1109/ICCW.2018.8403666
+#       Pages           : 
+#
+#   [A2] Authors        : Junho Cho
+#       Title           : Probabilistic Constellation Shaping for Optical Fiber Communications
+#       Journal/Editor  : JLT
+#       Volume - N°     : 37-6
+#       Date            : March 2019
+#       DOI/ISBN        : 10.1109/JLT.2019.2898855
+#       Pages           : 
+#
+#   Functions:
+#   [C3] Author         : Vincent Lauinger
+#       Contact         : vincent.lauinger@kit.edu
+#       Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#       Date            : 2022-06-15
+#       Program Title   : 
+#       Code Version    : 
+#       Web Address     : https://github.com/kit-cel/vae-equalizer
 # ---------------------------------------------
+
 
 #%% ===========================================================================
 # --- LIBRARIES ---
@@ -71,7 +78,6 @@ pi = np.pi
 # - dec_on_bound
 # - find_shift
 # - find_shift_symb_full
-# - init_dict
 # - SER_constell_shaping
 # - SER_estimation
 # - SER_IQflip
@@ -90,7 +96,7 @@ pi = np.pi
 def CMA(tx,rx): # Constant Modulus Algorithm
 
     N       = rx["sig_real"].shape[-1]
-    mh      = tx["Ntaps"]//2
+    mh      = tx['NsampTaps']//2
 
     # maintenance
     if 'CMA' not in rx:
@@ -613,31 +619,6 @@ def find_shift_symb_full(rx, tx, N_shift):
     else:
         return N_shift//2-ind_YX, 1
     
-#%%
-
-
-def init_dict():
-    
-    tx          = dict()
-    fibre       = dict()
-    rx          = dict()
-    
-
-    for field_name in ["mod","Nsps","Rs","nu","Ntaps"]:
-        tx[field_name] = 0
-        
-    for field_name in ["channel",'TauPMD','TauCD','phiIQ','theta1','theta_std']:
-        fibre[field_name] = 0
-        
-    for field_name in ['SNRdB',"NSymbBatch","N_lrhalf","Nframes","FrameChannel","Nmax_SymbFrame"]:
-        rx[field_name] = 0
-
-    tx      = misc.sort_dict_by_keys(tx)
-    fibre   = misc.sort_dict_by_keys(fibre)
-    rx      = misc.sort_dict_by_keys(rx)
-    
-    return tx,fibre,rx
-
 
 
 #%%
@@ -837,9 +818,9 @@ class twoXtwoFIR(nn.Module):
         self.conv_w = nn.Conv1d(
             in_channels     = 4,
             out_channels    = 2,
-            kernel_size     = tx["Ntaps"],
+            kernel_size     = tx['NsampTaps'],
             bias            = False,
-            padding         = tx["Ntaps"]//2,
+            padding         = tx['NsampTaps']//2,
             stride          = tx["Nsps"]
             ).to(dtype=torch.float32)
         
@@ -947,3 +928,98 @@ def train_self(BatchNo,rx,tx):
     rx      = misc.sort_dict_by_keys(rx)
     
     return rx
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+# convolution
+# x = [1 2 3]
+# y = [4 5 6]
+# z = x*y =  [z1 z2 z3 z4 z5]
+
+# what is done:
+#    z = fliplr(z): [6 5 4]
+# 
+# z1 = 
+# [0 0 1 2 3].
+# [6 5 4 0 0] = 6.0+5.0+4.1+2.0+3.0 = 4
+#
+# z2 = 
+# [0 1 2 3].
+# [6 5 4 0] = 6.0+5.1+4.2+3.0       = 13
+#
+# z3 = 
+# [1 2 3].
+# [6 5 4] = 6.1+5.2+4.3             = 28
+#
+# z4 = 
+# [1 2 3 0].
+# [0 6 5 4] = 0.1+6.2+5.3+4.0       = 27
+#
+# z5 = 
+# [1 2 3 0 0].
+# [0 0 6 5 4] = 0.1+0.2+6.3+5.0+4.0 = 18
+#
+# mode = full (default) [4 13 28 27 18]
+# mode = same           [13 28 27]
+# mode = valid          [28]
+
+
+
+
+
+
+
+
+

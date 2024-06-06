@@ -1,39 +1,46 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : louis tomczyk
+#   Author          : Louis Tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2023-03-04 (1.0.0) creation
-#                   : 2024-04-01 (1.1.1) [NEW] string_to_binary / binary_to_decimal
-#                   : 2024-04-03 (1.1.2) [NEW] plot_1y_axes
-#                   : 2024-05-22 (1.2.0) [NEW] convert_byte, get_total_size
-#   Date            : 2024-05-28 (1.2.1) create_xml_file 
-#   Version         : 1.2.1
+#   Version         : 1.2.2
+#   Date            : 2024-06-06
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
-# 
+
+# ----- CHANGELOG -----
+#   1.0.0 (2023-03-04) - creation
+#   1.1.1 (2024-04-01) - [NEW] string_to_binary / binary_to_decimal
+#   1.1.2 (2024-04-03) - [NEW] plot_1y_axes
+#   1.2.0 (2024-05-22) - [NEW] convert_byte, get_total_size
+#   1.2.1 (2024-05-28) - create_xml_file
+#   1.2.2 (2024-06-06) - Ntaps -> NsampTaps, create_xml_file
+
+# ----- MAIN IDEA -----
+#   This module provides utilities for data conversion and XML file creation.
+
 # ----- BIBLIOGRAPHY -----
-#   Articles/Books
-#   Authors             :
-#   Title               :
-#   Jounal/Editor       :
-#   Volume - N°         :
-#   Date                :
-#   DOI/ISBN            :
-#   Pages               :
-#  ----------------------
-#   Functions 
-#   Author              : [C1] CNRS - IDRIS
-#   Author contact      :
-#   Affiliation         :
-#   Date                : 2023-05-09
-#   Title of program    : Profilage de codes python
-#   Code version        :
-#   Type                : tutorial
-#   Web Address         : http://www.idris.fr/jean-zay/cpu/jean-zay-cpu-python.html
+#   Articles/Books:
+#   [A1] Authors        : 
+#       Title           : 
+#       Journal/Editor  : 
+#       Volume - N°     : 
+#       Date            : 
+#       DOI/ISBN        : 
+#       Pages           : 
+
+#   Functions:
+#   [C1] Author         : CNRS - IDRIS
+#       Contact         : 
+#       Affiliation     : 
+#       Date            : 2023-05-09
+#       Program Title   : Profilage de codes python
+#       Code Version    : 
+#       Type            : tutorial
+#       Web Address     : http://www.idris.fr/jean-zay/cpu/jean-zay-cpu-python.html
 # ---------------------------------------------
 # %%
 
@@ -60,7 +67,6 @@ from tkinter import filedialog
 
 import lib_general as gen
 import lib_matlab as mat
-import lib_misc as misc
 pi = np.pi
 
 
@@ -196,18 +202,18 @@ def create_xml_file(tx,fibre,rx,saving):
     sections    = ["TX","CHANNEL","RX"]
     
     if tx['nu'] != 0:
-        TX      = ["mod","nu","Nsps", "Rs","Ntaps",'dnu','SNRdB']
+        TX      = ["mod","nu","Nsps", "Rs","NsampTaps",'dnu','SNRdB']
     else:
-        TX      = ["mod", "Nsps", "Rs","Ntaps",'dnu','SNRdB']
+        TX      = ["mod", "Nsps", "Rs","NsampTaps",'dnu','SNRdB']
 
     CHANNEL     = ["tauPMD", "tauCD", "kind","law"]
     RX          = ["mimo",'lr',"Nframes", "NSymbBatch", "FrameChannel", "NSymbFrame","SNR_dB"]
     fields_list = [TX, CHANNEL, RX]
     
     if tx['nu'] != 0:
-        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu','SNRdB',"CD","PMD",'kind','law',"NSymbFrame","NSymbBatch","SNR_dB","Ntaps"]
+        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu','SNRdB',"CD","PMD",'kind','law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
     else:
-        saving_list = ["mimo",'lr','Rs','mod','dnu','SNRdB',"CD","PMD",'kind','law',"NSymbFrame","NSymbBatch","SNR_dB","Ntaps"]
+        saving_list = ["mimo",'lr','Rs','mod','dnu','SNRdB',"CD","PMD",'kind','law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
         
     CHANNELpar  = [np.round(fibre["tauPMD"]*1e12,0),           # [ps]
                    np.round(np.sqrt(fibre["tauCD"])*1e12,0),   # [ps]
@@ -265,14 +271,10 @@ def create_xml_file(tx,fibre,rx,saving):
             print(Slope*180/pi)
 
 
-
-    tx["Ntaps"] = 2*tx['NSymbTaps']+1
-
-
     TXpar       = [tx["mod"],
                    tx["Nsps"],
                    int(tx["Rs"]*1e-9),
-                   tx["Ntaps"],
+                   tx['NsampTaps'],
                    int(tx["dnu"]*1e-3),
                    tx['SNRdB']]
     
@@ -470,7 +472,7 @@ def init_dict():
     fibre['ThetasLaw']  = dict()
     tx["PhiLaw"]        = dict()
 
-    for field_name in ["mod","Nsps","Rs","nu","Ntaps",'dnu']:
+    for field_name in ["mod","Nsps","Rs","nu","NsampTaps",'dnu']:
         tx[field_name] = 0
         
     #for field_name in ["channel",'PMD','CD','phiIQ','theta1','theta_std']:
@@ -927,7 +929,7 @@ def save2mat(tx,fibre,rx,saving):
 
     name        = saving["filename"]+".mat"
     save_dict   = {
-                'NtapsTX'           : tx["Ntaps"],
+                'NtapsTX'           : tx['NsampTaps'],
                 'nu'                : tx["nu"],
                 'nu_sc'             : tx["nu_sc"],
                 'Rs'                : tx["Rs"],

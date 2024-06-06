@@ -1,54 +1,60 @@
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : louis tomczyk
+#   Author          : Louis Tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2024-03-04 (1.0.0)    creation
-#                   : 2024-04-03 (1.0.3)    compute_loss -> compute_vae_loss
-#                   : 2024-04-08 (1.1.0)    [NEW] decision, SER_estimation, compensate_and_truncate
-#                   : 2024-04-19 (1.2.0)    decision, find_shift --- storing SER values for ALL the frames
-#                   : 2024-05-21 (1.2.1)    find_shift & compensate_and_truncate --- use of 
-#                                               gen.plot_xcorr_2x2, gen.plot_decisions
-#                   :                       decoder -> decision
-#                   : 2024-05-23 (1.3.0)    find_shift & compensate_and_truncate: handling different number of filter taps
-#                                           [DELETED] phase_estimation, it will be done with matlab
-#   Date            : 2024-05-27 (1.4.0)    decision --- including PCS: needed to scale constellations, inspired from [C2]
-#   Version         : 1.3.0
+#   Version         : 1.4.1
+#   Date            : 2024-06-06
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
 #
+# ----- CHANGELOG -----
+#   1.0.0 (2024-03-04) - creation
+#   1.0.3 (2024-04-03) - compute_loss -> compute_vae_loss
+#   1.1.0 (2024-04-08) - [NEW] decision, SER_estimation, compensate_and_truncate
+#   1.2.0 (2024-04-19) - decision, find_shift --- storing SER values for ALL the frames
+#   1.2.1 (2024-05-21) - find_shift & compensate_and_truncate --- use of gen.plot_xcorr_2x2, gen.plot_decisions
+#                      - decoder -> decision
+#   1.3.0 (2024-05-23) - find_shift & compensate_and_truncate: handling different number of filter taps
+#                      - [DELETED] phase_estimation, it will be done with matlab
+#   1.4.0 (2024-05-27) - decision --- including PCS: needed to scale constellations, inspired from [C2]
+#   1.4.1 (2024-06-06) - find_shift: NSymb_to_remove changed (no use of any weird "reference" number of taps). Ntaps -> NsampTaps
+#
+# ----- MAIN IDEA -----
+#   Library for decision functions in (optical) telecommunications
+#
 # ----- BIBLIOGRAPHY -----
-#   Articles/Books
-#   Authors             :
-#   Title               :
-#   Jounal/Editor       :
-#   Volume - N°         :
-#   Date                :
-#   DOI/ISBN            :
-#   Pages               :
-#  ----------------------
-#   Functions           :
-#   Author              : [C1] Vincent LAUINGER
-#   Author contact      : vincent.lauinger@kit.edu
-#   Affiliation         : Communications Engineering Lab (CEL)
-#                           Karlsruhe Institute of Technology (KIT)
-#   Date                : 2022-06-15
-#   Title of program    :
-#   Code version        :
-#   Web Address         : https://github.com/kit-cel/vae-equalizer
-#  ----------------------
-#   Functions           :
-#   Author              : [C2] Jingtian LIU, Élie AWWAD, louis TOMCZYK
-#   Author contact      : elie.awwad@telecom-paris.fr
-#   Affiliation         : Télécom Paris, COMELEC, GTO
-#   Date                : 2024-04-27
-#   Title of program    : 
-#   Code version        : 3.0
-#   Type                : source code
-#   Web Address         :
+#   Articles/Books:
+#   Authors             : 
+#   Title               : 
+#   Journal/Editor      : 
+#   Volume - N°         : 
+#   Date                : 
+#   DOI/ISBN            : 
+#   Pages               : 
+#
+#   Functions:
+#   [C1] Author         : Vincent Lauinger
+#       Contact         : vincent.lauinger@kit.edu
+#       Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#       Date            : 2022-06-15
+#       Program Title   : 
+#       Code Version    : 
+#       Type            : Source code
+#       Web Address     : https://github.com/kit-cel/vae-equalizer
+#
+#   [C2] Authors        : Jingtian Liu, Élie Awwad, Louis Tomczyk
+#       Contact         : elie.awwad@telecom-paris.fr
+#       Affiliation     : Télécom Paris, COMELEC, GTO
+#       Date            : 2024-04-27
+#       Program Title   : 
+#       Code Version    : 3.0
+#       Type            : Source code
+#       Web Address     : 
 # ---------------------------------------------
+
 
 
 #%% ===========================================================================
@@ -59,6 +65,7 @@ import numpy as np
 import torch
 
 import matplotlib.pyplot as plt
+from lib_misc import KEYS as keys
 import lib_kit as kit
 import lib_maths as maths
 import lib_general as gen
@@ -265,8 +272,7 @@ def find_shift(tx,rx):
     sig     = rx['Symb_real_dec']
     
     if ref.shape[-1] != sig.shape[-1]:
-        Nsb_taps_ref    = 7
-        Nsb_to_remove   = int((Nsb_taps_ref - (tx["NSymbTaps"]-Nsb_taps_ref)/2)*tx["Nsps"])
+        Nsb_to_remove   = int(rx['NSymbCut_tot']-1)
         
         ref = ref[:,:,Nsb_to_remove:]
         # print('|ref.shape - sig.shape| = ',ref.shape[-1]-sig.shape[-1])
@@ -318,7 +324,8 @@ def mimo(tx,rx,saving,flags):
                         
                 # if rx['Frame'] >= rx['FrameChannel']:
                 #     if BatchNo%40 == 0:
-        gen.plot_const_2pol(rx['sig_real'], "RX f-{} B-{}".format(rx['Frame'],BatchNo))
+        # gen.plot_const_2pol(rx['sig_real'], "RX f-{} B-{}".format(rx['Frame'],BatchNo))
+        gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{} B-{}".format(rx['Frame'],BatchNo))
             
             # plot_loss_batch(rx,flags,saving,['kind','law',"std",'linewidth'],"Llikelihood")
             # plot_loss_batch(rx,flags,saving,['kind','law',"std",'linewidth'],"DKL")
@@ -331,7 +338,7 @@ def mimo(tx,rx,saving,flags):
         if rx["Frame"]>rx['FrameChannel']-1:
             rx,loss = kit.CMA(tx,rx)
             # gen.plot_loss_cma(rx,flags,saving,['kind','law',"std",'linewidth'],"x")
-            gen.plot_const_2pol(rx['sig_eq_real'], "RX f-{}".format(rx['Frame']))
+            gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{}".format(rx['Frame']))
         else:
             loss = []
 
@@ -350,6 +357,7 @@ def mimo(tx,rx,saving,flags):
 #%%
 def SER_estimation(tx,rx):
 
+    
     if rx['mimo'].lower() == "cma" and rx['Frame'] < rx['FrameChannel']:
 
         return rx

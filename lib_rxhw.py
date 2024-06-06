@@ -4,34 +4,42 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2023-04-04 (1.0.0) creation
-#   Date            : 2023-04-01 (1.0.2) cleaning
 #   Version         : 1.0.2
-#   Licence         : cc-by-nc-sa
-#                     Attribution - Non-Commercial - Share Alike 4.0 International
-# 
-# ----- Main idea -----
-# ----- INPUTS -----
+#   Date            : 2023-04-01
+#   License         : GNU GPLv2
+#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CANNOT: sublicense - hold liable
+#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#
+# ----- CHANGELOG -----
+#   1.0.0 (2023-04-04) - creation
+#   1.0.2 (2023-04-01) - cleaning
+#
+# ----- MAIN IDEA -----
+#   Basic functions and setup for the initial phase of the project
+#
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
-#   Authors             : 
+#   Authors             :
 #   Title               :
-#   Jounal/Editor       : 
-#   Volume - N°         : 
+#   Journal/Editor      :
+#   Volume - N°         :
 #   Date                :
 #   DOI/ISBN            :
 #   Pages               :
 #  ----------------------
-#   Functions           : 
-#   Author              : 
-#   Author contact      : 
+#   Functions
+#   Author              :
+#   Contact             :
 #   Affiliation         :
-#   Date                : 
-#   Title of program    : 
-#   Code version        : 
+#   Date                :
+#   Title of program    :
+#   Code version        :
 #   Type                :
 #   Web Address         :
 # ---------------------------------------------
+# %%
+
 
 
 #%% ===========================================================================
@@ -41,6 +49,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import lib_misc as misc
+from lib_misc import KEYS as keys
 import torch
 
 #%% ===========================================================================
@@ -62,14 +71,17 @@ def load_ase(tx,rx):
     # ==> P_noise_tot = 0.01   [mW]
     # ==> P_noise_AB  = 0.0025 [mW]   ---   A in {H,V}, B in {I,Q}    
 
-    SNR                 = 10**(rx['SNRdB']/10)
+    rx['SNR']               = 10**(rx['SNRdB']/10)
+    rx["noise_var"]         = torch.full((2,), tx['pow_mean']/rx['SNR']/2)
+
+    # SNR                 = 10**(rx['SNRdB']/10)
 
     rx_sig_cplx         = np.zeros((tx['Npolars'],tx['NsampFrame']),dtype = np.complex64)
     rx_sig_cplx[0]      = np.array(rx['sig_real'][0]+1j*rx['sig_real'][1])
     rx_sig_cplx[1]      = np.array(rx['sig_real'][2]+1j*rx['sig_real'][3])
 
     rx["P_rx_sig"]      = np.mean(np.abs(rx_sig_cplx)**2)    # total power in X+Y polarisations [W]
-    rx["P_noise"]       = rx["P_rx_sig"]/2/SNR
+    rx["P_noise"]       = rx["P_rx_sig"]/2/rx['SNR']
 
     sigma_n             = np.sqrt(rx["P_noise"]*tx["Nsps"])
 

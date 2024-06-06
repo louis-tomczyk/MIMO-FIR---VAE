@@ -4,40 +4,44 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Arxivs          : 2024-03-04 (1.0.0)    creation
-#                   : 2024-03-27 (1.1.1)    gen_phase_noise: new slicing mode
-#                                           [NEW] set_phis
-#   Date            : 2023-05-29 (1.2.0)    load_ase, load_phase_noise --- replaces 1.1.1 slicing mode
-#                                           from frame-wise to batch-wise
-#                                           [REMOVED] set_phis, included into gen_phase_noise
 #   Version         : 1.2.0
+#   Date            : 2024-05-29
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
 #                       MUST:   include original - disclose source - include copyright - state changes - include license
-# 
-# ----- Main idea -----
-# ----- INPUTS -----
+#
+# ----- CHANGELOG -----
+#   1.0.0 (2024-03-04) - creation
+#   1.1.1 (2024-03-27) - gen_phase_noise: new slicing mode
+#                      - [NEW] set_phis
+#   1.2.0 (2024-05-29) - load_ase, load_phase_noise --- replaces 1.1.1 slicing mode from frame-wise to batch-wise
+#                      - [REMOVED] set_phis, included into gen_phase_noise
+#
+# ----- MAIN IDEA -----
+#   Generation and management of phase noise and ASE noise in optical telecommunication systems
+#
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
 #   Authors             : 
 #   Title               :
-#   Jounal/Editor       : 
+#   Journal/Editor      : 
 #   Volume - N°         : 
 #   Date                :
 #   DOI/ISBN            :
 #   Pages               :
 #  ----------------------
-#   Functions           : 
-#   Author              : 
-#   Author contact      : 
+#   Functions
+#   Author              :
+#   Contact             :
 #   Affiliation         :
-#   Date                : 
-#   Title of program    : 
-#   Code version        : 
+#   Date                :
+#   Title of program    :
+#   Code version        :
 #   Type                :
 #   Web Address         :
 # ---------------------------------------------
+# %%
 
 #%% ===========================================================================
 # --- LIBRARIES ---
@@ -46,6 +50,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import lib_misc as misc
+from lib_misc import KEYS as keys
 import lib_general as gen
 import torch
 
@@ -94,16 +99,10 @@ def gen_phase_noise(tx,rx):
                 
                 # set angles by batches
                 for k in range(rx['NframesChannel']):
-                    
-                    # rx["NBatchFrame"]+1 because:
-                    #   tx['NsampTot] = rx['NsampTot']+rx['Nframes']*tx['Ntaps']
-                    #   so as long as rx['NsampBatch']>tx['Ntaps], we'll have enough samples
-                    #   that we need to cut afterwards
 
                     if tx["PhiLaw"]["law"]      == "linewidth":
                         tx['VAR_Phase']         = np.sqrt(2*pi*tx['dnu']/tx['fs'])
                         
-                        # noise_tmp               = np.random.normal(0,tx['VAR_Phase'],rx["NBatchFrame"]+1)
                         noise_tmp               = np.random.normal(0,tx['VAR_Phase'],rx["NBatchFrame"])
                         tmp_phase_noise[0,k,:]  = tmp_last_phase + np.cumsum(noise_tmp)
                         tmp_last_phase          = tmp_phase_noise[0,k,-1]
@@ -112,12 +111,6 @@ def gen_phase_noise(tx,rx):
                 # circshift to put the zeros phases where they should be
                 tmp_phase_noise[0]      = np.roll(tmp_phase_noise[0], -rx['NframesChannel'], axis = 0) # axis 0 = rows
                 
-                
-                # tmp_frame               = np.reshape(tmp_phase_noise[0],(rx['Nframes'],-1))
-                # tx['PhaseNoise_Batch']  = np.reshape(tmp_phase_noise[0],(-1,1))
-    
-                # distributing on the samples
-                # del tmp_phase_noise
 
             else:
                 if tx["PhiLaw"]["law"]      == "lin":
