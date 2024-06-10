@@ -9,15 +9,17 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
 
 # ----- CHANGELOG -----
-#   1.0.0 (2023-03-04) - creation
-#   1.1.1 (2024-04-01) - [NEW] string_to_binary / binary_to_decimal
-#   1.1.2 (2024-04-03) - [NEW] plot_1y_axes
-#   1.2.0 (2024-05-22) - [NEW] convert_byte, get_total_size
-#   1.2.1 (2024-05-28) - create_xml_file
-#   1.2.2 (2024-06-06) - Ntaps -> NsampTaps, create_xml_file
+#   1.0.0 (2023-03-04)  creation
+#   1.1.1 (2024-04-01)  [NEW] string_to_binary / binary_to_decimal
+#   1.1.2 (2024-04-03)  [NEW] plot_1y_axes
+#   1.2.0 (2024-05-22)  [NEW] convert_byte, get_total_size
+#   1.2.1 (2024-05-28)  create_xml_file
+#   1.2.2 (2024-06-06)  Ntaps -> NsampTaps, create_xml_file
+#                       KEYS, sorting and giving number of keys
 
 # ----- MAIN IDEA -----
 #   This module provides utilities for data conversion and XML file creation.
@@ -522,8 +524,12 @@ def is_date(string,fuzzy=False):
 #%%
 
 def KEYS(dict):
+    dict = sort_dict_by_keys(dict)
+    
     for key in dict.keys():
         print(key)
+        
+    print('\n number of keys = {}'.format(len(dict.keys())))
 
     
 #%%

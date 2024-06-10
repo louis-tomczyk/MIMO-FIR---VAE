@@ -9,7 +9,8 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2023-04-04) - creation

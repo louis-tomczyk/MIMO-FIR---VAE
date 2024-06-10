@@ -8,7 +8,8 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2023-03-04) - creation
@@ -29,7 +30,7 @@
 #   Functions
 #   [C1] Author          : Vincent Lauinger
 #        Contact         : vincent.lauinger@kit.edu
-#        Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#        Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
 #        Date            : 2022-06-15
 #        Program Title   : 
 #        Code Version    : 

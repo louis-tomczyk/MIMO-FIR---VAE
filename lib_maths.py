@@ -9,17 +9,18 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
-
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
+#
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
 #   1.1.0 (2024-03-28) - [NEW] inverse 3D matrix
 #   1.2.1 (2024-04-01) - [NEW] test_unitarity / test_unitarity3d
 #   1.2.2 (2024-05-27) - [NEW] get_power
-
+#
 # ----- MAIN IDEA -----
-#   This module provides utilities for matrix inversion and testing unitarity.
-
+#   Advanced mathematical operations
+#
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
 #   [A1] Authors        : 
@@ -29,7 +30,7 @@
 #       Date            : 
 #       DOI/ISBN        : 
 #       Pages           : 
-
+#
 #   Functions:
 #   [C1] Author         : 
 #       Contact         : 

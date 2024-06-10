@@ -9,13 +9,15 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
 #   1.1.1 (2024-03-27) - gen_phase_noise: new slicing mode
 #                      - [NEW] set_phis
-#   1.2.0 (2024-05-29) - load_ase, load_phase_noise --- replaces 1.1.1 slicing mode from frame-wise to batch-wise
+#   1.2.0 (2024-05-29) - load_ase, load_phase_noise --- replaces 1.1.1 slicing mode from frame-wise 
+#                           to batch-wise
 #                      - [REMOVED] set_phis, included into gen_phase_noise
 #
 # ----- MAIN IDEA -----

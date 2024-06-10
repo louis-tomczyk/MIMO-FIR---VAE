@@ -8,7 +8,8 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2023-03-13) - phase noise added
@@ -16,7 +17,7 @@
 #   1.2.0 (2023-04-19) - residual chromatic dispersion, Fpol Law Linear
 #   1.3.0 (2024-05-27) - cleaning, pcs table
 #   1.3.1 (2024-06-04) - blind/pilot aided
-#   1.3.2 (2024-06-06) - blind/pilot aided
+#   1.3.2 (2024-06-07) - blind/pilot aided, cleaning
 #
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -24,7 +25,8 @@
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
 #   [A1] Authors         : Vincent Lauinger
-#        Title           : Blind Equalization and Channel Estimation in Coherent Optical Communications Using Variational Autoencoders
+#        Title           : Blind Equalization and Channel Estimation in Coherent Optical
+#                           Communications Using Variational Autoencoders
 #        Journal/Editor  : J-SAC
 #        Volume - N°     : 40-9
 #        Date            : 2022-11
@@ -34,7 +36,7 @@
 #   Functions:
 #   [C1] Author          : Vincent Lauinger
 #        Contact         : vincent.lauinger@kit.edu
-#        Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#        Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
 #        Date            : 2022-06-15
 #        Program Title   : 
 #        Code Version    : 
@@ -105,20 +107,28 @@ tx['flag_phase_noise']          = 1
 #   5               0.0641
 #   4.75            0.078046875
 #   4.5             0.0938125
-#   4.25            0.112
+#   4.25            0.11
 #   4               0.133375
 # -----------------------------------------------------------------------------
 
-tx["mod"]                       = '16QAM'               # modulation format:  {4,16,64}QAM
+tx["mod"]                       = '64QAM'               # modulation format:  {4,16,64}QAM
 tx["nu"]                        = 0.0254                # for PCS: exp(-nu*|x|^2)/sum(exp(-nu*|xi|^2))
 tx['PhaseNoise_mode']           = "batch-wise"          # {samp-wise, batch-wise}
 
 
 # pilots mangement
-rx['mode']                      = 'pilots'         # {blind, pilots}
-tx["mod_pilots"]                = '4QAM'                # modulation format:  {4,16,64}QAM
-tx['Percentage_pilots_overhead']   = 3                     # percentage
+rx['mode']                      = 'blind'              # {blind, pilots}
+tx['pilots_info']              = [['cpr','rand',"fixed","same","4QAM",3]]
 
+# pilots_info[  0 = {cpr, synchro, ...}                             what dsp step
+#               1 = {rand (uniform), cazac (not implemented),...}   selection method:
+#               2 = {fixed, different}                              same for all batches or not
+#               3 = {same,polwise}                                  same for both polarisations or not
+#               4 = {4,16,64}QAM                                    modulation format used
+#               5 = {>0}                                            percentage of pilots
+# example
+# tx['pilots_info']              = [['cpr','rand',"fixed","same","4QAM",3],
+#                                    ['synchro','cazac',"fixed",'same',"4QAM",3]]
 
 # RX
 

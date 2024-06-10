@@ -9,17 +9,18 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
-
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
+#
 # ----- CHANGELOG -----
 #   1.0.0 (2021-09-29) - creation
 #   1.0.1 (2023-08-17) - updates
 #   1.0.2 (2024-04-24) - enhancements
 #   1.1.0 (2024-05-24) - [NEW] numel
-
+#
 # ----- MAIN IDEA -----
-#   This module provides numerical utilities and functions for matrix operations.
-
+#   Matlab fashionned functions
+#
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
 #   [A1] Authors        : 
@@ -29,7 +30,7 @@
 #       Date            : 
 #       DOI/ISBN        : 
 #       Pages           : 
-
+#
 #   Functions:
 #   [C1] Author         : 
 #       Contact         : 

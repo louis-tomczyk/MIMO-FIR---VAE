@@ -8,19 +8,23 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
 #   1.0.3 (2024-04-03) - compute_loss -> compute_vae_loss
 #   1.1.0 (2024-04-08) - [NEW] decision, SER_estimation, compensate_and_truncate
-#   1.2.0 (2024-04-19) - decision, find_shift --- storing SER values for ALL the frames
-#   1.2.1 (2024-05-21) - find_shift & compensate_and_truncate --- use of gen.plot_xcorr_2x2, gen.plot_decisions
+#   1.2.0 (2024-04-19) - decision, find_shift - storing SER values for ALL the frames
+#   1.2.1 (2024-05-21) - find_shift & compensate_and_truncate - use of gen.plot_xcorr_2x2,
+#                           gen.plot_decisions
 #                      - decoder -> decision
-#   1.3.0 (2024-05-23) - find_shift & compensate_and_truncate: handling different number of filter taps
+#   1.3.0 (2024-05-23) - find_shift & compensate_and_truncate: handling different number of filter
+#                           taps
 #                      - [DELETED] phase_estimation, it will be done with matlab
-#   1.4.0 (2024-05-27) - decision --- including PCS: needed to scale constellations, inspired from [C2]
-#   1.4.1 (2024-06-06) - find_shift: NSymb_to_remove changed (no use of any weird "reference" number of taps). Ntaps -> NsampTaps
+#   1.4.0 (2024-05-27) - decision - including PCS: needed to scale constellations, [C2] inspired
+#   1.4.1 (2024-06-06) - find_shift: NSymb_to_remove changed (no use of any weird "reference" number
+#                           of taps). Ntaps -> NsampTaps
 #
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
@@ -38,7 +42,7 @@
 #   Functions:
 #   [C1] Author         : Vincent Lauinger
 #       Contact         : vincent.lauinger@kit.edu
-#       Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#       Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
 #       Date            : 2022-06-15
 #       Program Title   : 
 #       Code Version    : 
@@ -321,11 +325,8 @@ def mimo(tx,rx,saving,flags):
                 rx              = kit.train_self(BatchNo,rx,tx)
                 rx,loss         = kit.compute_vae_loss(tx,rx)
                 maths.update_fir(loss,rx['optimiser'])
-                        
-                # if rx['Frame'] >= rx['FrameChannel']:
-                #     if BatchNo%40 == 0:
-        # gen.plot_const_2pol(rx['sig_real'], "RX f-{} B-{}".format(rx['Frame'],BatchNo))
-        gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{} B-{}".format(rx['Frame'],BatchNo))
+
+        gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:], title = "RX f-{}".format(rx['Frame']))
             
             # plot_loss_batch(rx,flags,saving,['kind','law',"std",'linewidth'],"Llikelihood")
             # plot_loss_batch(rx,flags,saving,['kind','law',"std",'linewidth'],"DKL")

@@ -9,20 +9,22 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2023-03-04) - creation
-#   1.1.0 (2024-03-27) - print_result --- PhaseNoise management
+#   1.1.0 (2024-03-27) - print_result - PhaseNoise management
 #                      - [NEW] save estimations
 #   1.1.1 (2024-04-03) - print_result
 #   1.2.0 (2024-04-19) - init_processing, along with rxdsp (1.1.0)
 #   1.2.1 (2024-05-22) - init_processing, along with rxdsp (1.3.0)
-#                      - init_processing, print_result --- differentiating VAE-CMA for initialization
+#                      - init_processing, print_result - differentiating VAE-CMA for initialisation
 #   1.2.2 (2024-05-28) - print_result
 #   1.2.3 (2024-06-04) - init_processing, pilots management, along with txdsp (1.1.0)
-#   1.2.4 (2024-06-06) - init_processing Nconv and NSymbEq changed to symbol wise instead of weird mix, along with rxdsp (1.4.1)
-#                      - Ntaps -> NsampTaps
+#   1.2.4 (2024-06-07) - init_processing NSymbConv and NSymbEq changed to symbol wise instead of
+#                       weird mix, along with rxdsp (1.4.1)
+#                      - cleaning (Ntaps, Nconv)
 #
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -30,7 +32,8 @@
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
 #   [A1] Author      : Vincent LAUINGER
-#        Title       : Blind Equalization and Channel Estimation in Coherent Optical Communications Using Variational Autoencoders
+#        Title       : Blind Equalization and Channel Estimation in Coherent Optical Communications
+#                       Using Variational Autoencoders
 #        Journal     : JOURNAL ON SELECTED AREAS IN COMMUNICATIONS
 #        Volume - N° : 40-9
 #        Date        : 2022-11
@@ -40,7 +43,7 @@
 #   Functions
 #   [C3] Author      : Vincent LAUINGER
 #        Contact     : vincent.lauinger@kit.edu
-#        Affiliation : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#        Affiliation : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
 #        Date        : 2022-06-15
 #        Program     : 
 #        Code version: 
@@ -167,28 +170,27 @@ def init_processing(tx, fibre, rx, saving, device):
 
     tx['Npolars']           = 2
     tx["RollOff"]           = 0.1
-    tx["fs"]                = tx["Rs"]*tx["Nsps"]           # [GHz]
+    tx["fs"]                = (1+tx["RollOff"])/2*tx["Rs"]*tx["Nsps"]           # [GHz]
     tx, rx                  = txdsp.get_constellation(tx, rx)
     
     if rx['mode'].lower()   != "blind":
-        tx, rx              = txdsp.get_constellation(tx, rx, 'pilots')
-    
+        for k in range(len(tx['pilots_info'])):
+            tx, rx           = txdsp.get_constellation(tx, rx, tx['pilots_info'][k])
+
+        
     tx["PhaseNoise"]        = np.zeros((tx['Npolars'],tx['NsampFrame'], rx['Nframes']))
     
 ################################################################################
 # INITIALISATION OF CHANNEL MATRIX
 ################################################################################
-
-    h_est                   = np.zeros([tx['Npolars'], tx['Npolars'], 2, tx['NsampTaps']])
+    h_est = np.zeros([tx['Npolars'], tx['Npolars'], 2, tx['NsampTaps']])
     h_est[0,0,0,tx["NSymbTaps"]-1] = 1
     h_est[1,1,0,tx["NSymbTaps"]-1] = 1
-    
+
     if rx['mimo'].lower() == "vae":
         h_est               = misc.my_tensor(h_est, requires_grad=True)
-        
+
     rx["h_est"]             = h_est
-
-
     fibre['phiIQ']          = np.zeros(tx['Npolars'],dtype = complex)
     
 ################################################################################

@@ -9,8 +9,9 @@
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute - place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright - state changes - include license
-
+#                       MUST:   include original - disclose source - include copyright -
+#                               state changes - include license
+#
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
 #   1.1.1 (2024-04-01) - [NEW] plot_fir
@@ -25,10 +26,10 @@
 #   1.5.0 (2024-06-06) - Naps -> NsampTaps, plot_const_1/2pol
 #                      - [REMOVED] plot_const_1/2pol(_2sig), plot_phases
 #                      - [NEW] plot_constellations, to replace the removed ones
-
+#
 # ----- MAIN IDEA -----
 #   Library for plotting functions in (optical) telecommunications
-
+#
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
 #   Authors             : 
@@ -38,17 +39,17 @@
 #   Date                : 
 #   DOI/ISBN            : 
 #   Pages               : 
-
+#
 #   Functions:
 #   [C1] Author         : Vincent Lauinger
 #       Contact         : vincent.lauinger@kit.edu
-#       Affiliation     : Communications Engineering Lab (CEL), Karlsruhe Institute of Technology (KIT)
+#       Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
 #       Date            : 2022-06-15
 #       Program Title   : 
 #       Code Version    : 
 #       Type            : Source code
 #       Web Address     : https://github.com/kit-cel/vae-equalizer
-
+#
 #   [C2] Authors        : Jingtian Liu, Élie Awwad, Louis Tomczyk
 #       Contact         : elie.awwad@telecom-paris.fr
 #       Affiliation     : Télécom Paris, COMELEC, GTO
