@@ -1,16 +1,18 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : Louis Tomczyk
+#   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Version         : 1.1.2
 #   Date            : 2024-06-06
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright -
-#                               state changes - include license
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
@@ -39,14 +41,15 @@
 #       DOI/ISBN        : 10.1109/JLT.2019.2898855
 #       Pages           : 
 #
-#   Functions:
-#   [C3] Author         : Vincent Lauinger
-#       Contact         : vincent.lauinger@kit.edu
-#       Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
-#       Date            : 2022-06-15
-#       Program Title   : 
-#       Code Version    : 
-#       Web Address     : https://github.com/kit-cel/vae-equalizer
+#   CODE:
+#   [C1] Author          : Vincent Lauinger
+#        Contact         : vincent.lauinger@kit.edu
+#        Laboratory/team : Communications Engineering Lab
+#        Institution     : Karlsruhe Institute of Technology (KIT)
+#        Date            : 2022-06-15
+#        Program Title   : 
+#        Code Version    : 
+#        Web Address     : https://github.com/kit-cel/vae-equalizer
 # ---------------------------------------------
 
 
@@ -847,12 +850,6 @@ class twoXtwoFIR(nn.Module):
         amp_lev_mat     = tx["amps"].repeat(rx["NSymbBatch"],1).transpose(0,1)
         amp_lev_mat_sq  = amp_lev_mat**2
         
-        # NsampBatch      = rx["minibatch_real"][:,0,:].shape[1]  
-        # YHI             = rx["minibatch_real"][0,0,:].view(1,NsampBatch)
-        # YHQ             = rx["minibatch_real"][0,1,:].view(1,NsampBatch)
-        # YVI             = rx["minibatch_real"][1,0,:].view(1,NsampBatch)
-        # YVQ             = rx["minibatch_real"][1,1,:].view(1,NsampBatch)
-        
         # NsampBatch      = rx["minibatch_real"][:,0].shape[1]  
         YHI             = rx["minibatch_real"][0].view(1,rx['NsampBatch'])
         YHQ             = rx["minibatch_real"][1].view(1,rx['NsampBatch'])
@@ -908,14 +905,7 @@ class twoXtwoFIR(nn.Module):
             
 def train_self(BatchNo,rx,tx):
     
-    rx['BatchNo']           = BatchNo
-    # rx["minibatch_real"]    = rx["sig_real"][:,:,BatchNo*rx["NsampBatch"]:(BatchNo+1)*rx["NsampBatch"]]
-    # rx['out_train'][:,:,BatchNo*rx["NSymbBatch"]:(BatchNo+1)*rx["NSymbBatch"]] = \
-    #                         rx['minibatch_output'].detach().clone()
-
-    # rx['out_train'][:,:,BatchNo*rx["NSymbBatch"]:(BatchNo+1)*rx["NSymbBatch"]] = \
-    #                         rx['minibatch_output'].detach().clone()
-    
+    rx['BatchNo']           = BatchNo   
     rx["minibatch_real"]    = rx["sig_real"][:,BatchNo*rx["NsampBatch"]:(BatchNo+1)*rx["NsampBatch"]]
     rx                      = rx['net'](tx,rx)
     
@@ -936,91 +926,4 @@ def train_self(BatchNo,rx,tx):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-# convolution
-# x = [1 2 3]
-# y = [4 5 6]
-# z = x*y =  [z1 z2 z3 z4 z5]
-
-# what is done:
-#    z = fliplr(z): [6 5 4]
-# 
-# z1 = 
-# [0 0 1 2 3].
-# [6 5 4 0 0] = 6.0+5.0+4.1+2.0+3.0 = 4
-#
-# z2 = 
-# [0 1 2 3].
-# [6 5 4 0] = 6.0+5.1+4.2+3.0       = 13
-#
-# z3 = 
-# [1 2 3].
-# [6 5 4] = 6.1+5.2+4.3             = 28
-#
-# z4 = 
-# [1 2 3 0].
-# [0 6 5 4] = 0.1+6.2+5.3+4.0       = 27
-#
-# z5 = 
-# [1 2 3 0 0].
-# [0 0 6 5 4] = 0.1+0.2+6.3+5.0+4.0 = 18
-#
-# mode = full (default) [4 13 28 27 18]
-# mode = same           [13 28 27]
-# mode = valid          [28]
-
-
-
-
-
-
-
-
-
+#%%

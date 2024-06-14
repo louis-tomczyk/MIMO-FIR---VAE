@@ -1,16 +1,18 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : Louis Tomczyk
+#   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Version         : 1.2.2
 #   Date            : 2024-06-06
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright -
-#                               state changes - include license
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
 
 # ----- CHANGELOG -----
 #   1.0.0 (2023-03-04)  creation
@@ -33,8 +35,8 @@
 #       Date            : 
 #       DOI/ISBN        : 
 #       Pages           : 
-
-#   Functions:
+#  ----------------------
+#   CODE
 #   [C1] Author         : CNRS - IDRIS
 #       Contact         : 
 #       Affiliation     : 
@@ -1046,6 +1048,8 @@ def set_saving_params():
 
 # ChatGPT
 def show_dict(my_dict):
+    
+    my_dict = sort_dict_by_keys(my_dict)
     max_key_length = max(len(key) for key in my_dict.keys())
     
     for key, value in my_dict.items():

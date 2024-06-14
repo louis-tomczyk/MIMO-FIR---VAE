@@ -6,10 +6,12 @@
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Version         : 1.0.3
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright -
-#                               state changes - include license
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2023-03-04) - creation
@@ -27,14 +29,14 @@
 #   DOI/ISBN            :
 #   Pages               :
 #  ----------------------
-#   Functions
+#   CODE
 #   [C1] Author          : Vincent Lauinger
 #        Contact         : vincent.lauinger@kit.edu
-#        Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
+#        Laboratory/team : Communications Engineering Lab
+#        Institution     : Karlsruhe Institute of Technology (KIT)
 #        Date            : 2022-06-15
 #        Program Title   : 
 #        Code Version    : 
-#        Type            : Source code
 #        Web Address     : https://github.com/kit-cel/vae-equalizer
 # ---------------------------------------------
 # %%

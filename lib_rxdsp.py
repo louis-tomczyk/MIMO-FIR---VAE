@@ -1,15 +1,17 @@
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : Louis Tomczyk
+#   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Version         : 1.4.1
 #   Date            : 2024-06-06
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright -
-#                               state changes - include license
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
@@ -38,16 +40,16 @@
 #   Date                : 
 #   DOI/ISBN            : 
 #   Pages               : 
-#
-#   Functions:
-#   [C1] Author         : Vincent Lauinger
-#       Contact         : vincent.lauinger@kit.edu
-#       Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
-#       Date            : 2022-06-15
-#       Program Title   : 
-#       Code Version    : 
-#       Type            : Source code
-#       Web Address     : https://github.com/kit-cel/vae-equalizer
+#  ----------------------
+#   CODE
+#   [C3] Author          : Vincent Lauinger
+#        Contact         : vincent.lauinger@kit.edu
+#        Laboratory/team : Communications Engineering Lab
+#        Institution     : Karlsruhe Institute of Technology (KIT)
+#        Date            : 2022-06-15
+#        Program Title   : 
+#        Code Version    : 
+#        Web Address     : https://github.com/kit-cel/vae-equalizer
 #
 #   [C2] Authors        : Jingtian Liu, Élie Awwad, Louis Tomczyk
 #       Contact         : elie.awwad@telecom-paris.fr
@@ -266,6 +268,61 @@ def decision(tx, rx):
 
     return rx
 
+#%%
+def find_pilots(tx,rx,what_pilots):
+    
+    if rx['mimo'].lower() != 'blind':
+        # maintenance
+        ref     = tx["pilots_{}_real".format(what_pilots[0])]
+        # sig     = rx['sig_eq_real'][:,rx['Frame']]
+        sig     = rx['sig_eq_real']
+        
+        THI     = ref[0]
+        THQ     = ref[1]
+        TVI     = ref[2]
+        TVQ     = ref[3]
+    
+        RHI     = np.reshape(sig[0],(1,-1)).squeeze()
+        RHQ     = np.reshape(sig[1],(1,-1)).squeeze()
+        RVI     = np.reshape(sig[2],(1,-1)).squeeze()
+        RVQ     = np.reshape(sig[3],(1,-1)).squeeze()
+    
+        # correlation between each channel
+        xcorrHI = np.correlate(THI,RHI)
+        xcorrHQ = np.correlate(THQ,RHQ)
+        xcorrVI = np.correlate(TVI,RVI)
+        xcorrVQ = np.correlate(TVQ,RVQ)
+    
+        # getting the shift
+        shiftHI = np.argmax(xcorrHI)
+        shiftHQ = np.argmax(xcorrHQ)
+        shiftVI = np.argmax(xcorrVI)
+        shiftVQ = np.argmax(xcorrVQ)
+        
+        thresh = 6
+        # print(np.sum(xcorrHI>thresh))
+        # print(np.sum(xcorrHQ>thresh))
+        # print(np.sum(xcorrVI>thresh))
+        # print(np.sum(xcorrVQ>thresh))
+    
+        # displaying the correaltions to check
+        # gen.plot_xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ, "test - find pilots")
+        
+        
+        
+        # for BatchNo in range(int(rx['NBatchFrame']/2)):
+        #     NBatch  = 2
+        #     a       = int(rx['NSymbFrame']/rx['NBatchFrame']+1)*BatchNo
+        #     b       = int(a+rx['NSymbFrame']/rx['NBatchFrame']*NBatch)
+        #     plt.plot(xcorrHI[a:b])
+        #     distances = np.zeros(1)
+        #     plt.title('{}'.format(rx['NSymbBatch']-np.argmax(xcorrHI[a:b])))
+        #     plt.show()
+    
+    
+        rx['PilotsShift']    = np.array([shiftHI,shiftHQ,shiftVI,shiftVQ]).astype(int)
+    
+    return rx
 
 
 #%%
@@ -316,7 +373,7 @@ def find_shift(tx,rx):
 
 
 #%%
-def mimo(tx,rx,saving,flags):
+def mimo(tx,rx,saving):
 
     if rx['mimo'].lower() == "vae":
         with torch.set_grad_enabled(True):
@@ -326,11 +383,11 @@ def mimo(tx,rx,saving,flags):
                 rx,loss         = kit.compute_vae_loss(tx,rx)
                 maths.update_fir(loss,rx['optimiser'])
 
-        gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:], title = "RX f-{}".format(rx['Frame']))
+        # gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:], title = "RX f-{}".format(rx['Frame']))
             
-            # plot_loss_batch(rx,flags,saving,['kind','law',"std",'linewidth'],"Llikelihood")
-            # plot_loss_batch(rx,flags,saving,['kind','law',"std",'linewidth'],"DKL")
-            # plot_loss_batch(rx,flags,saving,['kind','law',"std",'linewidth'],"losses")
+            # gen.plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"Llikelihood")
+            # plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"DKL")
+            # plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"losses")
 
         return rx,loss
 
@@ -338,8 +395,8 @@ def mimo(tx,rx,saving,flags):
 
         if rx["Frame"]>rx['FrameChannel']-1:
             rx,loss = kit.CMA(tx,rx)
-            # gen.plot_loss_cma(rx,flags,saving,['kind','law',"std",'linewidth'],"x")
-            gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{}".format(rx['Frame']))
+            # gen.plot_loss_cma(rx,saving,['kind','law',"std",'linewidth'],"x")
+            # gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{}".format(rx['Frame']))
         else:
             loss = []
 
@@ -389,6 +446,5 @@ def SNR_estimation(tx,rx):
         rx['Pnoise_est'][:,rx['Frame']]   = torch.mean(rx['Pnoise_batches'],dim=1)  
 
     return rx
-
 
 

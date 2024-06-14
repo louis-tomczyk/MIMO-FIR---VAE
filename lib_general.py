@@ -1,16 +1,18 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : Louis Tomczyk
+#   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Version         : 1.5.0
 #   Date            : 2024-06-06
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright -
-#                               state changes - include license
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
@@ -39,18 +41,17 @@
 #   Date                : 
 #   DOI/ISBN            : 
 #   Pages               : 
-#
-#   Functions:
+#  ----------------------
+#   CODE
 #   [C1] Author         : Vincent Lauinger
-#       Contact         : vincent.lauinger@kit.edu
-#       Affiliation     : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
-#       Date            : 2022-06-15
-#       Program Title   : 
-#       Code Version    : 
-#       Type            : Source code
-#       Web Address     : https://github.com/kit-cel/vae-equalizer
-#
-#   [C2] Authors        : Jingtian Liu, Élie Awwad, Louis Tomczyk
+#        Contact        : vincent.lauinger@kit.edu
+#        Laboratory/team: Communications Engineering Lab
+#        Institution    : Karlsruhe Institute of Technology (KIT)
+#        Date           : 2022-06-15
+#        Program Title  : 
+#        Code Version   : 
+#        Web Address    : https://github.com/kit-cel/vae-equalizer
+#   [C2] Authors        : Jingtian Liu, Élie Awwad, louis tomczyk
 #       Contact         : elie.awwad@telecom-paris.fr
 #       Affiliation     : Télécom Paris, COMELEC, GTO
 #       Date            : 2024-04-27
@@ -65,9 +66,7 @@
 # --- CONTENTS ---
 # - fir_2Dto3D
 # - fir_3Dto2D
-# - plot_const_1pol
-# - plot_const_2pol
-# - plot_const_2pol_2sig    (1.4.0)
+# - plot_constellations     (1.5.0)
 # - plot_decisions          (1.3.0)
 # - plot_fir                (1.1.1)
 # - plot_loss_batch
@@ -334,61 +333,59 @@ def plot_loss_batch(rx,flags,saving,keyword,what):
     
     # do not intervert SAVEFIG and SHOW otherwise the figure will not be saved
 
-    if flags['plot_loss_batch']:
-
-        Binary  = misc.string_to_binary(what)
-        Decimal = misc.binary_to_decimal(Binary)
-        Fig_id  = int(Decimal*1e-12)
-        plt.figure(Fig_id)
-        
-        x = [k for k in range(rx['BatchNo'])]
-        y = rx[what+'_subframe'][rx['Frame']][:rx['BatchNo']].detach().numpy()        
-        
-        if rx['Frame'] >= rx['FrameChannel']:
-            linestyle   = "solid"
+    Binary  = misc.string_to_binary(what)
+    Decimal = misc.binary_to_decimal(Binary)
+    Fig_id  = int(Decimal*1e-12)
+    plt.figure(Fig_id)
+    
+    x = [k for k in range(rx['BatchNo'])]
+    y = rx[what+'_subframe'][rx['Frame']][:rx['BatchNo']].detach().numpy()        
+    
+    if rx['Frame'] >= rx['FrameChannel']:
+        linestyle   = "solid"
+    else:
+        linestyle = ":"
+     
+    if rx['Frame'] == rx['FrameChannel']:
+        plt.plot(x,y,linestyle=linestyle,linewidth = 5, color = 'k',label = 'frame {} - after channel 1st round'.format(rx["Frame"]))   
+     
+    elif rx['Frame']%saving['skip'] == 0:
+        if rx["Frame"]<rx['FrameChannel']:
+            plt.plot(x,y,linestyle=linestyle,label = 'frame {} - b4 channel'.format(rx["Frame"]))
         else:
-            linestyle = ":"
-         
-        if rx['Frame'] == rx['FrameChannel']:
-            plt.plot(x,y,linestyle=linestyle,linewidth = 5, color = 'k',label = 'frame {} - after channel 1st round'.format(rx["Frame"]))   
-         
-        elif rx['Frame']%saving['skip'] == 0:
-            if rx["Frame"]<rx['FrameChannel']:
-                plt.plot(x,y,linestyle=linestyle,label = 'frame {} - b4 channel'.format(rx["Frame"]))
-            else:
-                plt.plot(x,y,linestyle=linestyle,label = 'frame {} - after channel'.format(rx["Frame"]))
+            plt.plot(x,y,linestyle=linestyle,label = 'frame {} - after channel'.format(rx["Frame"]))
 
-        if rx['Frame'] == rx['Nframes']-1:
-            plt.xlabel("iteration")
-            plt.ylabel(what)
+    if rx['Frame'] == rx['Nframes']-1:
+        plt.xlabel("iteration")
+        plt.ylabel(what)
 
-            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-                        
-            
-            if keyword != []:
-                patterns        = []
-                pattern_values  = []
-                
-                for kw in keyword:
-                    pattern_index   = misc.find_string(kw,saving['filename'])
-                    patterns.append(saving['filename'][pattern_index[0]:pattern_index[1]])
-                    pattern_values.append(saving['filename'][pattern_index[1]+1:pattern_index[1]+1+2])
-                
-                tname = what+' in batches - '
-                for k in range(len(patterns)):
-                    tname = tname + "{}-{} -- ".format(patterns[k],pattern_values[k])
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
                     
-                plt.title(tname)
-
-            else:
-                plt.title(what+" in the batches")
+        
+        if keyword != []:
+            patterns        = []
+            pattern_values  = []
+            
+            for kw in keyword:
+                pattern_index   = misc.find_string(kw,saving['filename'])
+                patterns.append(saving['filename'][pattern_index[0]:pattern_index[1]])
+                pattern_values.append(saving['filename'][pattern_index[1]+1:pattern_index[1]+1+2])
+            
+            tname = what+' in batches - '
+            for k in range(len(patterns)):
+                tname = tname + "{}-{} -- ".format(patterns[k],pattern_values[k])
                 
-            output_file = "{}.png".format(saving['filename'])
-            plt.savefig(output_file,bbox_inches='tight')
+            plt.title(tname)
+
+        else:
+            plt.title(what+" in the batches")
+            
+        output_file = "{}.png".format(saving['filename'])
+        plt.savefig(output_file,bbox_inches='tight')
             
 #%%
 
-def plot_loss_cma(rx,flags,saving,keyword,what):
+def plot_loss_cma(rx,saving,keyword,what):
     
     # a tensor with GRAD on cannot be plotted, it requires first to put it in a normal array
     # that's the purpose of DETACH
@@ -489,7 +486,7 @@ def plot_losses(Losses,OSNRdBs,title):
 
 #%%
 
-def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref,zoom):
+def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref=0,zoom=0):
 
     assert sig_11.shape == sig_12.shape == sig_21.shape == sig_22.shape
     

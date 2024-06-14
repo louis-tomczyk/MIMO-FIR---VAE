@@ -7,10 +7,12 @@
 #   Version         : 1.2.4
 #   Date            : 2024-06-06
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright -
-#                               state changes - include license
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2023-03-04) - creation
@@ -31,23 +33,25 @@
 #
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
-#   [A1] Author      : Vincent LAUINGER
-#        Title       : Blind Equalization and Channel Estimation in Coherent Optical Communications
-#                       Using Variational Autoencoders
-#        Journal     : JOURNAL ON SELECTED AREAS IN COMMUNICATIONS
-#        Volume - N° : 40-9
-#        Date        : 2022-11
-#        DOI/ISBN    : 10.1109/JSAC.2022.3191346
-#        Pages       : 2529 - 2539
+#   [A1] Authors         : Vincent Lauinger
+#        Title           : Blind Equalization and Channel Estimation in
+#                          Coherent Optical Communications Using Variational
+#                          Autoencoders
+#        Journal/Editor  : J-SAC
+#        Volume - N°     : 40-9
+#        Date            : 2022-11
+#        DOI/ISBN        : 10.1109/JSAC.2022.3191346
+#        Pages           : 2529 - 2539
 #  ----------------------
-#   Functions
-#   [C3] Author      : Vincent LAUINGER
-#        Contact     : vincent.lauinger@kit.edu
-#        Affiliation : Communications Engineering Lab, Karlsruhe Institute of Technology (KIT)
-#        Date        : 2022-06-15
-#        Program     : 
-#        Code version: 
-#        Web Address : https://github.com/kit-cel/vae-equalizer
+#   CODE
+#   [C1] Author          : Vincent Lauinger
+#        Contact         : vincent.lauinger@kit.edu
+#        Laboratory/team : Communications Engineering Lab
+#        Institution     : Karlsruhe Institute of Technology (KIT)
+#        Date            : 2022-06-15
+#        Program Title   : 
+#        Code Version    : 
+#        Web Address     : https://github.com/kit-cel/vae-equalizer
 # ---------------------------------------------
 # %%
 
@@ -101,15 +105,18 @@ def processing(tx, fibre, rx, saving, flags):
 
         rx              = init_train(tx, rx, frame)
         tx              = txdsp.transmitter(tx, rx)
-        tx, fibre, rx   = prop.propagation(tx, fibre, rx)
+        # tx, fibre, rx   = prop.propagation(tx, fibre, rx)
 
 
-        rx, loss        = rxdsp.mimo(tx, rx, saving, flags)
+        # rx, loss        = rxdsp.mimo(tx, rx, saving)
+        
+        # for k in range(len(tx['pilots_info'])):
+        #     rx          = rxdsp.find_pilots(tx, rx,tx['pilots_info'][k])
 
-        rx              = save_estimations(rx)
-        rx              = rxdsp.SNR_estimation(tx, rx)
-        rx              = rxdsp.SER_estimation(tx, rx)
-        array           = print_results(loss, frame, tx, fibre, rx, saving)
+        # rx              = save_estimations(rx)
+        # rx              = rxdsp.SNR_estimation(tx, rx)
+        # rx              = rxdsp.SER_estimation(tx, rx)
+        # array           = print_results(loss, frame, tx, fibre, rx, saving)
 
         # rx = gen.real2complex_fir(rx)
         # gen.show_fir_central_tap(rx)
@@ -117,13 +124,13 @@ def processing(tx, fibre, rx, saving, flags):
 
 
 
-    tx, fibre, rx = save_data(tx, fibre, rx, saving, array)
+    # tx, fibre, rx = save_data(tx, fibre, rx, saving, array)
 
     return tx, fibre, rx
 
 
 
-# %%
+#%%
 
 def init_processing(tx, fibre, rx, saving, device):
 
@@ -131,11 +138,9 @@ def init_processing(tx, fibre, rx, saving, device):
 # MISSING FIELDS
 ################################################################################
 
-
     if "channel" not in fibre:
         fibre['channel']    = "linear"
     
-
     if 'shaping_filter' not in tx and fibre["channel"].lower() != "awgn":
         tx['shaping_filter']= "rrc"
 
@@ -147,7 +152,6 @@ def init_processing(tx, fibre, rx, saving, device):
 # SYMBOLS AND SAMPLES MANAGEMENT
 ################################################################################
 
-    
     rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
     rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']
 
@@ -179,10 +183,14 @@ def init_processing(tx, fibre, rx, saving, device):
 
         
     tx["PhaseNoise"]        = np.zeros((tx['Npolars'],tx['NsampFrame'], rx['Nframes']))
+    tx['mimo']              = rx['mimo'] # usefull for txdsp.pilot_generation
+    tx['NSymbBatch']        = rx['NSymbBatch']
+    tx['NsampBatch']        = rx['NsampBatch']
     
 ################################################################################
 # INITIALISATION OF CHANNEL MATRIX
 ################################################################################
+
     h_est = np.zeros([tx['Npolars'], tx['Npolars'], 2, tx['NsampTaps']])
     h_est[0,0,0,tx["NSymbTaps"]-1] = 1
     h_est[1,1,0,tx["NSymbTaps"]-1] = 1
@@ -196,6 +204,7 @@ def init_processing(tx, fibre, rx, saving, device):
 ################################################################################
 # RANDOM EFFECTS
 ################################################################################
+
     fibre                   = prop.set_thetas(tx, fibre, rx)
     tx                      = txhw.gen_phase_noise(tx, rx)
 

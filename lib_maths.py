@@ -1,16 +1,18 @@
 # %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
-#   Author          : Louis Tomczyk
+#   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Version         : 1.2.2
 #   Date            : 2024-05-27
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute - place warranty
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source - include copyright -
-#                               state changes - include license
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
 #
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
@@ -30,8 +32,8 @@
 #       Date            : 
 #       DOI/ISBN        : 
 #       Pages           : 
-#
-#   Functions:
+#  ----------------------
+#   CODE
 #   [C1] Author         : 
 #       Contact         : 
 #       Affiliation     : 
