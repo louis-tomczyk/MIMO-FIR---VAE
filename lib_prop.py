@@ -69,7 +69,18 @@ pi = np.pi
 # =============================================================================
 
 
+#%% # linear channel
+def propagation(tx,fibre,rx):
 
+    rx      = simulate_dispersion(tx,fibre,rx)
+    rx      = rxhw.load_ase(tx,rx)
+
+    # if rx['Frame'] >= rx['FrameChannel']:
+    #     gen.plot_const_2pol(rx['sig_real'], "prop  f-{}".format(rx['Frame']-rx['FrameChannel']),tx)
+        
+    rx      = misc.sort_dict_by_keys(rx)
+    
+    return tx,fibre,rx
 
 #%% ===========================================================================
 # --- FUNCTIONS ---
@@ -133,21 +144,7 @@ def gen_random_theta(fibre):
 
 
 
-#%%
-def propagation(tx,fibre,rx):
 
-    # linear channel
-    rx      = simulate_dispersion(tx,fibre,rx)
-    rx      = rxhw.load_ase(tx,rx)
-
-    # if rx['Frame'] >= rx['FrameChannel']:
-    #     gen.plot_const_2pol(rx['sig_real'], "prop  f-{}".format(rx['Frame']-rx['FrameChannel']),tx)
-        
-    # tx      = misc.sort_dict_by_keys(tx)
-    # fibre   = misc.sort_dict_by_keys(fibre)
-    # rx      = misc.sort_dict_by_keys(rx)
-    
-    return tx,fibre,rx
 
 
 #%%

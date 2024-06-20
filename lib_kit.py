@@ -195,12 +195,14 @@ def CMA(tx,rx): # Constant Modulus Algorithm
     rx['CMA']['losses'][str(rx['Frame'])] = loss
 
 
-    rx['sig_eq_real'][0] = out[0,0,rx['NSymbCut']:-rx['NSymbCut']-1]
-    rx['sig_eq_real'][1] = out[0,1,rx['NSymbCut']:-rx['NSymbCut']-1]
-    rx['sig_eq_real'][2] = out[1,0,rx['NSymbCut']:-rx['NSymbCut']-1]
-    rx['sig_eq_real'][3] = out[1,1,rx['NSymbCut']:-rx['NSymbCut']-1]
-
-    return rx,loss
+    rx['sig_eq_real_cma']       = np.zeros((4,out.shape[-1]))
+    rx['sig_eq_real_cma'][0]    = out[0,0]
+    rx['sig_eq_real_cma'][1]    = out[0,1]
+    rx['sig_eq_real_cma'][2]    = out[1,0]
+    rx['sig_eq_real_cma'][3]    = out[1,1]
+    
+    
+    return rx, loss
 
 
 

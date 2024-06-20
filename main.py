@@ -59,7 +59,6 @@ mb.clear_all()
 import numpy as np
 import torch
 import lib_misc as misc
-from lib_matlab import clc
 import lib_txdsp as txdsp
 import processing as process
 import matplotlib.pyplot as plt
@@ -73,8 +72,13 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if device == "cuda": torch.cuda.init()
 torch.set_default_dtype(torch.float32)
 
+
+from lib_matlab import clc
+from lib_misc import KEYS as keys
+from lib_maths import power
 pi = np.pi
 clc()
+np.set_printoptions(linewidth=160)
 
 #%% ===========================================================================
 # --- PARAMETERS ---
@@ -86,11 +90,13 @@ tx,fibre,rx,saving,flags        = misc.init_dict()
 ################################ TRANSMITTER ##################################
 ###############################################################################
 
-tx["NSymbTaps"]                 = 7                     # must be odd number
-tx["Rs"]                        = 64e9                  # Symbol rate [Baud]
-tx['SNRdB']                     = 90
+tx["NSymbTaps"]                 = 7                                            # must be odd number
+tx["Rs"]                        = 64e9                                         # Baud] Symbol rate
+tx['SNRdB']                     = 50
 
 tx['flag_phase_noise']          = 1
+
+paramPHI                        = [1e5]                                        # [Hz] laser linewidth
 
 # -----------------------------------------------------------------------------
 # Entropies table
@@ -114,10 +120,9 @@ tx['flag_phase_noise']          = 1
 # -------------------------------------------------------
 
 
+tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
+tx["nu"]                        = 0                                       # for PCS: exp(-nu*|x|^2)/...
 
-tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
-tx["nu"]                        = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
-tx['PhaseNoise_mode']           = "batch-wise"                                 # {samp-wise, batch-wise}
 
 # -----------------------------------------------------------------------------
 # Pilots management
@@ -138,35 +143,39 @@ tx['PhaseNoise_mode']           = "batch-wise"                                 #
 #                                                   if not cazac
 # -----------------------------------------------------------------------------
 # Examples
-tx['pilots_info']       = [['synchro','rand',"framewise","same","4QAM",3,0]]   #ok
-tx['pilots_info']       = [['synchro','rand',"framewise","polwise","4QAM",3,0]]#ok
-tx['pilots_info']       = [['synchro','cazac',"framewise","","",64]]           #ok
-tx['pilots_info']       = [['synchro','data',"framewise","same","",10]]        #ok
-tx['pilots_info']       = [['synchro','data',"framewise","polwise","",10]]     #ok
+# tx['pilots_info']       = [['synchro','rand',"framewise","same","4QAM",3,0]]   #ok
+# tx['pilots_info']       = [['synchro','rand',"framewise","polwise","4QAM",3,0]]#ok
+# tx['pilots_info']       = [['synchro','cazac',"framewise","","",64]]           #ok
+# tx['pilots_info']       = [['synchro','data',"framewise","same","",10]]        #ok
+# tx['pilots_info']       = [['synchro','data',"framewise","polwise","",10]]     #ok
 
-tx['pilots_info']       = [['synchro_once','rand',"","same","4QAM",3,0]]       #ok
-tx['pilots_info']       = [['synchro_once','rand',"","polwise","4QAM",3,0]]    #ok
-tx['pilots_info']       = [['synchro_once','cazac',"","","",64]]               #ok
-tx['pilots_info']       = [['synchro_once','data',"","polwise","",10]]         #ok
-tx['pilots_info']       = [['synchro_once','data',"","same","",10]]            #ok
+# tx['pilots_info']       = [['synchro_once','rand',"","same","4QAM",3,0]]       #ok
+# tx['pilots_info']       = [['synchro_once','rand',"","polwise","4QAM",3,0]]    #ok
+# tx['pilots_info']       = [['synchro_once','cazac',"","","",64]]               #ok
+# tx['pilots_info']       = [['synchro_once','data',"","polwise","",10]]         #ok
+# tx['pilots_info']       = [['synchro_once','data',"","same","",10]]            #ok
 
-tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",3,0]]            #ok
-tx['pilots_info']       = [['cpr','rand',"same","polwise","4QAM",3,0]]         #ok
-tx['pilots_info']       = [['cpr','rand',"batchwise","same","4QAM",3,0]]       #ok
-tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",3,0]]    #ok
-tx['pilots_info']       = [['cpr','cazac',"","","",64]]                        #ok
+# tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",3,0]]            #ok
+# tx['pilots_info']       = [['cpr','rand',"same","polwise","4QAM",3,0]]         #ok
+# tx['pilots_info']       = [['cpr','rand',"batchwise","same","4QAM",3,0]]       #ok
+# tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",3,0]]    #ok
+# tx['pilots_info']       = [['cpr','cazac',"","","",64]]                        #ok
 # -----------------------------------------------------------------------------
 
 
-tx['pilots_info']       = [['synchro_once','data',"","same","",10],
-                           ['cpr','rand',"same","same","4QAM",3,0]]
+# tx['pilots_info']       = [['synchro_once','data',"","same","",10],
+#                            ['cpr','rand',"same","same","4QAM",3,0]]
+
+
+
+tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",3,0]]         #ok
 
 # tx['PhiLaw']["kind"]  = 'Rwalk'
 # tx['PhiLaw']["law"]   = 'linewidth'
 tx['PhiLaw']["kind"]    = 'func'
 tx['PhiLaw']["law"]     = 'lin'
 tx["PhiLaw"]['Start']   = 0*pi/180
-tx["PhiLaw"]['End']     = 1*pi/180
+tx["PhiLaw"]['End']     = 5*pi/180
 
 
 ###############################################################################
@@ -175,12 +184,12 @@ tx["PhiLaw"]['End']     = 1*pi/180
 
 rx['mode']              = 'pilots'                                             # {blind, pilots}
 rx['SNRdB']             = 25                                                   # {>0}
-rx["lr"]                = 5e-4                                                 # {>0,<1e-2}
 rx["mimo"]              = "cma"                                                # {cma,vae}
+rx["lr"]                = 5e-4                                                 # {>0,<1e-2}
 
 if tx['Rs'] == 64e9:
     rx["FrameChannel"]  = 5
-    rx["SymbScale"]     = 100
+    rx["SymbScale"]     = 5
 else:
     rx["FrameChannel"]  = 40
     rx["SymbScale"]     = 150
@@ -190,22 +199,18 @@ else:
 ################################## CHANNEL ####################################
 ###############################################################################
 
-tx['DeltaPhiC']                 = 1e-1                                         # [rad]
-fibre['DeltaThetaC']            = np.pi/35                                     # [rad]
-fibre['fpol']                   = 100                                          # [Hz]
-
 
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NframesChannel]]
 
 # paramPOL                        = np.array([[5],[85],[1]])
-paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[1]])
+# paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
+paramPOL                        = np.array([[0],[10]])
 
 
-paramPHI                        = [1e4]
 paramRea                        = [1] # must be the same size as paramPOL[0]
 
-fibre['PMD']                    = 0.04                                         # [ps/sqrt(km)]
+fibre['PMD']                    = 0                                         # [ps/sqrt(km)]
 fibre['D']                      = 17                                           # [ps/nm/km]
 fibre['PMD_SI']                 = fibre['PMD']*1e-12/np.sqrt(1000)             # [s/sqrt(m)], 1e-12/np.sqrt(1000) = 1 [ps/sqrt(km)]
 fibre['D_SI']                   = fibre['D']*1e-6                              # [s/m/m]
@@ -239,24 +244,25 @@ else:
 #%% ===========================================================================
 # --- FUNCTIONS ---
 # =============================================================================
-def process_data(love,nphi,tx,fibre,rx):
+def process_data(npol,nphi,tx,fibre,rx):
 
     for k in range(len(paramPOL)):
-        print("{}".format(paramPOL[k,love]))
+        print("{}".format(paramPOL[k,npol]))
         
     if len(paramPOL) == 3:      # linear evolution
-        RangeTheta                      = paramPOL[1,love] - paramPOL[0,love]
-        SlopeTheta                      = paramPOL[2,love]
+        RangeTheta                      = paramPOL[1,npol] - paramPOL[0,npol]
+        SlopeTheta                      = paramPOL[2,npol]
         
         deltaN_Channel                  = np.floor(RangeTheta/SlopeTheta)-rx["FrameChannel"]
         Nframes_Channel                 = rx["FrameChannel"]+deltaN_Channel
-        slope                           = (paramPOL[1,love]-paramPOL[0,love])/Nframes_Channel
+        slope                           = (paramPOL[1,npol]-paramPOL[0,npol])/Nframes_Channel
         print(slope)
-        fibre["ThetasLaw"]['Start']     = (paramPOL[0,love])*np.pi/180
-        fibre["ThetasLaw"]['End']       = (paramPOL[1,love])*np.pi/180
+        fibre["ThetasLaw"]['Start']     = (paramPOL[0,npol])*np.pi/180
+        fibre["ThetasLaw"]['End']       = (paramPOL[1,npol])*np.pi/180
     else:
         Nframes_Channel                 = paramPOL[-1]
-        fibre["ThetasLaw"]['theta_std'] = paramPOL[love][0]
+        fibre["ThetasLaw"]['theta_std'] = paramPOL[npol][0]
+        fibre['fpol']                   = paramPOL[npol][0]
 
     rx["Nframes"]                       = int(rx["FrameChannel"] + Nframes_Channel)
 
@@ -285,10 +291,10 @@ def process_data(love,nphi,tx,fibre,rx):
 # --- LOGISTICS ---
 # =============================================================================
 
-for love in range(len(paramPOL[0])):
+for npol in range(len(paramPOL[0])):
 
     
-    Nrea = int(paramRea[love])
+    Nrea = int(paramRea[npol])
     print(Nrea)
 
     for k in range(Nrea):
@@ -299,7 +305,7 @@ for love in range(len(paramPOL[0])):
                     delayed(process_data)(k,tx,fibre,rx) for k in range(len(paramPOL)))
                 
             else:
-                tx,fibre,rx     = process_data(love,nphi,tx,fibre,rx)
+                tx,fibre,rx     = process_data(npol,nphi,tx,fibre,rx)
                 
                 if "thetadiffs" in fibre:
                     del fibre['thetadiffs']

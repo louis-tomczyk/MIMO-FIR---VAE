@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.4
-#   Date            : 2024-06-06
+#   Version         : 1.2.5
+#   Date            : 2024-06-20
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -21,13 +21,18 @@
 #   1.1.1 (2024-04-03) - print_result
 #   1.2.0 (2024-04-19) - init_processing, along with rxdsp (1.1.0)
 #   1.2.1 (2024-05-22) - init_processing, along with rxdsp (1.3.0)
-#                      - init_processing, print_result - differentiating VAE-CMA for initialisation
+#                      - init_processing, print_result - differentiating
+#                           VAE-CMA for initialisation
 #   1.2.2 (2024-05-28) - print_result
-#   1.2.3 (2024-06-04) - init_processing, pilots management, along with txdsp (1.1.0)
-#   1.2.4 (2024-06-07) - init_processing NSymbConv and NSymbEq changed to symbol wise instead of
-#                       weird mix, along with rxdsp (1.4.1)
+#   1.2.3 (2024-06-04) - init_processing, pilots management, along with txdsp
+#                           (1.1.0)
+#   1.2.4 (2024-06-07) - init_processing NSymbConv and NSymbEq changed to
+#                           symbol wise instead of weird mix, along with rxdsp
+#                           (1.4.1)
 #                      - cleaning (Ntaps, Nconv)
-#
+#   1.2.5 (2024-06-20) - init_processing: pilots for CPR, see rxdsp.CPR_pilots
+#                           along with rxdsp (1.5.0)
+# 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
 #
@@ -85,9 +90,12 @@ import lib_txhw as txhw
 import lib_rxdsp as rxdsp
 import lib_general as gen
 import lib_matlab as mat
+from lib_matlab import clc
 import timeit
 
+from lib_matlab import clc
 from lib_misc import KEYS as keys
+from lib_maths import power
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 #%% ===========================================================================
@@ -103,25 +111,11 @@ def processing(tx, fibre, rx, saving, flags):
 
         # print(frame)
 
-        rx              = init_train(tx, rx, frame)
+        rx              = init_train(tx, rx, frame)                            # if vae, otherwise: transparent
         tx              = txdsp.transmitter(tx, rx)
-        # tx, fibre, rx   = prop.propagation(tx, fibre, rx)
-
-
-        # rx, loss        = rxdsp.mimo(tx, rx, saving)
-        
-        # for k in range(len(tx['pilots_info'])):
-        #     rx          = rxdsp.find_pilots(tx, rx,tx['pilots_info'][k])
-
-        # rx              = save_estimations(rx)
-        # rx              = rxdsp.SNR_estimation(tx, rx)
-        # rx              = rxdsp.SER_estimation(tx, rx)
+        tx, fibre, rx   = prop.propagation(tx, fibre, rx)
+        rx, loss        = rxdsp.receiver(tx,rx,saving)
         # array           = print_results(loss, frame, tx, fibre, rx, saving)
-
-        # rx = gen.real2complex_fir(rx)
-        # gen.show_fir_central_tap(rx)
-        # gen.show_pol_matrix_central_tap(fibre, rx)
-
 
 
     # tx, fibre, rx = save_data(tx, fibre, rx, saving, array)
@@ -146,8 +140,18 @@ def init_processing(tx, fibre, rx, saving, device):
 
     if 'skip' not in saving:
         saving['skip']      = 10
-
-
+        
+    if 'PhaseNoise_mode' not in tx:
+        tx['PhaseNoise_mode'] = "batch-wise"                                   # {samp-wise, batch-wise}
+        
+        
+    if 'DeltaPhiC' not in tx:
+        tx['DeltaPhiC']                 = 1e-1                                 # [rad]
+        
+    if 'DeltaThetaC' not in fibre:
+        fibre['DeltaThetaC']            = np.pi/35                             # [rad]
+        
+        
 ################################################################################
 # SYMBOLS AND SAMPLES MANAGEMENT
 ################################################################################
@@ -165,7 +169,6 @@ def init_processing(tx, fibre, rx, saving, device):
     
     tx['NsampChannel']      = tx['NsampFrame']*rx['NframesChannel']
     tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel'] 
-
 
 
 ################################################################################
@@ -209,13 +212,27 @@ def init_processing(tx, fibre, rx, saving, device):
     tx                      = txhw.gen_phase_noise(tx, rx)
 
 ################################################################################
-# RANDOM EFFECTS
+# RECEIVER
 ################################################################################
 
     if rx['mimo'].lower() == "vae":
         rx['net']           = kit.twoXtwoFIR(tx).to(device)
         rx['optimiser']     = optim.Adam(rx['net'].parameters(), lr=rx['lr'])
         rx['optimiser'].add_param_group({"params": rx["h_est"]})
+
+    # stuffing for pilots_aided cpr, see rxdsp.CPR_pilots
+    if rx['mode'].lower() != 'blind':
+        # Nzeros = NSb/B- floor(NSb_pilots/2)
+        # because CMA skips tx['Nsps'] symbols during the SGD        
+        rx['NSymbPilots_cma']   =  int(np.floor(tx['pilots_info'][0][-1]/2))
+        rx['NBatchFrame_pilots']= rx['NBatchFrame']-2
+        rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes']-rx['FrameChannel'],\
+                                            tx['Npolars'],
+                                            rx['NBatchFrame_pilots'],
+                                            rx['NSymbPilots_cma']))
+            
+        rx['Nzeros_stuffing']   = rx['NSymbBatch']-rx['NSymbPilots_cma']
+
 
 ################################################################################
 # OUTPUT
@@ -418,10 +435,4 @@ def save_data(tx, fibre, rx, saving, array):
     return tx, fibre, rx
 
 
-# %%
-def save_estimations(rx):
 
-    rx["H_est_l"].append(rx["h_est"].tolist())
-
-
-    return rx

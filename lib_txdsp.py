@@ -27,7 +27,7 @@
 #                       - [NEW] pilot_insertion
 #                       - transmitter: including pilot_insertion
 #   1.2.1 (2024-06-11)  - pilot_generation: including batch/frame wise
-#   1.2.2 (2024-06-11)  - pilot_generation/insertion, robustness + cazac + data
+#   1.2.2 (2024-06-14)  - pilot_generation/insertion, robustness + cazac + data
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -79,8 +79,9 @@ import lib_matlab as mb
 
 pi = np.pi
 
-from lib_misc import KEYS as keys
 from lib_matlab import clc
+from lib_misc import KEYS as keys
+from lib_maths import power
 
 
 
@@ -97,6 +98,39 @@ from lib_matlab import clc
 # - transmitter                     --- called in : processing.processing
 # =============================================================================
 
+
+
+#%%
+def transmitter(tx,rx):
+
+    tx          = shaping_filter(tx)
+    tx          = data_generation(tx,rx)
+    
+    for what_pilots_k in range(len(tx['pilots_info'])):
+        
+        tx      = pilot_generation(tx, rx, what_pilots_k)
+        tx,rx   = pilot_insertion(tx, rx, what_pilots_k)
+    
+
+    tx          = data_shaping(tx)
+
+        
+    # # gen.plot_constellations(tx['sig_real'])
+        
+    # let the vae learn the rrc filter
+    if rx["Frame"] >= rx["FrameChannel"]:
+        tx      = txhw.load_ase(tx,rx)
+        tx      = txhw.load_phase_noise(tx,rx)
+
+        
+    tx          = misc.sort_dict_by_keys(tx)
+    return tx
+
+
+
+
+
+#%%
 
 
 #%% ===========================================================================
@@ -201,11 +235,47 @@ def data_shaping(tx):
 
     return tx
 
+#%%
+def pilots_shaping(tx,rx,what_pilots_k):
+
+    # # The "valid" mode for convolution already shrinks the length
+    # tx["NsampFrame"]  = tx["Nsamp_up"]-(tx['NsampTaps']-1)
+    # 0 == pol H ------- 1 == pol V
+
+    for what_pilots_k in range(len(tx['pilots_info'])):
+        what_pilots         = tx["pilots_info"][what_pilots_k]
+        pilots_function     = 'pilots_'+what_pilots[0]
+        pilots_NSymb        = what_pilots[-1]
+        
+        h_pulse             = tx['hmatrix'][0]
+        pilots_shaped_Nsamp = tx['Nsps']*pilots_NSymb-h_pulse.shape[0]+1
+        tx["{}_real".format(pilots_function)] = \
+            np.zeros((tx["Npolars"]*2,pilots_shaped_Nsamp), dtype=np.float32)
+    
+        pilots_shape = tx["{}_cplx_up".format(pilots_function)].shape
+        
+        if len(pilots_shape) == 3 and pilots_shape[1] != 1:
+            tmpH_pilots = tx["{}_cplx_up".format(pilots_function)][0,rx['Frame'],:]
+            tmpV_pilots = tx["{}_cplx_up".format(pilots_function)][0,rx['Frame'],:]
+            
+        elif len(pilots_shape) == 3 and pilots_shape[1] == 1:
+            tmpH_pilots = tx["{}_cplx_up".format(pilots_function)][0,0,:]
+            tmpV_pilots = tx["{}_cplx_up".format(pilots_function)][1,0,:]
+            
+        tmpH = np.convolve(tmpH_pilots,h_pulse, mode = "valid")
+        tmpV = np.convolve(tmpV_pilots,h_pulse, mode = "valid")
+        
+        tx["{}_real".format(pilots_function)][0]   = np.real(tmpH)
+        tx["{}_real".format(pilots_function)][1]   = np.imag(tmpH)
+        tx["{}_real".format(pilots_function)][2]   = np.real(tmpV)
+        tx["{}_real".format(pilots_function)][3]   = np.imag(tmpV)
+    
+        tx                  = misc.sort_dict_by_keys(tx)
+
+    return tx
 
 #%%
 def get_constellation(tx,rx,*what_pilots):
-    
-
     
 ############################################################################### 
 ######################### CONSTELLATION CONSTRUCTION ##########################
@@ -214,6 +284,7 @@ def get_constellation(tx,rx,*what_pilots):
     # parameters definition of each constellation
     constellations = {}
     params = {
+        'BPSK'  :   (2, [-1, 1]),
         '4QAM'  :   (2, [-1, 1]),
         '16QAM' :   (4, [-3, -1, 1, 3]),
         '64QAM' :   (8, [-7, -5, -3, -1, 1, 3, 5, 7]),
@@ -227,19 +298,22 @@ def get_constellation(tx,rx,*what_pilots):
         
     if len(what_pilots) == 0:
         Nradii = {
+            'BPSK'  :   (1, [2]),
             '4QAM'  :   (1, [4]),
             '16QAM' :   (3, [4, 8, 4]),
             '64QAM' :   (9, [4, 8, 4, 8, 8, 12, 8, 8, 4])
         }
     
     # creation of available constellations
-    for modfor, (side, amplitudes) in params.items():
-        points = []
-        for i in range(side):
-            for j in range(side):
-                points.append(amplitudes[i] + 1j * amplitudes[j])
-        constellations[modfor]  = np.array(points)
-
+    if 'psk' not in tx['mod'].lower():
+        for modfor, (side, amplitudes) in params.items():
+            points = []
+            for i in range(side):
+                for j in range(side):
+                    points.append(amplitudes[i] + 1j * amplitudes[j])
+            constellations[modfor]  = np.array(points)
+    elif tx['mod'].lower() == 'bpsk':
+        constellations[modfor] = np.array([1j,-1j])
 
     # norm factor: sqrt(2*(M-1)/3)
     # 4qam: sqrt(2) -- 16 qam: sqrt(10) -- 64qam: sqrt(42) -- 256qam: sqrt(170)
@@ -396,12 +470,13 @@ def pilot_generation(tx,rx,what_pilots_k):
 
     what_pilots = tx['pilots_info'][what_pilots_k]
     
-    def set_flags_and_redos(what_pilots):
+    def set_params(what_pilots):
         
-        pilots_function  = 'pilots_' + what_pilots[0].lower()
-        pilots_changes   = what_pilots[2].lower()
-        pilots_polwise   = what_pilots[3].lower()
-
+        pilots_function = 'pilots_' + what_pilots[0].lower()
+        pilots_changes  = what_pilots[2].lower()
+        pilots_polwise  = what_pilots[3].lower()
+        pilots_mod      = what_pilots[4].lower()
+        
         # ------------------------------------------------------------- FLAG DO
         if (pilots_changes == 'same')\
             and '{}_flag_all_same'.format(pilots_function) in tx:
@@ -450,7 +525,21 @@ def pilot_generation(tx,rx,what_pilots_k):
             N_redo      = 1
             N_redo_pol  = 1
             
-        return flag_do, N_redo, N_redo_pol, pilots_function
+            
+        if flag_do:
+            if (tx['mimo'].lower() == "vae")\
+                and ('synchro' in pilots_function.lower())\
+                and (what_pilots[1].lower() == 'data'):
+                shape   = (N_redo_pol,N_redo,tx['NSymbBatch'])
+
+            elif what_pilots[2].lower() == 'cazac':
+                shape   = (N_redo_pol,N_redo,what_pilots[-1])
+
+            else:
+                shape   = (N_redo_pol,N_redo,tx['NSymb_{}'.\
+                                        format(pilots_function)])
+            
+        return flag_do, N_redo, N_redo_pol, pilots_function, pilots_mod, shape
     # ----------------------------------------------------------------------- #
     
     def gen_cazac(tx):
@@ -464,13 +553,11 @@ def pilot_generation(tx,rx,what_pilots_k):
         pilots_I    = np.real(np.exp(1j*tmp1*tmp2*tmp3))
         pilots_Q    = np.imag(np.exp(1j*tmp1*tmp2*tmp3)) # (64,)
         
-        # pilots_I    = mb.repmat(pilots_I, (2,1))
-        # pilots_Q    = mb.repmat(pilots_Q, (2,1))
-        
         return pilots_I,pilots_Q
     # ----------------------------------------------------------------------- #
         
     def gen_custom(tx):
+        
         amps_I      = np.ones(tx['NSymb_{}'.format(pilots_function)])
         amps_Q      = np.ones(tx['NSymb_{}'.format(pilots_function)])
         phis_I      = np.ones(tx['NSymb_{}'.format(pilots_function)])*pi/4
@@ -496,6 +583,7 @@ def pilot_generation(tx,rx,what_pilots_k):
     # ----------------------------------------------------------------------- #
         
     def gen_from_file(tx):
+        
         file        = open(tx['pilots_explicit'], 'r')
         pilots      = file.read()
         file.close()
@@ -508,52 +596,53 @@ def pilot_generation(tx,rx,what_pilots_k):
         pilots_I    = np.real(amps_I*np.exp(1j*phis_I))
         pilots_Q    = np.imag(amps_Q*np.exp(1j*phis_Q))
         
-        pilots_I    = mb.repmat(pilots_I, (2,1))
-        pilots_Q    = mb.repmat(pilots_Q, (2,1))
-        
         return pilots_I,pilots_Q
     # ----------------------------------------------------------------------- #
         
     def gen_rand(tx):
-        
 
-        pilots_I = np.random.default_rng().choice(\
-                        tx["amps_{}".format(pilots_function)],
-                        tx["NSymb_{}".format(pilots_function)])
-            
         pilots_Q = np.random.default_rng().choice(\
                         tx["amps_{}".format(pilots_function)],
                         tx["NSymb_{}".format(pilots_function)])
-        
+            
+        if 'psk' not in pilots_mod:
+            pilots_I = np.random.default_rng().choice(\
+                            tx["amps_{}".format(pilots_function)],
+                            tx["NSymb_{}".format(pilots_function)])
+        else:
+            pilots_I = np.zeros(pilots_Q.shape)
+
         return pilots_I,pilots_Q
     # ----------------------------------------------------------------------- #
     
     def pilots_processing(tx,pilots_I,pilots_Q,what_pilots_k):
         
-        what_pilots     = tx['pilots_info'][what_pilots_k]
-        pilots_I        = np.round(pilots_I,4)#.squeeze()
-        pilots_Q        = np.round(pilots_Q,4)#.squeeze()
+        what_pilots             = tx['pilots_info'][what_pilots_k]
+        pilots_I                = np.round(pilots_I,4)
+        pilots_Q                = np.round(pilots_Q,4)
 
-        pow_I           = np.mean(np.abs(pilots_I)**2)
-        pow_Q           = np.mean(np.abs(pilots_Q)**2)
-        pow_tot         = pow_I+pow_Q
-        power_scale     = np.sqrt(tx['sig_power']/pow_tot)
+        pow_pilots_I            = np.mean(np.abs(pilots_I)**2)
+        pow_pilots_Q            = np.mean(np.abs(pilots_Q)**2)
+        pow_pilots_tot          = pow_pilots_I+pow_pilots_Q
+        tx['sig_pilots_ratio']  = np.sqrt(tx['sig_power']/pow_pilots_tot)
 
-        pilots_I        *= power_scale
-        pilots_Q        *= power_scale
-        pilots_cplx     = pilots_I + 1j*pilots_Q
+        pilots_cplx  = (pilots_I + 1j*pilots_Q)*tx['sig_pilots_ratio']
+        # pilots_cplx             = (pilots_I + 1j*pilots_Q)*10
         
         if (what_pilots[3].lower() == "same") or ("cazac" in what_pilots):
             pilots_cplx = mb.repmat(pilots_cplx, (tx['Npolars'],1,1))
 
         tx["{}_cplx_up".format(pilots_function)]     = \
-        np.zeros((tx["Npolars"],N_redo,tx["Nsamp_{}".format(pilots_function)]),dtype=np.complex64)
+        np.zeros((tx["Npolars"],N_redo,tx["Nsamp_{}".format(pilots_function)]),
+                 dtype=np.complex64)
             
-        tx["{}_cplx_up".format(pilots_function)][:,:,::tx["Nsps"]]    = pilots_cplx
+        tx["{}_cplx_up".format(pilots_function)][:,:,::tx["Nsps"]]= pilots_cplx
 
         tmpH = tx['{}_cplx_up'.format(pilots_function)][0]
         tmpV = tx['{}_cplx_up'.format(pilots_function)][1]
             
+        # if same pilots on both polar all the symbols should be equal
+        # otherwise they must be different 
         if N_redo_pol == 1 or 'cazac' in what_pilots:
             assert np.sum(tmpH == tmpV) == tx["Nsamp_{}".format(pilots_function)]*N_redo
         else:
@@ -572,23 +661,10 @@ def pilot_generation(tx,rx,what_pilots_k):
 ###############################################################################
 
     if rx['mode'].lower() != "blind":
-        flag_do, N_redo, N_redo_pol, pilots_function\
-            = set_flags_and_redos(what_pilots)
+        flag_do, N_redo, N_redo_pol, pilots_function, pilots_mod, shape\
+            = set_params(what_pilots)
 
-        # ------------------------------------------------------------------- #
         if flag_do:
-
-            if (tx['mimo'].lower() == "vae")\
-                and ('synchro' in pilots_function.lower())\
-                and (what_pilots[1].lower() == 'data'):
-                shape   = (N_redo_pol,N_redo,tx['NSymbBatch'])
-
-            elif what_pilots[2].lower() == 'cazac':
-                shape   = (N_redo_pol,N_redo,what_pilots[-1])
-
-            else:
-                shape   = (N_redo_pol,N_redo,tx['NSymb_{}'.\
-                                        format(pilots_function)])
 
             pilots_I    = np.zeros(shape)
             pilots_Q    = np.zeros(shape)
@@ -612,6 +688,7 @@ def pilot_generation(tx,rx,what_pilots_k):
                         pilots_I[j,k], pilots_Q[j,k] = gen_rand(tx)
 
 
+            # scaling the pilots power, upsampling and saving into tx dict
             tx  = pilots_processing(tx, pilots_I, pilots_Q,what_pilots_k)
             tx  = misc.sort_dict_by_keys(tx)
         
@@ -650,17 +727,22 @@ def pilot_insertion(tx,rx,what_pilots_k):
                 index_end       = index_start + tx['Nsamp_pilots_{}'.format(pilots_function)]
                     
                 if pilots_function == "synchro_once":
-                    tx['sig_cplx_up'][:,index_start:index_end] = tx['pilots_{}_cplx_up'.format(pilots_function)].squeeze()
+                    tx['sig_cplx_up'][:,index_start:index_end] =\
+                        tx['pilots_{}_cplx_up'.format(pilots_function)].squeeze()
                 
                 elif pilots_function == "synchro":
                     if "cazac" in what_pilots:
-                        tx['sig_cplx_up'][:,index_start:index_end] = tx['pilots_{}_cplx_up'.format(pilots_function)].squeeze()
+                        tx['sig_cplx_up'][:,index_start:index_end] =\
+                            tx['pilots_{}_cplx_up'.format(pilots_function)].squeeze()
                     else:
-                        tx['sig_cplx_up'][:,index_start:index_end] = tx['pilots_{}_cplx_up'.format(pilots_function)][:,rx['Frame'],:]
+                        tx['sig_cplx_up'][:,index_start:index_end] =\
+                            tx['pilots_{}_cplx_up'.format(pilots_function)][:,rx['Frame'],:]
                     
                 else:
-                    tx['sig_cplx_up'][:,index_start:index_end] = tx['pilots_{}_cplx_up'.format(pilots_function)][:,rx['Frame']]
-
+                    tx['sig_cplx_up'][:,index_start:index_end] =\
+                        tx['pilots_{}_cplx_up'.format(pilots_function)][:,rx['Frame']]
+    # ----------------------------------------------------------------------- #
+    
         else:
             for k in range(rx['NBatchFrame']):
                 
@@ -676,6 +758,10 @@ def pilot_insertion(tx,rx,what_pilots_k):
                         pilots  = tx['pilots_{}_cplx_up'.format(pilots_function)][:,k,:]
                     
                 tx['sig_cplx_up'][:,index_start:index_end] = pilots
+                
+        tx['Symb_{}_cplx'.format(pilots_function)] =\
+            tx['pilots_{}_cplx_up'.format(pilots_function)][:,:,::tx['Nsps']]
+        # gen.plot_constellations(tx['Symb_{}_cplx'.format(pilots_function)])
 
         if ('once' in pilots_function) or ('same' in pilots_changes):
             tx['{}_flag_all_same'.format(pilots_function)] = 1
@@ -687,17 +773,20 @@ def pilot_insertion(tx,rx,what_pilots_k):
 def set_Nsymbols(tx,fibre,rx):
 
     # number of symbols having the same polarisation state
-    if fibre['fpol'] != 0:
-        rx["NSymbFrame"]    = int(fibre['DeltaThetaC']**2/4*tx['Rs']/fibre['fpol'])
-    else:
-        rx["NSymbFrame"]    = 10000
+    # if fibre['fpol'] != 0:
+    #     rx["NSymbFrame"]    = int(fibre['DeltaThetaC']**2/4*tx['Rs']/fibre['fpol'])
+    # else:
+    #     rx["NSymbFrame"]    = 10000
     
-    # number of symbols having more or less the same phase
-    if tx['dnu'] != 0:
-        rx["NSymbBatch"]    = int(tx['DeltaPhiC']**2/4*tx['Rs']/tx['dnu'])
-    else:
-        rx['NSymbBatch']    = 100
+    # # number of symbols having more or less the same phase
+    # if tx['dnu'] != 0:
+    #     rx["NSymbBatch"]    = int(tx['DeltaPhiC']**2/4*tx['Rs']/tx['dnu'])
+    # else:
+    #     rx['NSymbBatch']    = 100
     
+    rx["NSymbFrame"]    = 20000
+    rx['NSymbBatch']    = 500
+        
     tx['NSymbFrame']        = rx["NSymbFrame"]
     tx["NSymbConv"]         = rx["NSymbFrame"]+tx['NSymbTaps']+1
     tx["Nsamp_up"]          = tx["Nsps"]*(tx["NSymbConv"]-1)+1
@@ -811,12 +900,15 @@ def set_Nsymbols(tx,fibre,rx):
     tx['NsampTot']          = tx['NsampFrame']*rx['Nframes']
     rx["NsampBatch"]        = rx['NSymbBatch']*tx['Nsps']    
     
-    rx["NSymbCut"]          = 10  # number of symbols cut off to prevent edge effects of convolution
+
+    # number of symbols cut off to prevent edge effects of convolution
+    rx["NSymbCut"]          = 10
     rx["NSymbCut_tot"]      = 2*rx['NSymbCut']+1
     
-    rx['NSymbEq']           = rx["NSymbFrame"]    
-    if rx['mimo'].lower() != "vae":        
+    rx['NSymbEq']           = rx["NSymbFrame"]
+    if rx['mimo'].lower() != "vae":
         rx['NSymbEq']       -= rx['NSymbCut_tot']-1
+
 
 ###############################################################################
 ############################# displaying results ##############################
@@ -923,65 +1015,3 @@ def shaping_filter(tx):
 
     return tx
 
-#%%
-def transmitter(tx,rx):
-
-    tx          = shaping_filter(tx)
-    tx          = data_generation(tx,rx)
-    
-    for what_pilots_k in range(len(tx['pilots_info'])):
-        
-        tx      = pilot_generation(tx, rx, what_pilots_k)
-        tx,rx   = pilot_insertion(tx, rx, what_pilots_k)
-        
-    pilots_function     = 'pilots_' + tx['pilots_info'][what_pilots_k][0].lower()
-    pilots_Nsymb        = tx['pilots_info'][what_pilots_k][-1]
-    
-    # ----------------------------------------------------------------------- #
-    plt.figure()
-    Npilots_burst       = 3
-    Nsamp_show_pilots   = pilots_Nsymb*tx['Nsps']
-
-
-    istarts             = np.array([k*rx['NsampBatch'] for k in range(Npilots_burst)])
-    iends               = istarts + Nsamp_show_pilots
-
-    
-    time_pilots         = [np.linspace(k*rx['NsampBatch'], k*rx['NsampBatch']+Nsamp_show_pilots-1, Nsamp_show_pilots) for k in range(Npilots_burst)]
-    time_pilots
-
-    for k in range(Npilots_burst):
-        plt.subplot(2,3,k+1)
-        plt.plot(time_pilots[k],np.real(tx['sig_cplx_up'][0][istarts[k]:iends[k]]),'-b',label = 'pilots {}'.format(k),linewidth = 1)
-        plt.title('{} - polH'.format(rx['Frame']))
-        plt.ylim([-1,1])
-
-        plt.subplot(2,3,3+1+k)
-        plt.plot(time_pilots[k],np.real(tx['sig_cplx_up'][1][istarts[k]:iends[k]]),'-b',label = 'pilots {}'.format(k),linewidth = 1)
-        plt.title('{} - polV'.format(rx['Frame']))
-        plt.ylim([-1,1])
-
-
-    plt.show()
-    # ----------------------------------------------------------------------- #
-    
-    # gen.plot_constellations(tx['sig_cplx_up'])
-    
-
-    # tx          = data_shaping(tx)
-    # # gen.plot_constellations(tx['sig_real'])
-        
-    # if rx["Frame"] >= rx["FrameChannel"]:
-
-    #     tx      = txhw.load_ase(tx,rx)
-    #     tx      = txhw.load_phase_noise(tx,rx)
-
-        
-    tx          = misc.sort_dict_by_keys(tx)
-    return tx
-
-
-
-
-
-#%%

@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.5.0
-#   Date            : 2024-06-06
+#   Version         : 1.5.1
+#   Date            : 2024-06-20
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -29,6 +29,8 @@
 #                      - [REMOVED] plot_const_1/2pol(_2sig), plot_phases
 #                      - [NEW] plot_constellations, to replace the removed ones
 #
+#   1.5.1 (2024-06-20) - plot_constellations: adding the grid
+# 
 # ----- MAIN IDEA -----
 #   Library for plotting functions in (optical) telecommunications
 #
@@ -149,7 +151,7 @@ def fir_3Dto2D(rx):
     return tmp
 
 #%% plot_const_2pol + plot_const_2pol + plot_const_2pol_2sig + ChatGPT
-def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', title = ''):
+def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', title = '',axislim = [-2,2]):
     def process_signal(sig):
         if type(sig) == torch.Tensor:
             sig = sig.detach().numpy()
@@ -159,35 +161,40 @@ def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', 
             polHQ = np.imag(sig[0]).flatten()
             polVI = np.real(sig[1]).flatten() if len(sig) > 1 else None
             polVQ = np.imag(sig[1]).flatten() if len(sig) > 1 else None
+            
         else:
             if sig.shape[0] != 2:
                 polHI = sig[0].flatten()
                 polHQ = sig[1].flatten()
                 polVI = sig[2].flatten() if sig.shape[0] > 2 else None
                 polVQ = sig[3].flatten() if sig.shape[0] > 2 else None
+
             else:
                 polHI = sig[0][0].flatten()
                 polHQ = sig[0][1].flatten()
                 polVI = sig[1][0].flatten() if sig.shape[0] > 1 else None
                 polVQ = sig[1][1].flatten() if sig.shape[0] > 1 else None
+
         return polHI, polHQ, polVI, polVQ       
-        
+    # ----------------------------------------------------------------------- #
 
     def truncate_and_normalize(polHI, polHQ, polVI, polVQ):
         Nmax = int(5e3)
         if polHI is not None and len(polHI) > Nmax:
-            polHI = polHI[:Nmax]
-            polHQ = polHQ[:Nmax]
+            polHI   = polHI[:Nmax]
+            polHQ   = polHQ[:Nmax]
+            
             if polVI is not None:
                 polVI = polVI[:Nmax]
                 polVQ = polVQ[:Nmax]
 
         if norm == 1:
-            M1HI = np.mean(abs(polHI)**2)
-            M1HQ = np.mean(abs(polHQ)**2)
-            M1VI = np.mean(abs(polVI)**2) if polVI is not None else 0
-            M1VQ = np.mean(abs(polVQ)**2) if polVQ is not None else 0
-            MMM = np.sqrt(max([M1HI, M1HQ, M1VI, M1VQ]))
+            M1HI    = np.mean(abs(polHI)**2)
+            M1HQ    = np.mean(abs(polHQ)**2)
+            M1VI    = np.mean(abs(polVI)**2) if polVI is not None else 0
+            M1VQ    = np.mean(abs(polVQ)**2) if polVQ is not None else 0
+            MMM     = np.sqrt(max([M1HI, M1HQ, M1VI, M1VQ]))
+            
         else:
             MMM = 1
 
@@ -195,36 +202,61 @@ def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', 
         polHQnorm = polHQ / MMM
         polVInorm = polVI / MMM if polVI is not None else None
         polVQnorm = polVQ / MMM if polVQ is not None else None
+        
         return polHInorm, polHQnorm, polVInorm, polVQnorm
+    # ----------------------------------------------------------------------- #
 
     def plot_subplot(polar, polHInorm, polHQnorm, polVInorm, polVQnorm, color, label):
         fontsize = 12
         if polar.lower() == 'h' or polar.lower() == 'both':
             plt.subplot(1, 2, 1)
+            
+            plt.plot([-1,1],[0,0], c = 'black',linestyle = 'dashed')
+            plt.plot([0,0],[-1,1], c = 'black',linestyle = 'dashed')
+
             plt.scatter(polHInorm[0::sps], polHQnorm[0::sps], c=color, label=label)
             plt.xlabel("In Phase", fontsize=fontsize)
             plt.ylabel("Quadrature", fontsize=fontsize)
             if title.lower != '':
                 plt.title('polH ' + title, fontsize=fontsize)
             plt.gca().set_aspect('equal', adjustable='box')
+            # plt.xlim(axislim)
+            # plt.ylim(axislim)
 
         if (polar.lower() == 'v' or polar.lower() == 'both') and polVInorm is not None and polVQnorm is not None:
             if polar == 'both':
                 plt.subplot(1, 2, 2)
             else:
                 plt.subplot(1, 1, 1)
+                
+            plt.plot([-1,1],[0,0], c = 'black',linestyle = 'dashed')
+            plt.plot([0,0],[-1,1], c = 'black',linestyle = 'dashed')
+
             plt.scatter(polVInorm[0::sps], polVQnorm[0::sps], c=color, label=label)
             plt.xlabel("In Phase", fontsize=fontsize)
-            plt.ylabel("Quadrature", fontsize=fontsize)
+            if sig2 is not None:
+                plt.ylabel("Quadrature", fontsize=fontsize)
+                
             if title.lower != '':
                 plt.title('polV ' + title, fontsize=fontsize)
             plt.gca().set_aspect('equal', adjustable='box')
+            # plt.xlim(axislim)
+            # plt.ylim(axislim)
+            
+            
+    # ----------------------------------------------------------------------- #
 
     sig1_data = process_signal(sig1)
-    sig2_data = process_signal(sig2) if sig2 is not None else (None, None, None, None)
+    sig2_data = process_signal(sig2) if sig2 is not None\
+                                    else (None, None, None, None)
 
-    pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm = truncate_and_normalize(*sig1_data)
-    pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm = truncate_and_normalize(*sig2_data) if sig2 is not None else (None, None, None, None)
+    pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm =\
+                                truncate_and_normalize(*sig1_data)
+                                
+    pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm =\
+                                truncate_and_normalize(*sig2_data)\
+                                if sig2 is not None\
+                                else (None, None, None, None)
 
     plt.figure()
 
@@ -233,14 +265,16 @@ def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', 
     else:
         plt.subplot(1, 1, 1)
 
-    plot_subplot(polar, pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm, 'black', labels[0] if labels else None)
+    plot_subplot(polar, pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm,
+                 'black', labels[0] if labels else None)
 
     if sig2 is not None:
         if polar == 'both':
             plt.subplot(1, 2, 2)
         else:
             plt.subplot(1, 1, 1)
-        plot_subplot(polar, pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm, 'blue', labels[1] if labels else None)
+        plot_subplot(polar, pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm,
+                     'blue', labels[1] if labels else None)
         plt.legend()
 
     plt.show()

@@ -92,8 +92,8 @@ def load_ase(tx,rx):
     randn_Q             = np.random.randn(tx["Npolars"],tx["NsampFrame"]).astype(np.float32)
 
     randn_IQ            = (randn_I+1j*randn_Q).astype(np.complex64)
-    Noise               = sigma_n*randn_IQ    
-    rx_sig_cplx         = rx_sig_cplx + Noise
+    rx['Noise']         = sigma_n*randn_IQ    
+    rx_sig_cplx         = rx_sig_cplx + rx['Noise']
 
     rx['sig_real'][0]   = torch.tensor(np.real(rx_sig_cplx[0]))   # HI
     rx['sig_real'][1]   = torch.tensor(np.imag(rx_sig_cplx[0]))   # HQ

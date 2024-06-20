@@ -217,7 +217,7 @@ def load_ase(tx,rx):
     tx['sig_real'][2]   = torch.tensor(np.real(tx_sig_cplx[1]))
     tx['sig_real'][3]   = torch.tensor(np.imag(tx_sig_cplx[1]))
     
-    # misc.plot_const_1pol(tx["sig_cplx"][0],'ase loading')
+    # gen.plot_constellation(tx["sig_cplx"][0],title = "TX ase loading)
 
     return tx
 
