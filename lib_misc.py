@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.2
-#   Date            : 2024-06-06
+#   Version         : 1.3.0
+#   Date            : 2024-06-28
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -13,7 +13,7 @@
 #                       MUST:   include original - disclose source -
 #                               include copyright - state changes -
 #                               include license
-
+# 
 # ----- CHANGELOG -----
 #   1.0.0 (2023-03-04)  creation
 #   1.1.1 (2024-04-01)  [NEW] string_to_binary / binary_to_decimal
@@ -22,10 +22,18 @@
 #   1.2.1 (2024-05-28)  create_xml_file
 #   1.2.2 (2024-06-06)  Ntaps -> NsampTaps, create_xml_file
 #                       KEYS, sorting and giving number of keys
-
+#   1.3.0 (2024-06-28)  [NEW]   remove_n_characters_from_filenames,
+#                       [NEW]   replace_string_in_filenames
+#                       [NEW]   truncate_lr_in_filename
+#                       [NEW]   add_string_in_filemane
+#                       move_files_to_folder: year as argument
+#                       set_saving_params: no temporary folder anymore
+#                       create_xml_file: adding the realisation number to the
+#                       file name
+# 
 # ----- MAIN IDEA -----
-#   This module provides utilities for data conversion and XML file creation.
-
+#   Miscellaneous functions for logistics and plots^
+# 
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
 #   [A1] Authors        : 
@@ -67,7 +75,7 @@ from itertools import chain
 import xml.etree.ElementTree as ET
 from dateutil.parser import parse
 from tkinter import filedialog
-
+import re
 
 import lib_general as gen
 import lib_matlab as mat
@@ -76,15 +84,16 @@ pi = np.pi
 
 #%% ============================================================================
 # --- CONTENTS ---
+# - add_string_in_filemane              (1.3.0)
 # - are_same_dicts
 # - are_same_tensors
 # - array2csv
-# - binary_to_decimal               (1.1.1)
-# - create_xml_file                 (1.3.0)
-# - convert_byte                    (1.2.0)
+# - binary_to_decimal                   (1.1.1)
+# - create_xml_file
+# - convert_byte                        (1.2.0)
 # - extract_values_from_filename
 # - find_string
-# - get_total_size                  (1.2.0)
+# - get_total_size                      (1.2.0)
 # - import_data
 # - init_dict
 # - is_date
@@ -96,17 +105,20 @@ pi = np.pi
 # - move_files_to_folder
 # - my_tensor
 # - my_zeros_tensor
-# - plot_1y_axes                    (1.1.2)
+# - plot_1y_axes                        (1.1.2)
 # - plot_2y_axes
 # - plot_3y_axes
 # - remove_using_index
+# - remove_n_characters_from_filenames  (1.3.0)
+# - replace_string_in_filenames         (1.3.0)
 # - save2mat
 # - select_and_read_files
 # - set_saving_params
 # - show_dict
 # - sort_dict_by_keys
 # - sort_key
-# - string_to_binary                (1.1.1)
+# - string_to_binary                    (1.1.1)
+# - truncate_lr_in_filename             (1.3.0)
 # - what
 # - xml2dict
 # =============================================================================
@@ -133,6 +145,37 @@ plt.rcParams["axes.titleweight"]= "bold"
 # --- FUNCTIONS ---
 #% =============================================================================
 
+def add_string_in_filemane(path, loc, string,*varargin):
+
+    if not os.path.isdir(path):
+        print("The specified path is not a valid directory.")
+        return
+    
+
+    for filename in os.listdir(path):
+        flag_do = 0
+        if len(varargin) == 0:
+            if os.path.isfile(os.path.join(path, filename)):
+            
+                flag_do = 1
+
+        else:
+            if len(varargin) == 1 and varargin[0] in filename.lower():
+                flag_do = 1
+                
+            if len(varargin) == 2\
+                and varargin[0] in filename.lower()\
+                and varargin[1] not in filename.lower():
+                
+                    flag_do = 1
+
+        if flag_do:
+            new_filename    = filename[:loc] + string + filename[loc:]
+            old_file        = os.path.join(path, filename)
+            new_file        = os.path.join(path, new_filename)
+        
+            os.rename(old_file, new_file)
+    
 
 #%%
 
@@ -201,7 +244,7 @@ def convert_byte(num, suffix="B"):
 #%%
 
 # ChatGPT
-def create_xml_file(tx,fibre,rx,saving):
+def create_xml_file(tx,fibre,rx,saving,*varargin):
     
     sections    = ["TX","CHANNEL","RX"]
     
@@ -272,7 +315,6 @@ def create_xml_file(tx,fibre,rx,saving):
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['End']*180/pi,1))
             CHANNELpar.append(np.round(Slope*180/pi,2))
             
-            print(Slope*180/pi)
 
 
     TXpar       = [tx["mod"],
@@ -299,7 +341,7 @@ def create_xml_file(tx,fibre,rx,saving):
     params_list             = [TXpar, CHANNELpar,RXpar]
     [base_path, my_path]    = set_saving_params()
     
-    os.chdir(my_path)
+    os.chdir(base_path)
     
     # root element for XML
     root = ET.Element("SIMULATION-PARAMETERS")
@@ -315,8 +357,13 @@ def create_xml_file(tx,fibre,rx,saving):
 
     # file name creation
     current_time    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    file_name       = current_time
+    
 
+    file_name       = current_time
+    
+    if len(varargin) != 0:
+        file_name   = file_name + f'   {varargin[0]}'
+        
     for name in saving_list:
         # print("\n"*3)
         # print(name)
@@ -552,17 +599,17 @@ def list2vector(input,axis = 'col'):
 #%%
 def list_folders(path):
     try:
-        # Utilisez la fonction os.listdir() pour obtenir la liste de tous les fichiers et répertoires dans le path spécifié.
+        # list of all the files and repositories
         folders = os.listdir(path)
 
-        # Filtrez les éléments qui sont des répertoires en utilisant os.path.isdir().
-        folders = [folder for folder in folders if os.path.isdir(os.path.join(path, folder))]
+        # select only folders
+        folders = [folder for folder in folders\
+                   if os.path.isdir(os.path.join(path, folder))]
 
         return folders
     
     except OSError as e:
-        # Gérez les erreurs liées au path spécifié (par exemple, s'il n'existe pas).
-        print(f"Erreur : {e}")
+        print(f"Error : {e}")
         return []
         
 #%%
@@ -571,16 +618,21 @@ def list_functions(module_name):
         # Import the specified module by name
         module = __import__(module_name)
         print(f"The functions in module {module_name} are:")
+        
         # Get all attributes of the module
         attributes = dir(module)
+        
         # Sort attributes alphabetically ignoring case
         sorted_attributes = sorted(attributes, key=lambda x: x.lower())
+        
         # Iterate through sorted attributes and display those that are functions
         for attribute_name in sorted_attributes:
+        
             attribute = getattr(module, attribute_name)
             # Check if the attribute is a function
             if callable(attribute):
                 print(f"- {attribute_name}")
+                
     except ImportError:
         print(f"The module {module_name} could not be imported.")
     
@@ -597,10 +649,11 @@ def merge_data_folders(saving, deletion=True):
         if folder[0:5] == 'data-':
             folders_tmp.append(folder)
    
+    folders_to_delete   = []
     folders             = sorted(folders_tmp,key=sort_key)
     Nfolders            = len(folders)
-    merge_folder        = saving["merge_path"][-(4+4+2+2+3):] # 4 for 'data' and '2023', 2 for 'yy', 'mm', 'dd', 3*1 for '-'
-    folders_to_delete   = []
+    merge_folder        = saving["merge_path"][-(4+4+2+2+3):]
+    # 4 for 'data', 4 for '2024', 2 for 'yy', 'mm', 'dd', 3*1 for '-'
     
     for k in range(Nfolders):
         if (merge_folder in folders[k]) & (merge_folder != folders[k]):
@@ -613,7 +666,8 @@ def merge_data_folders(saving, deletion=True):
         
         for file_name in os.listdir(source_folder):
             # Vérifier si le fichier a la même date que le dossier de fusion
-            merge_folder_tmp = merge_folder[4+1+2:] # 4 for 'data', 1 for '-', 2 for '20'
+            # 4 for 'data', 1 for '-', 2 for '20'
+            merge_folder_tmp = merge_folder[4+1+2:]
             
             if file_name.startswith(merge_folder_tmp):
                 source      = os.path.join(source_folder, file_name)
@@ -630,9 +684,7 @@ def merge_data_folders(saving, deletion=True):
 
 
 #%%
-
-
-def move_files_to_folder():
+def move_files_to_folder(year):
     # Obtenez la liste des fichiers dans le répertoire actuel
     files = [f for f in os.listdir('.') if os.path.isfile(f)]
 
@@ -644,10 +696,7 @@ def move_files_to_folder():
         day_part    = date_part[0]
 
         if is_date(day_part) == True:
-            if int(day_part[0]) == 20:
-                date_folder = f'data-{day_part}'
-            else:
-                date_folder = f'data-20{day_part}'
+            date_folder = f'data-{day_part}'
                             
             # Vérifiez si le dossier existe déjà, sinon, créez-le
             if not os.path.exists(date_folder):
@@ -659,14 +708,16 @@ def move_files_to_folder():
 #%%
 
 def my_tensor(size,device='cpu',dtype=torch.float32,requires_grad=False):
-    return torch.tensor(size,device=device,dtype=dtype,requires_grad=requires_grad)
+    return torch.tensor(size,device=device,\
+                        dtype=dtype,requires_grad=requires_grad)
 
 
 
 #%%
 
 def my_zeros_tensor(size,device='cpu',dtype=torch.float32,requires_grad=False):
-    return torch.zeros(size,device=device,dtype=dtype,requires_grad=requires_grad)
+    return torch.zeros(size,device=device,\
+                       dtype=dtype,requires_grad=requires_grad)
 
 
 #%%
@@ -675,21 +726,19 @@ def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
     
 
     directory_path = saving["root_path"]
-    # Vérifier si le répertoire existe
+
     if not os.path.exists(directory_path):
-        raise FileNotFoundError(f"The folder '{directory_path}' does not exists.")
+        raise FileNotFoundError(\
+                            f"The folder '{directory_path}' does not exists.")
 
-    # Liste des fichiers CSV dans le répertoire
-    csv_files = [file for file in os.listdir(directory_path) if file.endswith(".csv")]
+    csv_files = [file for file in os.listdir(directory_path)\
+                 if file.endswith(".csv")]
 
-    # Parcourir tous les fichiers CSV dans le répertoire
     for csv_file in csv_files:
         csv_path = os.path.join(directory_path, csv_file)
 
-        # Extraire les valeurs des mots-clés du nom du fichier
         values, keywords = extract_values_from_filename(csv_file)
 
-        # Charger le fichier CSV en utilisant pandas
         df = pd.read_csv(csv_path)
         x  = df[xaxis]
         y  = df[yaxis]
@@ -698,17 +747,15 @@ def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
             x       = x[varargin[0]:]
             y       = y[varargin[0]:]
 
-        # Créer la figure
         fig, ax1 = plt.subplots(figsize=(10, 6.1423))
 
-        # Tracer y1 en fonction d'itération sur l'axe gauche
         ax1.plot(x, y, color='tab:blue',linestyle='dashed',linewidth = 2)
         ax1.set_xlabel(xaxis)
         ax1.set_ylabel(yaxis, color='tab:blue')
         ax1.tick_params(axis='y', labelcolor='tab:blue')
         
-        
-        mytext  = ''.join(["{}:{} - ".format(key,values[key]) for key in keywords if key in values])
+        mytext  = ''.join([f"{key}:{values[key]} - "\
+                           for key in keywords if key in values])
         
         text_lim = 45
         
@@ -726,14 +773,17 @@ def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
             pos_mytext2 = 0.25#len(mytext2)/50            
             pos_mytext3 = 0.25#len(mytext3)/50
             
-        plt.text(0.5-pos_mytext, 1, mytext, fontsize=14, transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext2, 0.95, mytext2, fontsize=14, transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext3, 0.9, mytext3, fontsize=14, transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext,    1,      mytext,  fontsize=14,\
+                 transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext2,   0.95,   mytext2, fontsize=14,\
+                 transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext3,   0.9,    mytext3, fontsize=14,\
+                 transform=plt.gcf().transFigure)
             
         # tmp     = len(mytext)/200
-        # plt.text(0.5-tmp, 0.95, mytext, fontsize=14, transform=plt.gcf().transFigure)
+        # plt.text(0.5-tmp, 0.95, mytext, fontsize=14, \
+        #   transform=plt.gcf().transFigure)
         
-        # Sauvegarder la figure en format image
         if type(extensions) == list:
             for extension in extensions:
                 output_file = os.path.splitext(csv_file)[0] + '.'+ extension
@@ -747,57 +797,52 @@ def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
 
 
 def plot_2y_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
-    
 
     directory_path = saving["root_path"]
-    # Vérifier si le répertoire existe
+
     if not os.path.exists(directory_path):
-        raise FileNotFoundError(f"The folder '{directory_path}' does not exists.")
+        raise FileNotFoundError(\
+                            f"The folder '{directory_path}' does not exists.")
 
-    # Liste des fichiers CSV dans le répertoire
-    csv_files = [file for file in os.listdir(directory_path) if file.endswith(".csv")]
+    csv_files = [file for file in os.listdir(directory_path)\
+                 if file.endswith(".csv")]
 
-    # Parcourir tous les fichiers CSV dans le répertoire
     for csv_file in csv_files:
         csv_path = os.path.join(directory_path, csv_file)
 
-        # Extraire les valeurs des mots-clés du nom du fichier
         values, keywords = extract_values_from_filename(csv_file)
 
-        # Charger le fichier CSV en utilisant pandas
         df = pd.read_csv(csv_path)
         x  = df[xaxis]
-        y1        = df[yaxis_left]
-        y2         = df[yaxis_right]
+        y1 = df[yaxis_left]
+        y2 = df[yaxis_right]
         
         if len(varargin) == 1:
             x  = x[varargin[0]:]
             y1        = y1[varargin[0]:]
             y2         = y2[varargin[0]:]
 
-        # Créer la figure
         fig, ax1 = plt.subplots(figsize=(10, 6.1423))
 
-        # Tracer y1 en fonction d'itération sur l'axe gauche
         ax1.plot(x, y1, color='tab:blue',linestyle='dashed',linewidth = 2)
         ax1.set_xlabel(xaxis)
         ax1.set_ylabel(yaxis_left   , color='tab:blue')
         # ax1.set_ylim(-1200, 700)
         ax1.tick_params(axis='y', labelcolor='tab:blue')
         
-        # Créer un axe Y droit pour le SNR
+        # create right Y axis
         ax2 = ax1.twinx()
 
-        # Tracer SNR en fonction d'itération sur l'axe droit
         ax2.plot(x, y2, color='tab:red')
         # ax2.set_ylabel(yaxis_right, color='tab:red')
         ax2.set_ylabel(yaxis_right, color='tab:red')
         # ax2.set_ylim(0, 40)
         ax2.tick_params(axis='y', labelcolor='tab:red')
         
-        mytext  = ''.join(["{}:{} - ".format(key,values[key]) for key in keywords if key in values])
+        mytext  = ''.join([f"{key}:{values[key]} - "\
+                           for key in keywords if key in values])
         
-        text_lim = 45
+        text_lim = 50
         
         if len(mytext)>text_lim:
 
@@ -809,16 +854,20 @@ def plot_2y_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
                 mytext3 = mytext2[text_lim+11:]
                 mytext2 = mytext2[:text_lim+11]
             
-            pos_mytext  = 0.25#len(mytext)/50
-            pos_mytext2 = 0.25#len(mytext2)/50            
-            pos_mytext3 = 0.25#len(mytext3)/50
-            
-        plt.text(0.5-pos_mytext, 1, mytext, fontsize=14, transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext2, 0.95, mytext2, fontsize=14, transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext3, 0.9, mytext3, fontsize=14, transform=plt.gcf().transFigure)
+            pos_mytext  = 0.375#len(mytext)/50
+            pos_mytext2 = 0.375#len(mytext2)/50            
+            pos_mytext3 = 0.375#len(mytext3)/50
+
+        plt.text(0.5-pos_mytext,    1,      mytext,  fontsize=14,\
+                 transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext2,   0.95,   mytext2, fontsize=14,\
+                 transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext3,   0.9,    mytext3, fontsize=14,\
+                 transform=plt.gcf().transFigure)
             
         # tmp     = len(mytext)/200
-        # plt.text(0.5-tmp, 0.95, mytext, fontsize=14, transform=plt.gcf().transFigure)
+        # plt.text(0.5-tmp, 0.95, mytext,\
+        #   fontsize=14, transform=plt.gcf().transFigure)
         
         # Sauvegarder la figure en format image
         if type(extensions) == list:
@@ -835,12 +884,13 @@ def plot_2y_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
 def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
     
     directory_path = saving["root_path"]
-    
 
     if not os.path.exists(directory_path):
-        raise FileNotFoundError(f"the folder '{directory_path}' does not exists.")
+        raise FileNotFoundError(\
+                            f"The folder '{directory_path}' does not exists.")
 
-    csv_files = [file for file in os.listdir(directory_path) if file.endswith(".csv")]
+    csv_files = [file for file in os.listdir(directory_path)\
+                 if file.endswith(".csv")]
 
     for csv_file in csv_files:
         csv_path    = os.path.join(directory_path, csv_file)
@@ -870,13 +920,14 @@ def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
         ax2.tick_params(axis='y', labelcolor='tab:red')
         
         ax3 = ax1.twinx()
-        ax3.spines['right'].set_position(('outward', 60))  # Ajustement de la position de l'axe
+        ax3.spines['right'].set_position(('outward', 60))  # adjust axis pos
         ax3.set_ylabel(yaxis_right_2, color='tab:green')
         ax3.plot(x, y3, color='tab:green')
         ax3.tick_params(axis='y', labelcolor='tab:green')
 #        ax3.set_ylim(-45,+45)
         
-        mytext      = ''.join(["{}:{} - ".format(key,values[key]) for key in keys if key in values])
+        mytext  = ''.join([f"{key}:{values[key]} - "\
+                           for key in keys if key in values])
         text_lim    = 45
         
         if len(mytext)>text_lim:
@@ -893,9 +944,12 @@ def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
             pos_mytext2 = 0.25#len(mytext2)/50            
             pos_mytext3 = 0.25#len(mytext3)/50
             
-        plt.text(0.5-pos_mytext, 1, mytext, fontsize=14, transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext2, 0.95, mytext2, fontsize=14, transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext3, 0.9, mytext3, fontsize=14, transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext,    1,      mytext,  fontsize=14,\
+                 transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext2,   0.95,   mytext2, fontsize=14,\
+                 transform=plt.gcf().transFigure)
+        plt.text(0.5-pos_mytext3,   0.9,    mytext3, fontsize=14,\
+                 transform=plt.gcf().transFigure)
         
         # Sauvegarder la figure en format image
         if type(extensions) == list:
@@ -912,7 +966,7 @@ def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
 
 #%%
         
-#   https://www.kite.com/python/answers/how-to-remove-an-element-from-an-array-in-python
+# https://www.kite.com/python/answers/how-to-remove-an-element-from-an-array-in-python
 def remove_using_index(All_Indexes,List_or_Array):
     
     if type(List_or_Array) == list:
@@ -933,6 +987,36 @@ def remove_using_index(All_Indexes,List_or_Array):
     
     
 
+#%%
+def remove_n_characters_from_filenames(directory, n):
+
+    for filename in os.listdir(directory):
+
+        if os.path.isfile(os.path.join(directory, filename)):
+            new_filename = filename[n:]
+            os.rename(
+                os.path.join(directory, filename),
+                os.path.join(directory, new_filename)
+            )
+
+#%% ChatGPT
+def replace_string_in_filenames(path, old_string, new_string):
+
+    if not os.path.isdir(path):
+        print(f"path {path} not valid")
+        return
+    
+    for root, dirs, files in os.walk(path):
+        for file_name in files:
+
+            if old_string in file_name:
+
+                new_file_name = file_name.replace(old_string, new_string)
+                old_file_path = os.path.join(root, file_name)
+                new_file_path = os.path.join(root, new_file_name)
+                
+                os.rename(old_file_path, new_file_path)
+   
 #%%
 def save2mat(tx,fibre,rx,saving):
 
@@ -974,7 +1058,8 @@ def save2mat(tx,fibre,rx,saving):
     
 #%%
 
-def select_and_read_files(extension="csv",skiprow = 0,title = "Select files",Multiple = True):
+def select_and_read_files(extension="csv",skiprow = 0,\
+                          title = "Select files",Multiple = True):
     """
     return[0] = data_matrices
     return[1] = field_names
@@ -983,7 +1068,7 @@ def select_and_read_files(extension="csv",skiprow = 0,title = "Select files",Mul
     """
     
     root = tk.Tk()
-    root.withdraw()  # Masque la fenêtre principale de tkinter
+    root.withdraw() # hide tkinter window
 
     file_paths = filedialog.askopenfilenames(
         title       = title,
@@ -1004,17 +1089,16 @@ def select_and_read_files(extension="csv",skiprow = 0,title = "Select files",Mul
                     field_names = row
                     break
             
-        # get the names of the files
         file_name = file_path.split("/")[-1]
         file_names.append(file_name)
 
-        # read files using the delimiter
         if extension == "csv":
-            data = np.loadtxt(file_path, delimiter=",", skiprows=skiprow)  # Ignorer la première ligne et utiliser la virgule comme délimiteur
+            data = np.loadtxt(file_path, delimiter=",", skiprows=skiprow)
             data_matrices.append(data)
 
     if skiprow == 0:
         return data_matrices,file_names, file_paths
+    
     else:
         return data_matrices, field_names, file_names, file_paths
     
@@ -1025,21 +1109,16 @@ def select_and_read_files(extension="csv",skiprow = 0,title = "Select files",Mul
             
 def set_saving_params():
     
-    current_day = date.today().strftime("%Y-%m-%d")
+    current_day = date.today().strftime("%y-%m-%d")
 
     base_path   = "data-"+current_day
     k           = 0
     my_path_tmp = base_path
 
-    while os.path.exists(my_path_tmp):
-        k += 1
-        my_path_tmp = f"{base_path}-{k}"
-
     try:
-        os.mkdir(my_path_tmp)
-        # print(f"Dossier créé : {my_path_tmp}")
-    except Exception as e:
-        print(f"Erreur lors de la création du dossier : {str(e)}")
+        os.mkdir(base_path)
+    except:
+        pass
 
     return [base_path, my_path_tmp]
 
@@ -1077,11 +1156,10 @@ def sort_dict_by_keys(input_dict):
 #%%
 # ChatGPT
 def sort_key(element):
-    # Séparer l'élément en fonction des tirets et convertir le dernier élément en entier
-    # Ceci permet de trier en fonction du numéro après le dernier tiret.
+    # split the element according to the dashes and convert the last one as an
+    # integer which enables sorting by the dash number
+
     return int(element.split('-')[-1])
-
-
 
 
 
@@ -1090,12 +1168,33 @@ def sort_key(element):
 def string_to_binary(input_string):
     binary_string = ""
     for char in input_string:
-        # Convertir chaque caractère en binaire et ajouter à la chaîne résultante
-        binary_char = format(ord(char), '08b')  # Convertir le caractère en binaire sur 8 bits
+        #  convert each character in 8bits binary and adding it to the existing
+        #  string
+    
+        binary_char     = format(ord(char), '08b')
         binary_string += binary_char
     return binary_string
 
         
+
+#%% ChatGPT
+def truncate_lr_in_filename(directory):
+    lr_pattern = re.compile(r'(lr\s)(\d+\.\d+)')
+    
+    for filename in os.listdir(directory):
+        
+        # Search for the pattern in the filename
+        match = lr_pattern.search(filename)
+        
+        if match:
+            lr          = float(match.group(2))
+            lr_trunc    = f'{lr:.2f}'
+            new_fname   = filename.replace(match.group(2), lr_trunc)            
+            old_file    = os.path.join(directory, filename)
+            new_file    = os.path.join(directory, new_fname)
+            
+            os.rename(old_file, new_file)
+            
 
 
 
@@ -1126,6 +1225,6 @@ def xml2dict(file_path):
         return data_dict
     
     except ET.ParseError as e:
-        print(f"Erreur de parsing XML : {e}")
+        print(f"XML parsing error: {e}")
         return None
 

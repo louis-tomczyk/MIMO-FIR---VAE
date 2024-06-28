@@ -28,7 +28,6 @@
 #   1.5.0 (2024-06-06) - Naps -> NsampTaps, plot_const_1/2pol
 #                      - [REMOVED] plot_const_1/2pol(_2sig), plot_phases
 #                      - [NEW] plot_constellations, to replace the removed ones
-#
 #   1.5.1 (2024-06-20) - plot_constellations: adding the grid
 # 
 # ----- MAIN IDEA -----
@@ -150,8 +149,10 @@ def fir_3Dto2D(rx):
     
     return tmp
 
-#%% plot_const_2pol + plot_const_2pol + plot_const_2pol_2sig + ChatGPT
-def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', title = '',axislim = [-2,2]):
+
+
+#%%
+def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', title='', axislim=[-2, 2]):
     def process_signal(sig):
         if type(sig) == torch.Tensor:
             sig = sig.detach().numpy()
@@ -206,80 +207,71 @@ def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', 
         return polHInorm, polHQnorm, polVInorm, polVQnorm
     # ----------------------------------------------------------------------- #
 
-    def plot_subplot(polar, polHInorm, polHQnorm, polVInorm, polVQnorm, color, label):
+    def plot_subplot(subplot_idx, polar, polHInorm, polHQnorm, polVInorm, polVQnorm, color, label):
         fontsize = 12
-        if polar.lower() == 'h' or polar.lower() == 'both':
-            plt.subplot(1, 2, 1)
-            
-            plt.plot([-1,1],[0,0], c = 'black',linestyle = 'dashed')
-            plt.plot([0,0],[-1,1], c = 'black',linestyle = 'dashed')
+        plt.subplot(1, 2, subplot_idx)
+        
+        eps = np.finfo(float).eps
+        x   = np.linspace(-1+eps,1-eps,75)
+        y1p = np.sqrt(1-x**2)
+        y1m = -np.sqrt(1-x**2)
+        
+        
+        plt.plot([-1, 1], [0, 0],  c='black', linestyle='dotted', linewidth = 0.5)
+        plt.plot([0, 0],  [-1, 1], c='black', linestyle='dotted', linewidth = 0.5)
+        plt.plot([-1, 1], [-1, 1], c='black', linestyle='dotted', linewidth = 0.5)
+        plt.plot([-1, 1], [1, -1], c='black', linestyle='dotted', linewidth = 0.5)
+        
+        plt.plot(x, y1p, c='black', linestyle='dotted', linewidth = 0.5)
+        plt.plot(x, y1m, c='black', linestyle='dotted', linewidth = 0.5)
+        
 
+
+        if polar.lower() == 'h':
             plt.scatter(polHInorm[0::sps], polHQnorm[0::sps], c=color, label=label)
             plt.xlabel("In Phase", fontsize=fontsize)
             plt.ylabel("Quadrature", fontsize=fontsize)
-            if title.lower != '':
-                plt.title('polH ' + title, fontsize=fontsize)
-            plt.gca().set_aspect('equal', adjustable='box')
-            # plt.xlim(axislim)
-            # plt.ylim(axislim)
-
-        if (polar.lower() == 'v' or polar.lower() == 'both') and polVInorm is not None and polVQnorm is not None:
-            if polar == 'both':
-                plt.subplot(1, 2, 2)
-            else:
-                plt.subplot(1, 1, 1)
-                
-            plt.plot([-1,1],[0,0], c = 'black',linestyle = 'dashed')
-            plt.plot([0,0],[-1,1], c = 'black',linestyle = 'dashed')
-
+            if title.lower() != '':
+                plt.title('pol1 ' + title, fontsize=fontsize)
+        elif polar.lower() == 'v' and polVInorm is not None and polVQnorm is not None:
             plt.scatter(polVInorm[0::sps], polVQnorm[0::sps], c=color, label=label)
             plt.xlabel("In Phase", fontsize=fontsize)
-            if sig2 is not None:
-                plt.ylabel("Quadrature", fontsize=fontsize)
+            plt.ylabel("Quadrature", fontsize=fontsize)
+            if title.lower() != '':
+                plt.title('pol2 ' + title, fontsize=fontsize)
                 
-            if title.lower != '':
-                plt.title('polV ' + title, fontsize=fontsize)
-            plt.gca().set_aspect('equal', adjustable='box')
-            # plt.xlim(axislim)
-            # plt.ylim(axislim)
-            
-            
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.xlim(axislim)
+        plt.ylim(axislim)
+
     # ----------------------------------------------------------------------- #
 
     sig1_data = process_signal(sig1)
-    sig2_data = process_signal(sig2) if sig2 is not None\
-                                    else (None, None, None, None)
+    sig2_data = process_signal(sig2) if sig2 is not None else (None, None, None, None)
 
-    pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm =\
-                                truncate_and_normalize(*sig1_data)
-                                
-    pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm =\
-                                truncate_and_normalize(*sig2_data)\
-                                if sig2 is not None\
-                                else (None, None, None, None)
+    pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm = truncate_and_normalize(*sig1_data)
+    pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm = truncate_and_normalize(*sig2_data) if sig2 is not None else (None, None, None, None)
 
     plt.figure()
 
     if polar.lower() == 'both':
-        plt.subplot(1, 2, 1)
+        plot_subplot(1, 'h', pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm, 'black', labels[0] if labels else None)
+        if sig2 is not None:
+            plot_subplot(1, 'h', pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm, 'blue', labels[1] if labels else None)
+
+        plot_subplot(2, 'v', pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm, 'black', labels[0] if labels else None)
+        if sig2 is not None:
+            plot_subplot(2, 'v', pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm, 'blue', labels[1] if labels else None)
     else:
-        plt.subplot(1, 1, 1)
+        plot_subplot(1, polar, pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm, 'black', labels[0] if labels else None)
+        if sig2 is not None:
+            plot_subplot(1, polar, pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm, 'blue', labels[1] if labels else None)
 
-    plot_subplot(polar, pol1HInorm, pol1HQnorm, pol1VInorm, pol1VQnorm,
-                 'black', labels[0] if labels else None)
-
-    if sig2 is not None:
-        if polar == 'both':
-            plt.subplot(1, 2, 2)
-        else:
-            plt.subplot(1, 1, 1)
-        plot_subplot(polar, pol2HInorm, pol2HQnorm, pol2VInorm, pol2VQnorm,
-                     'blue', labels[1] if labels else None)
+    if labels:
         plt.legend()
 
     plt.show()
 
-    
 #%%
 def plot_decisions(t,r,Nplots):
     

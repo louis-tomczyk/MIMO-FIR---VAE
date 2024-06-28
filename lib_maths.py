@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.4
-#   Date            : 2024-06-20
+#   Version         : 1.3.0
+#   Date            : 2024-06-27
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -21,6 +21,7 @@
 #   1.2.2 (2024-05-27) - [NEW] get_power
 #   1.2.3 (2024-06-18) - [NEW] zero_stuffing, cleaning
 #   1.2.4 (2024-06-20) - zero_stuffing: enabling multiple signal processing
+#   1.3.0 (2024-06-27) - [NEW] my_low_pass_filter
 #
 # ----- MAIN IDEA -----
 #   Advanced mathematical operations
@@ -49,12 +50,13 @@
 
 #%%
 # =============================================================================
-# get_power             (1.2.2)
-# update_fir            (1.0.0)
-# inverse3Dmatrix       (1.1.0)
 # fft_matrix
+# get_power             (1.2.2)
+# inverse3Dmatrix       (1.1.0)
+# my_low_pass_filter    (1.3.0)
 # test_unitarity        (1.2.1)
 # test_unitarity3d      (1.2.1)
+# update_fir            (1.0.0)
 # zero_stuffing         (1.2.3)
 # =============================================================================
 
@@ -63,9 +65,10 @@ import numpy as np
 import sys
 import torch
 import lib_matlab as mb
+import matplotlib.pyplot as plt
+from scipy.signal import butter, filtfilt
 
 #%%
-
 def fft_matrix(matrix):
     
     matrixFFT = np.zeros(matrix.shape,dtype = complex)
@@ -80,12 +83,10 @@ def get_power(sig, flag_real2cplx = 0, flag_flatten = 0):
     if type(sig) == torch.Tensor:
         sig     = sig.numpy()
         
-    shape   = sig.shape
+    shape       = sig.shape
     if len(shape) == 1:
         sig     = np.expand_dims(sig,0)
         shape   = sig.shape 
-
-
 
     if flag_real2cplx == 1:
         Npow    = int(shape[0]/2)
@@ -131,10 +132,132 @@ def inverse3Dmatrix(matrix3D):
 
     return matrix3Dinverse
 
-#%%
-def power(x):
+
+
+
+
+#%% ChatGPT
+def my_low_pass_filter(signal, filter_params):
+# =============================================================================
+# signal         : signal to filter
+# filter_params  : changes according to the filter type:
+#
+# rect_filter_params = {
+#     'type'          : 'rectangular',
+#     'cutoff'        : cutoff,
+#     'fs'            : fs
+# }
+# 
+# butter_filter_params = {
+#     'type'          : 'butterworth',
+#     'order'         : order,
+#     'cutoff'        : cutoff,
+#     'fs'            : fs
+# }
+# 
+# ma_filter_params = {
+#     'type'          : 'moving_average',
+#     'window_size'   : window_size,
+#     'average_type'  : 'uniform'
+# }
+# =============================================================================
+
+    def rectangular_filter(signal, cutoff, fs,):
+        n           = len(signal)
+        freq        = np.fft.fftshift(np.fft.fftfreq(n, d=1/fs))
+
+        fft_signal  = np.fft.fftshift(np.fft.fft(signal))
+        filter_mask = np.abs(freq) <= cutoff
+        
+        fft_signal[~filter_mask] = 0
+        filtered_signal = np.fft.ifft(np.fft.fftshift(fft_signal))
+        
+        # ------------------------------------------------------------ to check
+        # plt.figure()
+        # plt.semilogy(freq, np.abs(fft_signal), label="signal fft")
+        # plt.semilogy(freq, np.abs(filter_mask), label="filter")
+        # plt.legend()
+        # plt.xlim([-15,15])
+        # plt.show()
+        # 
+        # plt.figure()
+        # dt    = 1/fs
+        # time  = np.linspace(0, (n-1)*dt, n)
+        # plt.plot(time, signal)
+        # plt.plot(time, np.real(filtered_signal), label="filtered signal")
+        # plt.legend()
+        # plt.show()
+        # ------------------------------------------------------------ to check
+        
+        return np.real(filtered_signal)
+    # ----------------------------------------------------------------------- #
     
-    return np.mean((np.abs(x))**2)
+    def butterworth_filter(signal, cutoff, order, fs):
+        nyq             = 0.5 * fs
+        normal_cutoff   = cutoff / nyq
+            
+        b, a            = butter(order, normal_cutoff, btype='low')
+        y               = filtfilt(b, a, signal)
+        
+        return y
+    # ----------------------------------------------------------------------- #
+    
+    def moving_average_filter(signal, window_size = 10, average_type='uniform',
+                             xmax = 3, *varargin):
+        
+        if average_type == 'uniform':
+            window = np.ones(int(window_size)) / float(window_size)
+            
+        elif average_type == 'gaussian':
+            if len(varargin) != 0:
+                std_dev = varargin[0]
+            else:
+                std_dev = window_size/6
+                
+            window  = np.exp(-0.5*(np.linspace(-xmax,xmax,window_size)/std_dev) ** 2)
+            window  /= np.sum(window)
+            
+        else:
+            raise ValueError("Invalid. Use 'uniform' or 'gaussian'.")
+        
+        filtered_signal = np.convolve(signal, window, 'same')
+        
+        return filtered_signal
+    # ----------------------------------------------------------------------- #
+    
+    filter_type = filter_params.get('type', '').lower()
+    
+    if 'rect' in filter_type.lower():
+        return rectangular_filter(signal, filter_params['cutoff'],\
+                                  filter_params['fs'])
+    
+    elif 'butter' in filter_type.lower():
+        return butterworth_filter(signal, filter_params['cutoff'],\
+                                  filter_params['order'], filter_params['fs'])
+
+    elif 'moving' in filter_type.lower():
+        
+        if 'uni' in filter_params['ma_type'].lower():
+            return moving_average_filter(signal, filter_params['window_size'])
+        
+        elif 'gauss' in filter_params['ma_type'].lower():
+            if "xmax" not in filter_params:
+                filter_params['xmax'] = 3
+                
+            if 'std' not in filter_params:
+                filter_params['std'] = filter_params['window_size']/6
+                
+            return moving_average_filter(signal,
+                                         filter_params['window_size'],
+                                         "gaussian",
+                                         filter_params['xmax'],
+                                         filter_params['std'])
+    
+    else:
+        raise ValueError("Invalid. Use 'rectangular', 'butterworth', or\
+                         'moving_average'.")
+
+
 
 #%%
 def test_unitarity(matrix):
@@ -182,7 +305,6 @@ def update_fir(loss,optimiser):
     
 #     sig_in      = array([1, 2, 3, 4, 5, 6, 7, 8])
 #     sig_stuffed = array([[1, 2, 3, 4, 0, 0, 5, 6, 7, 8, 0, 0]])
-
 #     sig_stuffed = zero_stuffing(sig_in,Nzeros = 2, Ntimes = 2)
 
 
@@ -209,8 +331,8 @@ def zero_stuffing(sig_in, Nzeros, Ntimes):
         # Concatenate the zeros to the end of each row
         sig_stuffed[k] = np.hstack((tmp, my_zeros)).reshape((1,-1))
 
-        # to check
+        # ------------------------------------------------------------ to check
         # sig_stuffed = np.reshape((1,-1))
-    
+        # ------------------------------------------------------------ to check    
     
     return sig_stuffed

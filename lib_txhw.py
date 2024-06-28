@@ -97,15 +97,13 @@ def gen_phase_noise(tx,rx):
             tmp_phase_noise = np.zeros((1,rx['Nframes'],rx['NBatchFrame']))
             if tx["PhiLaw"]['kind']         == 'Rwalk':
 
-                # tmp_phase_noise = np.zeros((1,rx['Nframes'],rx['NBatchFrame']+1))
-
                 tmp_last_phase  = 0
                 
                 # set angles by batches
                 for k in range(rx['NframesChannel']):
 
                     if tx["PhiLaw"]["law"]      == "linewidth":
-                        tx['VAR_Phase']         = np.sqrt(2*pi*tx['dnu']/tx['fs'])
+                        tx['VAR_Phase']         = 2*pi*tx['dnu']/tx['fs']
                         
                         noise_tmp               = np.random.normal(0,tx['VAR_Phase'],rx["NBatchFrame"])
                         tmp_phase_noise[0,k,:]  = tmp_last_phase + np.cumsum(noise_tmp)
@@ -129,6 +127,7 @@ def gen_phase_noise(tx,rx):
                     tmp_phase_noise[0]      = np.reshape(tmp,(rx['Nframes'],-1))
             
 
+            tx["PhaseNoise_unique"] = tmp_phase_noise[0].squeeze()
             tmp_pn                  = np.repeat(tmp_phase_noise[0],rx['NsampBatch'],axis=1)
             tmp_pn_rs               = np.reshape(tmp_pn,(rx['Nframes'],-1))
             
@@ -224,7 +223,7 @@ def load_ase(tx,rx):
 
 
 #%%
-def load_phase_noise(tx,rx):
+def load_phase_noise(tx,rx,*varargin):
 
     if rx['Frame'] == rx['FrameChannel']:
         print('loading PhaseNoise @ TX\n')
@@ -241,10 +240,18 @@ def load_phase_noise(tx,rx):
     tx['sig_real'][2]   = torch.tensor(np.real(tx_sig_cplx[1]))
     tx['sig_real'][3]   = torch.tensor(np.imag(tx_sig_cplx[1]))
 
-    # plt.figure()
-    # plt.plot(tx['PhaseNoise'][0])
-    # plt.plot(tx['PhaseNoise'][1])
-    # gen.plot_const_2pol(tx["sig_cplx"],'phase noise laoding')
+    if len(varargin) != 0 and 'pn time trace' in varargin:
+        for k in range(rx['Nframes']):
+            pns = round(tx['PhaseNoise'][0,0,k]*180/pi,3)
+            pne = round(tx['PhaseNoise'][0,-1,k]*180/pi,3)
+            
+            plt.figure()
+            plt.plot(tx['PhaseNoise'][0,:,k]*180/pi)
+            plt.title(f"frame {k}, pn-s = {pns}, pn-e = {pne}")
+            plt.show()
+            
+    if len(varargin) != 0 and 'pn const' in varargin:
+        gen.plot_constellations(tx["sig_cplx"],title = 'phase noise laoding')
 
     tx              = misc.sort_dict_by_keys(tx)
 

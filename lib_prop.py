@@ -4,7 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.0.3
+#   Version         : 1.0.4
+#   Date            : 2024-06-27
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -18,6 +19,7 @@
 #   1.0.1 (2024-04-21) - set_thetas: if 'theta_in' not in fibre["ThetasLaw"]
 #   1.0.2 (2024-04-24) - set_thetas: as 04-21, propagation: awgn
 #   1.0.3 (2024-05-27) - simulate dispersion: C/PM-D ---> tauC/PM-D
+#   1.0.4 (2024-06-27) - propagation: varargin to check synchro of pilots
 #
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
@@ -70,10 +72,54 @@ pi = np.pi
 
 
 #%% # linear channel
-def propagation(tx,fibre,rx):
+def propagation(tx,fibre,rx,*varargin):
 
     rx      = simulate_dispersion(tx,fibre,rx)
     rx      = rxhw.load_ase(tx,rx)
+    
+    
+    if len(varargin) > 0 and varargin is not None:
+        # cf. data_shaping, convolution with filter, mode valid
+        # 
+        # y         = conv(x,h,'valid) of len(x) = N, len(h) = M
+        # len(y)    = N-M+1
+        #
+        # formula: mode full    y[n] = sum_(k=0^{n})   x[k]   . h[n-k]
+        # formula: mode valid   y[n] = sum_(k=0^{M-1}) x[k+n] . h[n-k]
+
+        x1 = tx['Nsamp_pilots_cpr']-tx['NsampTaps']+1
+        for k in range(5):
+            kstart  = k*tx['NsampBatch']
+            kend    = kstart + tx['Nsamp_pilots_cpr']
+            plt.figure()
+            
+            plt.subplot(2,2,1)
+            plt.plot(tx["sig_real"][0,kstart:kend])
+            plt.plot([x1,x1],[-1,1])
+            plt.title("HI")
+            plt.ylim([-1,1])
+    
+            plt.subplot(2,2,2)
+            plt.plot(tx["sig_real"][1,kstart:kend])
+            plt.plot([x1,x1],[-1,1])
+            plt.title("HQ")
+            plt.ylim([-1,1])
+    
+            plt.subplot(2,2,3)
+            plt.plot(tx["sig_real"][2,kstart:kend])
+            plt.plot([x1,x1],[-1,1])
+            plt.title("VI")
+            plt.ylim([-1,1])
+    
+            plt.subplot(2,2,4)
+            plt.plot(tx["sig_real"][3,kstart:kend])
+            plt.plot([x1,x1],[-1,1])
+            plt.title("VQ")
+            plt.ylim([-1,1])
+    
+            plt.suptitle("data shaping {} - {}-{}".format(rx['Frame'],kstart,kend))
+            plt.show()
+    
 
     # if rx['Frame'] >= rx['FrameChannel']:
     #     gen.plot_const_2pol(rx['sig_real'], "prop  f-{}".format(rx['Frame']-rx['FrameChannel']),tx)

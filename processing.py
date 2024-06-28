@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.5
-#   Date            : 2024-06-20
+#   Version         : 1.2.6
+#   Date            : 2024-06-21
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -32,6 +32,7 @@
 #                      - cleaning (Ntaps, Nconv)
 #   1.2.5 (2024-06-20) - init_processing: pilots for CPR, see rxdsp.CPR_pilots
 #                           along with rxdsp (1.5.0)
+#   1.2.6 (2024-06-21) - init_processing: avoid 'pilots' with "vae"
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -95,7 +96,7 @@ import timeit
 
 from lib_matlab import clc
 from lib_misc import KEYS as keys
-from lib_maths import power
+from lib_maths import get_power as power
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 #%% ===========================================================================
@@ -115,10 +116,10 @@ def processing(tx, fibre, rx, saving, flags):
         tx              = txdsp.transmitter(tx, rx)
         tx, fibre, rx   = prop.propagation(tx, fibre, rx)
         rx, loss        = rxdsp.receiver(tx,rx,saving)
-        # array           = print_results(loss, frame, tx, fibre, rx, saving)
+        array           = print_results(loss, frame, tx, fibre, rx, saving)
 
 
-    # tx, fibre, rx = save_data(tx, fibre, rx, saving, array)
+    tx, fibre, rx = save_data(tx, fibre, rx, saving, array)
 
     return tx, fibre, rx
 
@@ -127,11 +128,17 @@ def processing(tx, fibre, rx, saving, flags):
 #%%
 
 def init_processing(tx, fibre, rx, saving, device):
-
-################################################################################
+# =============================================================================
 # MISSING FIELDS
-################################################################################
+# =============================================================================
 
+    flag_incoherence = 0
+    if rx['mimo'].lower() == 'vae' and rx['mode'] != 'blind':
+        flag_incoherence = 1
+        
+    assert not flag_incoherence, "pilots aided equalisation is for CMA only\
+                                check rx['mimo'] in main.py"
+    
     if "channel" not in fibre:
         fibre['channel']    = "linear"
     
@@ -150,11 +157,10 @@ def init_processing(tx, fibre, rx, saving, device):
         
     if 'DeltaThetaC' not in fibre:
         fibre['DeltaThetaC']            = np.pi/35                             # [rad]
-        
-        
-################################################################################
+
+# =============================================================================
 # SYMBOLS AND SAMPLES MANAGEMENT
-################################################################################
+# =============================================================================
 
     rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
     rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']
@@ -170,10 +176,9 @@ def init_processing(tx, fibre, rx, saving, device):
     tx['NsampChannel']      = tx['NsampFrame']*rx['NframesChannel']
     tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel'] 
 
-
-################################################################################
+# =============================================================================
 # TRANSMITTER
-################################################################################
+# =============================================================================
 
     tx['Npolars']           = 2
     tx["RollOff"]           = 0.1
@@ -189,10 +194,11 @@ def init_processing(tx, fibre, rx, saving, device):
     tx['mimo']              = rx['mimo'] # usefull for txdsp.pilot_generation
     tx['NSymbBatch']        = rx['NSymbBatch']
     tx['NsampBatch']        = rx['NsampBatch']
-    
-################################################################################
+
+# =============================================================================
 # INITIALISATION OF CHANNEL MATRIX
-################################################################################
+# =============================================================================
+
 
     h_est = np.zeros([tx['Npolars'], tx['Npolars'], 2, tx['NsampTaps']])
     h_est[0,0,0,tx["NSymbTaps"]-1] = 1
@@ -203,40 +209,43 @@ def init_processing(tx, fibre, rx, saving, device):
 
     rx["h_est"]             = h_est
     fibre['phiIQ']          = np.zeros(tx['Npolars'],dtype = complex)
-    
-################################################################################
+
+# =============================================================================
 # RANDOM EFFECTS
-################################################################################
+# =============================================================================
 
     fibre                   = prop.set_thetas(tx, fibre, rx)
     tx                      = txhw.gen_phase_noise(tx, rx)
 
-################################################################################
+# =============================================================================
 # RECEIVER
-################################################################################
+# =============================================================================
 
     if rx['mimo'].lower() == "vae":
         rx['net']           = kit.twoXtwoFIR(tx).to(device)
         rx['optimiser']     = optim.Adam(rx['net'].parameters(), lr=rx['lr'])
         rx['optimiser'].add_param_group({"params": rx["h_est"]})
 
-    # stuffing for pilots_aided cpr, see rxdsp.CPR_pilots
     if rx['mode'].lower() != 'blind':
-        # Nzeros = NSb/B- floor(NSb_pilots/2)
-        # because CMA skips tx['Nsps'] symbols during the SGD        
-        rx['NSymbPilots_cma']   =  int(np.floor(tx['pilots_info'][0][-1]/2))
+        # we remove the first and last batch of each frame for edges effects
         rx['NBatchFrame_pilots']= rx['NBatchFrame']-2
+        rx['NSymb_pilots_cpr']  = tx['NSymb_pilots_cpr']-tx['NSymbTaps']
+        rx['Nzeros_stuffing']   = rx['NSymbBatch']-rx['NSymb_pilots_cpr']
+        # rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes']-rx['FrameChannel'],\
+        #                                     tx['Npolars'],
+        #                                     rx['NBatchFrame_pilots'],
+        #                                     rx['NSymb_pilots_cpr']))
         rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes']-rx['FrameChannel'],\
                                             tx['Npolars'],
-                                            rx['NBatchFrame_pilots'],
-                                            rx['NSymbPilots_cma']))
+                                            rx['NBatchFrame_pilots']))
+        rx['PhaseNoise_pilots_std'] = np.zeros(rx['PhaseNoise_pilots'].shape)
             
-        rx['Nzeros_stuffing']   = rx['NSymbBatch']-rx['NSymbPilots_cma']
+        rx['NSymbEq']           = rx["NSymbFrame"]-2*rx['NSymbBatch']
 
 
-################################################################################
+# =============================================================================
 # OUTPUT
-################################################################################
+# =============================================================================
 
     # OUTPUTS
     # if rx["mimo"].lower() == "cma":
@@ -256,16 +265,27 @@ def init_processing(tx, fibre, rx, saving, device):
     rx['sig_real']          = torch.zeros((tx['Npolars']*2,tx['NsampFrame']))
 
 
+
     if rx['mimo'].lower() == "vae":
-        rx['sig_eq_real']   = np.zeros((tx['Npolars']*2, rx['Nframes'], rx['NBatchFrame'],rx['NSymbBatch'])).astype(np.float32)
-
+        rx['sig_eq_real']   = np.zeros((tx['Npolars']*2,
+                                    rx['Nframes'],
+                                    rx['NBatchFrame'],
+                                    rx['NSymbBatch'])).astype(np.float32)
+    
     else:
-        rx['sig_eq_real']   = np.zeros((tx['Npolars']*2, rx['NframesChannel'], rx['NSymbEq'])).astype(np.float32)
+        rx['sig_eq_real']   = np.zeros((tx['Npolars']*2,
+                                    rx['NframesChannel'],
+                                    rx['NSymbEq'])).astype(np.float32)
 
 
-    rx['Symb_real_dec']     = np.zeros((tx['Npolars']*2,rx['Nframes'],rx['NSymbEq']),dtype = np.float16)
+
+    rx['Symb_real_dec']     = np.zeros((tx['Npolars']*2,
+                                        rx['Nframes'],
+                                        rx['NSymbEq']),dtype = np.float16)
+    
     rx["SER_valid"]         = np.zeros((2, rx['Nframes']),dtype = np.float128)
-    rx['Pnoise_est']        = np.zeros((tx["Npolars"], rx['Nframes']),dtype = np.float32)
+    rx['Pnoise_est']        = np.zeros((tx["Npolars"],
+                                        rx['Nframes']),dtype = np.float32)
 
 
     tx      = misc.sort_dict_by_keys(tx)

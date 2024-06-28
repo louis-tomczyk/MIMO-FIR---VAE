@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.1.2
-#   Date            : 2024-06-06
+#   Version         : 1.1.3
+#   Date            : 2024-06-21
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -17,8 +17,9 @@
 # ----- CHANGELOG -----
 #   1.0.0 (2024-03-04) - creation
 #   1.1.0 (2024-04-01) - cleaning
-#   1.1.1 (2024-05-22) - CMA, use of numpy instead of torch, saves memory & time
+#   1.1.1 (2024-05-22) - CMA, use numpy instead of torch, saves memory & time
 #   1.1.2 (2024-06-06) - [REMOVED] init_dict, moved to misc
+#   1.1.3 (2024-06-21) - train_self -> train_vae
 #
 # ----- MAIN IDEA -----
 #   Library for CMA equalizer in (optical) telecommunications
@@ -26,7 +27,8 @@
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
 #   [A1] Authors        : Avi Caciularu
-#       Title           : Blind Channel Equalization Using Variational Autoencoders
+#       Title           : Blind Channel Equalization Using Variational
+#                           Autoencoders
 #       Journal/Editor  : ICC
 #       Volume - N°     : 
 #       Date            : May 2018
@@ -34,7 +36,8 @@
 #       Pages           : 
 #
 #   [A2] Authors        : Junho Cho
-#       Title           : Probabilistic Constellation Shaping for Optical Fiber Communications
+#       Title           : Probabilistic Constellation Shaping for Optical Fiber
+#                           Communications
 #       Journal/Editor  : JLT
 #       Volume - N°     : 37-6
 #       Date            : March 2019
@@ -815,6 +818,7 @@ def soft_dec(out, var, amp_levels, nu_sc):
 #%% [C3]
 class twoXtwoFIR(nn.Module):
     
+    # caution: rx['noise_var'] will be missing if rxhw.load_ase is off
     # initialisation of tw0XtwoFIR with nn.Module.__init__ method
     # but with the attributes of tw0XtwoFIR
     def __init__(self, tx):
@@ -882,8 +886,10 @@ class twoXtwoFIR(nn.Module):
         
         # Soft demapping
         # correction term for PCS: + nu_sc * amp_levels**2 -- see [2]
-        # calculation of q according to the paper, with the comparison of the estimated x_hat
-        # (after equalizer, before soft demapper) to all the possible amplitudes 
+        # calculation of q according to the paper, with the comparison of the
+        # estimated x_hat
+        # (after equalizer, before soft demapper) to all the possible
+        # amplitudes
         
         q_est[0, :n, :] = self.sm((ZHI-amp_lev_mat)**2/2/rx["noise_var"][0]
                                           +  tx["nu_sc"]* amp_lev_mat_sq)
@@ -905,7 +911,7 @@ class twoXtwoFIR(nn.Module):
 
 #%%
             
-def train_self(BatchNo,rx,tx):
+def train_vae(BatchNo,rx,tx):
     
     rx['BatchNo']           = BatchNo   
     rx["minibatch_real"]    = rx["sig_real"][:,BatchNo*rx["NsampBatch"]:(BatchNo+1)*rx["NsampBatch"]]

@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.5.0
-#   Date            : 2024-06-20
+#   Version         : 1.5.2
+#   Date            : 2024-06-27
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -30,10 +30,19 @@
 #                           matlab
 #   1.4.0 (2024-05-27) - decision - including PCS: needed to scale
 #                           constellations, [C2] inspired
-#   1.4.1 (2024-06-06) - find_shift: NSymb_to_remove changed (no use of any weird "reference" number
-#                           of taps). Ntaps -> NsampTaps
-#   1.5.0 (2024-06-20) - [NEW] CPR_pilots: for MQAM modulations, Carrier Phase
-#                           Recovery is QPSK pilot aided. see [A1]
+#   1.4.1 (2024-06-06) - find_shift: NSymb_to_remove changed (no use of any
+#                           weird "reference" number of taps).
+#                           Ntaps -> NsampTaps
+#   1.5.0 (2024-06-20) - [DRAFT] CPR_pilots: for MQAM modulations, Carrier
+#                           Phase Recovery is QPSK pilot aided. see [A1]
+#   1.5.1 (2024-06-21) - train_self -> train_vae, along with kit (1.1.3)
+#                        decision: adapting for pilots_aided [TO BE FINISHED]
+#                        [REMOVED] find_pilots
+#   1.5.2 (2024-06-27) - CPR_pilots: removed decision because of synchro issues
+#                           synchro ok + filtering, varargin to check
+#                       compensate_and_truncate: varargin to check
+#                       decision: varargin to check
+#                       cleaning + "".format(...) -> f"{...}"
 #
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
@@ -87,7 +96,7 @@ import lib_rxdsp as rxdsp
 
 from lib_matlab import clc
 from lib_misc import KEYS as keys
-from lib_maths import power
+from lib_maths import get_power as power
 
 
 pi = np.pi
@@ -117,17 +126,23 @@ def receiver(tx,rx,saving):
         
         # print(rx['Frame'])
 
+        # if rx['Frame'] >= rx['FrameChannel']:
+            # gen.plot_constellations(sig1 = tx['sig_real'],title ='tx')
+            # gen.plot_constellations(sig1 = rx['sig_real'],title ='rx b4 mimo')
+            # gen.plot_constellations(sig1 = rx['sig_eq_real_cma'],title =
+            #                                   'rx after mimo {}'.format(rx['Frame']))  
+
+            # gen.plot_constellations(sig1 = rx['sig_real'], sig2 = rx['sig_eq_real_cma'], polar = 'both', labels = ["b4 cma","after cma"])
+
+            
         rx              = remove_symbols(rx,'data')
-        rx              = CPR_pilots(tx, rx)
-        # rx              = save_estimations(rx)
-        # rx              = SNR_estimation(tx, rx)
-        # rx              = SER_estimation(tx, rx)
+        rx              = CPR_pilots(tx, rx,'time trace pn')                            # {align,demod,time trace pn}
+        rx              = save_estimations(rx)
+        rx              = SNR_estimation(tx, rx)
+        rx              = SER_estimation(tx, rx)
         
 
-        # if rx['Frame'] >= rx['FrameChannel']:
-        #     gen.plot_constellations(sig1 = tx['sig_real'],title ='tx')
-        #     gen.plot_constellations(sig1 = rx['sig_real'],title ='rx b4 mimo')
-        #     gen.plot_constellations(sig1 = rx['sig_eq_real_cma'],title ='rx after mimo')        
+      
         
         # ------------------------------------------------------------------- #
         # k           = 0
@@ -188,19 +203,19 @@ def receiver(tx,rx,saving):
 
 
 #%%
-def compensate_and_truncate(tx,rx):
+def compensate_and_truncate(tx,rx,*varargin):
 
     # T == tx['Symb_real']
-    THI     = rx['tmp'][0][0]
-    THQ     = rx['tmp'][0][1]
-    TVI     = rx['tmp'][0][2]
-    TVQ     = rx['tmp'][0][3]
+    THI     = rx['tmp'][0][0].round(4)
+    THQ     = rx['tmp'][0][1].round(4)
+    TVI     = rx['tmp'][0][2].round(4)
+    TVQ     = rx['tmp'][0][3].round(4)
 
     # R == rx['Symb_real_dec']
-    RHI     = rx['tmp'][1][0]
-    RHQ     = rx['tmp'][1][1]
-    RVI     = rx['tmp'][1][2]
-    RVQ     = rx['tmp'][1][3]
+    RHI     = rx['tmp'][1][0].round(4)
+    RHQ     = rx['tmp'][1][1].round(4)
+    RVI     = rx['tmp'][1][2].round(4)
+    RVQ     = rx['tmp'][1][3].round(4)
 
     if rx["mimo"].lower() == "cma":
         rx['NSymbSER']  = len(THI[0])
@@ -225,15 +240,23 @@ def compensate_and_truncate(tx,rx):
     shiftVI = np.argmax(xcorrVI)-rx["NSymbEq"]/2
     shiftVQ = np.argmax(xcorrVQ)-rx["NSymbEq"]/2
 
-    # displaying correlations if needed to check
-    # gen.plot_xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ,title ='test - compensated', ref = 1, zoom = 1)
-
+    # ---------------------------------------------------------------- to check
+    if len(varargin) != 0 and varargin is not None:
+        gen.plot_xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ,\
+                           title ='compensate_and_truncate', ref = 1, zoom = 1)
+    # ---------------------------------------------------------------- to check
+    
     assert shiftHI == shiftHQ == shiftVI == shiftVQ == 0,\
         "shift values should be equal to 0: {} - {} - {} - {}".format(\
           shiftHI,shiftHQ,shiftVI,shiftVQ)
 
-    tx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,rx['Nframes'],rx['NSymbSER'])).astype(np.float16)
-    rx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,rx['Nframes'],rx['NSymbSER'])).astype(np.float16)
+    tx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,
+                                    rx['Nframes'],
+                                    rx['NSymbSER'])).astype(np.float16)
+    
+    rx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,
+                                    rx['Nframes'],
+                                    rx['NSymbSER'])).astype(np.float16)
 
 
     tx['Symb_SER_real'][0,rx['Frame']]  = THI[0]
@@ -246,13 +269,17 @@ def compensate_and_truncate(tx,rx):
     rx['Symb_SER_real'][2,rx['Frame']]  = RVI[0]
     rx['Symb_SER_real'][3,rx['Frame']]  = RVQ[0]
 
-    '''
-    # displaying signals if needed to check
-    if rx["Frame"] == rx["Nframes"]-1:
-        t = tx['Symb_SER_real'][:,rx['Frame']]
-        r = rx['Symb_SER_real'][:,rx['Frame']]
-        gen.plot_decisions(t, r, 15)
-    '''
+    # ---------------------------------------------------------------- to check
+    if len(varargin) != 0 and varargin is not None:
+        if rx["Frame"] == rx["Nframes"]-1:
+            t = tx['Symb_SER_real'][:,rx['Frame']]
+            r = rx['Symb_SER_real'][:,rx['Frame']]
+            gen.plot_decisions(t, r, 15)
+            # print(sum(r[0]==t[0])/len(r[0]))
+            # print(sum(r[1]==t[1])/len(r[0]))
+            # print(sum(r[2]==t[2])/len(r[0]))
+            # print(sum(r[3]==t[3])/len(r[0]))
+    # ---------------------------------------------------------------- to check
 
     del rx['tmp']
 
@@ -260,7 +287,7 @@ def compensate_and_truncate(tx,rx):
 
 
 #%%
-def decision(tx, rx):           
+def decision(tx, rx, *varargin):           
             
     if rx['mimo'].lower() == "cma" and rx['Frame'] < rx['FrameChannel']:
         return rx
@@ -273,14 +300,20 @@ def decision(tx, rx):
             frame   = rx['Frame']
 
 
-        ZHI     = np.round(np.reshape(rx["sig_eq_real"][0, frame], (1, -1)).squeeze(), 4)
-        ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1, frame], (1, -1)).squeeze(), 4)
-        ZVI     = np.round(np.reshape(rx["sig_eq_real"][2, frame], (1, -1)).squeeze(), 4)
-        ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3, frame], (1, -1)).squeeze(), 4)
+        if rx['mode'].lower() == 'blind':
+            ZHI     = np.round(np.reshape(rx["sig_eq_real"][0, frame], (1, -1)).squeeze(), 4)
+            ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1, frame], (1, -1)).squeeze(), 4)
+            ZVI     = np.round(np.reshape(rx["sig_eq_real"][2, frame], (1, -1)).squeeze(), 4)
+            ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3, frame], (1, -1)).squeeze(), 4)        
+            Prx     = maths.get_power(rx["sig_eq_real"][:, frame],flag_real2cplx=1,flag_flatten=1)
         
-        Prx     = maths.get_power(rx["sig_eq_real"][:, frame],flag_real2cplx=1,flag_flatten=1)
+        else:
+            ZHI     = np.round(np.reshape(rx["sig_eq_real"][0], (1, -1)).squeeze(), 4)
+            ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1], (1, -1)).squeeze(), 4)
+            ZVI     = np.round(np.reshape(rx["sig_eq_real"][2], (1, -1)).squeeze(), 4)
+            ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3], (1, -1)).squeeze(), 4)
+            Prx     = maths.get_power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
         
-        # (1.3.0): no division by the power
         ZHI     = ZHI/np.sqrt(Prx[0])
         ZHQ     = ZHQ/np.sqrt(Prx[0])
         ZVI     = ZVI/np.sqrt(Prx[1])
@@ -304,16 +337,12 @@ def decision(tx, rx):
         if tx['nu'] != 0:
             Xref = Xref/np.sqrt(np.mean(Ptx))
         
-        # (1.3.0)         
-        # Ref     = np.tile(tx['amps'].unsqueeze(1), [1, rx['NSymbEq']])
-        # (1.4.0)
         Ref     = np.tile(np.unique(np.real(Xref)), [rx['NSymbEq'],1]).transpose()
-        
-        
-        Err_HI = abs(ZHI_ext - Ref).astype(np.float16)
-        Err_HQ = abs(ZHQ_ext - Ref).astype(np.float16)
-        Err_VI = abs(ZVI_ext - Ref).astype(np.float16)
-        Err_VQ = abs(ZVQ_ext - Ref).astype(np.float16)
+
+        Err_HI  = abs(ZHI_ext - Ref).astype(np.float16)
+        Err_HQ  = abs(ZHQ_ext - Ref).astype(np.float16)
+        Err_VI  = abs(ZVI_ext - Ref).astype(np.float16)
+        Err_VQ  = abs(ZVQ_ext - Ref).astype(np.float16)
 
         if tx["nu"] != 0: # probabilistic shaping
         
@@ -345,28 +374,28 @@ def decision(tx, rx):
         
 
         
-        '''
-        # for checking the result --- time traces
-        if rx["Frame"] => rx["FrameChannel"]:
-            t = [ZHI,ZHQ,ZVI,ZVQ]
-            r = [ZHI_dec,ZHQ_dec,ZVI_dec,ZVQ_dec]
-            gen.plot_decisions(t, r, 5)
-            
-        # for checking the result --- constellations
-        if rx["Frame"] => rx["FrameChannel"]:
-            TX = np.reshape(tx["Symb_real"],(4,-1))
-            ZX = np.array([ZHI_dec+1j*ZHQ_dec,ZVI_dec+1j*ZVQ_dec])
-            gen.plot_const_2pol_2sig(TX, ZX, ['tx',"zx"])
-        '''
+    # ---------------------------------------------------------------- to check
+        if len(varargin) != 0 and varargin is not None:
+            # for checking the result --- time traces
+            if rx["Frame"] >= rx["FrameChannel"]:
+                t = [ZHI,ZHQ,ZVI,ZVQ]
+                r = [ZHI_dec,ZHQ_dec,ZVI_dec,ZVQ_dec]
+                gen.plot_decisions(t, r, 5)
+                
+            # for checking the result --- constellations
+            if rx["Frame"] >= rx["FrameChannel"]:
+                TX = np.reshape(tx["Symb_real"],(4,-1))
+                ZX = np.array([ZHI_dec+1j*ZHQ_dec,ZVI_dec+1j*ZVQ_dec])
+                gen.plot_constellations(TX,ZX, labels =['tx',"zx"])
+    # ---------------------------------------------------------------- to check
+
 
     return rx
 
+
+
 #%%
-def CPR_pilots(tx,rx):
-    
-# =============================================================================
-#     maintenance
-# =============================================================================
+def CPR_pilots(tx,rx,*varargin):
 
     if rx['mode'].lower() == 'blind'\
     or "sig_eq_real_cma" not in rx\
@@ -377,217 +406,185 @@ def CPR_pilots(tx,rx):
         what_pilots             = tx['pilots_info'][0]
         pilots_function         = what_pilots[0].lower()
         pilots_changes          = what_pilots[2].lower()
-        pilots                  = tx['Symb_{}_cplx'.format(pilots_function)]
+        tx_pilots               = tx['Symb_{}_cplx'.format(pilots_function)]
 
 # =============================================================================
-#     stuffing
+#     maintenance
 # =============================================================================
-    
+
+        rx['NSymb_pilots_cpr']  = tx['NSymb_pilots_cpr']-tx['NSymbTaps']
+
         if pilots_changes != "batchwise":
-            pilots_H_all        = mb.repmat(pilots, (rx['NBatchFrame'],1))
-            pilots_V_all        = mb.repmat(pilots, (rx['NBatchFrame'],1))
-        else:
-            pilots_H_all        = pilots[0]
-            pilots_V_all        = pilots[1]
-    
-        pilots_H                = pilots_H_all[:,0:rx['NSymbPilots_cma']]
-        pilots_V                = pilots_V_all[:,0:rx['NSymbPilots_cma']]
-       
-        [H_stuffed, V_stuffed]  = maths.zero_stuffing(
-                                             sig_in = [pilots_H,pilots_V],\
-                                             Nzeros = rx['Nzeros_stuffing'],
-                                             Ntimes = rx['NBatchFrame'])
+            tx_pilots_H_all     = mb.repmat(tx_pilots[0], (rx['NBatchFrame'],1))
+            tx_pilots_V_all     = mb.repmat(tx_pilots[1], (rx['NBatchFrame'],1))
+        else:          
+            tx_pilots_H_all     = tx_pilots[0]
+            tx_pilots_V_all     = tx_pilots[1]
 
-        rx['pilots_{}_cplx_stuffed'.format(pilots_function)] =\
-                 np.concatenate((H_stuffed,V_stuffed),axis = 0)
+        rx_HI       = rx['sig_eq_real'][0]
+        rx_HQ       = rx['sig_eq_real'][1]
+        rx_VI       = rx['sig_eq_real'][2]
+        rx_VQ       = rx['sig_eq_real'][3]
 
-        rx                      = remove_symbols(rx,'pilots_cpr')
+        rx_H        = np.expand_dims(rx_HI+1j*rx_HQ,axis = 0)
+        rx_V        = np.expand_dims(rx_VI+1j*rx_VQ,axis = 0)
+
+        rx_H_pilots = np.zeros((rx['NBatchFrame_pilots'],\
+                                rx['NSymb_pilots_cpr'])).astype(np.complex64)
+        rx_V_pilots = np.zeros((rx['NBatchFrame_pilots'],\
+                                rx['NSymb_pilots_cpr'])).astype(np.complex64)
         
-        del pilots_H, pilots_V, H_stuffed, V_stuffed
-        del pilots, pilots_H_all, pilots_V_all
         
 # =============================================================================
-#     logistics
+#     pilots alignement: sent VS received, shift caused by the shaping
 # =============================================================================
-
-        rx_HI    = rx['sig_eq_real'][0]
-        rx_HQ    = rx['sig_eq_real'][1]
-        rx_VI    = rx['sig_eq_real'][2]
-        rx_VQ    = rx['sig_eq_real'][3]
-
-        rx_H     = np.expand_dims(rx_HI+1j*rx_HQ,axis = 0)
-        rx_V     = np.expand_dims(rx_VI+1j*rx_VQ,axis = 0)
-
-
-        pilots_H_stuffed    = np.expand_dims(
-            rx['pilots_{}_cplx_stuffed'.format(pilots_function)][0],axis = 0)
-        pilots_V_stuffed    = np.expand_dims(
-            rx['pilots_{}_cplx_stuffed'.format(pilots_function)][1],axis = 0)
-
-
-        gen.plot_constellations(sig1 = rx_H, sig2 = pilots_H_stuffed,
-            polar = 'H',labels=['RX','pilots'],title = "received and pilots")
         
-        del rx_HI, rx_HQ, rx_VI, rx_VQ
-        
+        tx_pilots_H         = tx_pilots_H_all[1:-1]
+        tx_pilots_V         = tx_pilots_V_all[1:-1]
+
+        Nroll               = -(tx['NSymbTaps']-1)
+        tx_pilots_H_roll    = np.roll(tx_pilots_H,Nroll)
+        tx_pilots_V_roll    = np.roll(tx_pilots_V,Nroll)
+
+        rx_H_rs             = np.reshape(rx_H, (rx['NBatchFrame_pilots'],-1))
+        rx_V_rs             = np.reshape(rx_V, (rx['NBatchFrame_pilots'],-1))
+
+        for k in range(int(rx['NBatchFrame_pilots'])):
+
+            rx_H_pilots[k] = rx_H_rs[k, :rx['NSymb_pilots_cpr']]
+            rx_V_pilots[k] = rx_V_rs[k, :rx['NSymb_pilots_cpr']]
+
+    # ---------------------------------------------------------------- to check
+        if len(varargin) != 0 and 'align' in varargin:
+            for k in range(int(rx['NBatchFrame_pilots']/7)):            
+                plt.figure()
+                # 
+                plt.subplot(1,2,1)
+                plt.plot(np.real(tx_pilots_H_roll[k]),linewidth=2,label='TX')
+                plt.plot(np.real(rx_H_pilots[k]),linewidth=2,label = 'RX')
+                plt.legend()
+                plt.title("polH")
+                # 
+                plt.subplot(1,2,2)
+                plt.plot(np.real(tx_pilots_V_roll[k]),linewidth=2,label='TX')
+                plt.plot(np.real(rx_V_pilots[k]),linewidth = 2,label = 'RX')
+                plt.legend()
+                plt.title("polV")
+                # 
+                plt.suptitle(f"frame = {rx['Frame']}")
+                plt.show()
+    # ---------------------------------------------------------------- to check
+            
+        del tx_pilots_H_all, tx_pilots_V_all
+        del rx_HI, rx_HQ, rx_VI, rx_VQ, rx_H, rx_V
+        del rx_H_rs, rx_V_rs
+
+
 # =============================================================================
 #       conjugaison
 # =============================================================================
-        tmpH    = rx_H*np.conj(pilots_H_stuffed)
-        tmpV    = rx_V*np.conj(pilots_V_stuffed)
-    
 
-        tmpH    = np.expand_dims(tmpH[tmpH!=0], axis = 0)
-        tmpV    = np.expand_dims(tmpV[tmpV!=0], axis = 0)
-        
-        # the supplementary rotation of pi/4 is to prevent the ambiguity
-        # in angle estimation
-        tmpHn   = tmpH/np.abs(tmpH)*np.exp(1j*pi/4)
-        tmpVn   = tmpV/np.abs(tmpV)*np.exp(1j*pi/4)
 
-        del rx_H, rx_V, tmpH, tmpV
-        gen.plot_constellations(tmpHn,polar = 'both',
-                    title = 'tmp {} = z_n*a_n^*'.format(rx['Frame']))
+        tmpH = rx_H_pilots*np.conj(tx_pilots_H_roll[:,:rx['NSymb_pilots_cpr']])
+        tmpV = rx_V_pilots*np.conj(tx_pilots_V_roll[:,:rx['NSymb_pilots_cpr']])
         
+        tmpHn = tmpH/power(tmpH)
+        tmpVn = tmpV/power(tmpV)
+        
+        # ------------------------------------------------------------ to check
+        if len(varargin) != 0 and 'demod' in varargin:
+            gen.plot_constellations(sig1 = tmpHn, sig2 = tmpVn,\
+                labels= ['H','V'], title = f"cpr_pilots, frame {rx['Frame']}")
+        # ------------------------------------------------------------ to check
 
 # =============================================================================
-#     decision
+#     phase noise: estimation
 # =============================================================================
+                
+        phis_H          = np.angle(tmpHn)*180/pi                               # [deg]
+        phis_V          = np.angle(tmpVn)*180/pi                               # [deg]
         
-        phis_H          = np.angle(tmpHn)
-        phis_V          = np.angle(tmpVn)
+        phis_H_mean     = np.mean(phis_H,axis = 1)
+        phis_H_std      = np.std(phis_H,axis = 1)
 
-        phis_H_batches  = np.reshape(phis_H,(-1,rx['NSymbPilots_cma']))
-        phis_V_batches  = np.reshape(phis_V,(-1,rx['NSymbPilots_cma']))
-    
-        ref_angles      = np.array([[-3,-1,+1,+3]]).T*pi/4
-        ref_angles_rep  = mb.repmat(ref_angles, (1,rx['NSymbPilots_cma']))
-        
-        argmins_H       = np.zeros((rx['NBatchFrame_pilots'],
-                                    rx['NSymbPilots_cma'])).astype(int)
-        argmins_V       = np.zeros((rx['NBatchFrame_pilots'],
-                                    rx['NSymbPilots_cma'])).astype(int)
-        
-        phis_dec_H      = np.zeros((rx['NBatchFrame_pilots'],
-                                    rx['NSymbPilots_cma']))
-        phis_dec_V      = np.zeros((rx['NBatchFrame_pilots'],
-                                    rx['NSymbPilots_cma']))
-        
-        
-        for k in range(rx['NBatchFrame_pilots']):
-            phis_H_batch_k  = mb.repmat(phis_H_batches[k],(4,1))
-            phis_V_batch_k  = mb.repmat(phis_V_batches[k],(4,1))
-            
-            diff_H          = np.abs(phis_H_batch_k - ref_angles_rep)
-            diff_V          = np.abs(phis_V_batch_k - ref_angles_rep)
-            
-            argmins_H[k]    = np.argmin(diff_H,axis = 0)
-            argmins_V[k]    = np.argmin(diff_V,axis = 0)
-            
-            
-        for k in range(rx['NBatchFrame_pilots']):
-            for j in range(rx['NSymbPilots_cma']):
-                phis_dec_H[k,j] = ref_angles[argmins_H[k,j]][0]
-                phis_dec_V[k,j] = ref_angles[argmins_V[k,j]][0]
+        phis_V_mean     = np.mean(phis_V,axis = 1)
+        phis_V_std      = np.std(phis_V,axis = 1)
 
-        # if wanna check
-        # plt.figure()
-        # #
-        # plt.subplot(1,2,1)
-        # plt.plot(phis_H.T,label = 'rx')
-        # plt.plot(phis_dec_H.flatten(),label = 'dec')
-        # plt.legend()
-        # plt.title("pol H")
-        # #
-        # plt.subplot(1,2,2)
-        # plt.plot(phis_V.T,label = 'rx')
-        # plt.plot(phis_dec_V.flatten(),label = 'dec')
-        # plt.legend()
-        # plt.title("pol V")
-        # #
-        # plt.show()
+        del tmpHn, tmpVn, tx_pilots, rx_H_pilots, rx_V_pilots
+        del tx_pilots_H, tx_pilots_V, tx_pilots_H_roll, tx_pilots_V_roll
 
-        del tmpHn, tmpVn, phis_H, phis_V, ref_angles, ref_angles_rep
-        del phis_H_batch_k, phis_V_batch_k, diff_H, diff_V
-        del argmins_H, argmins_V
         
 # =============================================================================
-#     phase noise
+#     phase noise: 
 # =============================================================================
 
-        for k in range(rx['NBatchFrame_pilots']):
+        # for k in range(rx['NBatchFrame_pilots']):
 
-            rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],0,k] =\
-                                    phis_H_batches[k]-phis_dec_H[k]
+        rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],0] = phis_H_mean
+        rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],1] = phis_V_mean
                                     
-            rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],1,k] =\
-                                        phis_V_batches[k]-phis_dec_V[k]
+        rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],0] =\
+                                phis_H_std
+                                
+        rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],1] =\
+                                phis_V_std
+        
+        phi_noise_H     = rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],0]
+        phi_noise_V     = rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],1]
+        
+# =============================================================================
+#     noise filtering
+# =============================================================================
+        
+        # ma_filter_params = {
+        #     'type'          : 'moving_average',
+        #     'ma_type'       : 'gaussian',
+        #     'window_size'   : 5,
+        #     'std_dev'       : 2
+        # }
+        
+        ma_filter_params = {
+            'type'          : 'moving_average',
+            'ma_type'       : 'uniform',
+            'window_size'   : 5,
+        }
+        pn_H_filter = maths.my_low_pass_filter(phi_noise_H, ma_filter_params)
+
+        # ------------------------------------------------------------ to check
+
+        
+        phi_noise_H_std = rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],0]
+        phi_noise_V_std = rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],1]
+
+        if len(varargin) != 0 and "time trace pn" in varargin:
+            tmp_pn      = tx['PhaseNoise_unique'][rx['Frame'],1:-1]
+            batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
+            # tmp_pn_rs = np.reshape(tmp_pn,(rx['NBatchFrame_pilots'],-1))
+            # tmp_pn_rp = np.repeat(tmp_pn_rs, rx['NSymb_pilots_cpr'])
+            # tmp_pn      = np.reshape(tmp_pn_rp,(1,-1))
             
+            plt.figure()
+            plt.plot(batches,tmp_pn*180/pi, label = 'ground truth')
+            plt.plot(batches, phi_noise_H, label = 'estimation raw')
+            plt.plot(batches,pn_H_filter, linestyle = 'dashed',label = "estimation filt")
+            plt.legend()
+            # plt.errorbar(batches, phi_noise_H, phi_noise_H_std)
+            plt.show()
+        # ------------------------------------------------------------ to check
+        
+# =============================================================================
+#     interpolation
+# =============================================================================
+
+        [H_stuffed, V_stuffed]  = maths.zero_stuffing(
+                                          sig_in = [phi_noise_H,phi_noise_V],\
+                                          Nzeros = rx['Nzeros_stuffing'],
+                                          Ntimes = rx['NBatchFrame_pilots'])
+            
+
+        
         return rx
 
-
-
-
-#%%
-def find_pilots(tx,rx):
-    
-    if rx['mimo'].lower() != 'blind'\
-    and rx['mimo'].lower() == 'cma'\
-    and rx['Frame'] >= rx['FrameChannel']:
-        for k in range(len(tx['pilots_info'])):
-            
-            # maintenance
-            ref     = tx["pilots_{}_real".format(tx['pilots_info'][k][0])]
-            sig     = rx['sig_eq_real'].squeeze()
-            
-            # sig     = rx['sig_real']
-            
-            THI     = ref[0]
-            THQ     = ref[1]
-            TVI     = ref[2]
-            TVQ     = ref[3]
-        
-            RHI     = np.reshape(sig[0],(1,-1)).squeeze()
-            RHQ     = np.reshape(sig[1],(1,-1)).squeeze()
-            RVI     = np.reshape(sig[2],(1,-1)).squeeze()
-            RVQ     = np.reshape(sig[3],(1,-1)).squeeze()
-        
-            # correlation between each channel
-            xcorrHI = np.correlate(THI,RHI,mode = 'full')
-            xcorrHQ = np.correlate(THQ,RHQ,mode = 'full')
-            xcorrVI = np.correlate(TVI,RVI,mode = 'full')
-            xcorrVQ = np.correlate(TVQ,RVQ,mode = 'full')
-        
-            # getting the shift
-            shiftHI = np.argmax(xcorrHI)
-            shiftHQ = np.argmax(xcorrHQ)
-            shiftVI = np.argmax(xcorrVI)
-            shiftVQ = np.argmax(xcorrVQ)
-            
-            # thresh = 6
-            # print(np.sum(xcorrHI>thresh))
-            # print(np.sum(xcorrHQ>thresh))
-            # print(np.sum(xcorrVI>thresh))
-            # print(np.sum(xcorrVQ>thresh))
-        
-            # displaying the correaltions to check
-            gen.plot_xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ, "test {} - find pilots".format(rx['Frame']))
-            
-            
-            
-            # for BatchNo in range(int(rx['NBatchFrame']/2)):
-            #     NBatch  = 2
-            #     a       = int(rx['NSymbFrame']/rx['NBatchFrame']+1)*BatchNo
-            #     b       = int(a+rx['NSymbFrame']/rx['NBatchFrame']*NBatch)
-            #     plt.plot(xcorrHI[a:b])
-            #     distances = np.zeros(1)
-            #     plt.title('{}'.format(rx['NSymbBatch']-np.argmax(xcorrHI[a:b])))
-            #     plt.show()
-        
-        
-            rx['PilotsShift']    = np.array([shiftHI,shiftHQ,shiftVI,shiftVQ]).astype(int)
-    
-    return rx
 
 
 #%%
@@ -595,6 +592,12 @@ def find_shift(tx,rx):
 
     # maintenance
     ref     = tx['Symb_real'].numpy()
+    if rx['mode'].lower() != 'blind':
+        tmp = ref[:,:,rx['NSymbBatch']:-rx['NSymbBatch']]
+        del ref
+        ref = tmp
+        
+    
     sig     = rx['Symb_real_dec']
     
     if ref.shape[-1] != sig.shape[-1]:
@@ -628,9 +631,13 @@ def find_shift(tx,rx):
     shiftVQ = np.argmax(xcorrVQ)-rx["NSymbEq"]/2
 
     # displaying the correaltions to check
-    # gen.plot_xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ, "test - find shift", ref=1, zoom=1)
+    # gen.plot_xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ,\
+    #                   "test - find shift", ref=1, zoom=1)
 
-    assert shiftHI == shiftHQ == shiftVI == shiftVQ, "shift values should be equal : {} - {} - {} - {}".format(shiftHI,shiftHQ,shiftVI,shiftVQ)
+    assert shiftHI == shiftHQ == shiftVI == shiftVQ,\
+        "shift values should be equal :"+\
+           f"{shiftHI} - {shiftHQ} - {shiftVI} - {shiftVQ}"
+           
     rx['NSymbShift']    = int(shiftHI)
 
 
@@ -644,11 +651,13 @@ def mimo(tx,rx,saving):
         with torch.set_grad_enabled(True):
             for BatchNo in range(rx["NBatchFrame"]):
 
-                rx              = kit.train_self(BatchNo,rx,tx)
+                rx              = kit.train_vae(BatchNo,rx,tx)
                 rx,loss         = kit.compute_vae_loss(tx,rx)
                 maths.update_fir(loss,rx['optimiser'])
 
-        # gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:], title = "RX f-{}".format(rx['Frame']))
+            if rx["Frame"]>rx['FrameChannel']-1:
+                gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:],\
+                                        title = f"RX f-{rx['Frame']}")
             
             # gen.plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"Llikelihood")
             # plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"DKL")
@@ -671,34 +680,30 @@ def mimo(tx,rx,saving):
         loss = []
         return rx,loss
 
-    # if rx['Frame'] >= rx['FrameChannel']:
-    #     title = "eq f-{}".format(rx['Frame']-rx['FrameChannel'])
-    #     gen.plot_const_2pol(rx['sig_eq_real'], title, tx)
 
 
 
 #%%
 def remove_symbols(rx,what):
 
-    if rx['Frame'] >= rx['FrameChannel']:
-        
+    if rx['Frame'] >= rx['FrameChannel'] and rx['mimo'].lower() != 'vae':
+
         if what.lower() == 'data':
             if rx['mode'].lower() == 'blind':
                 rx['sig_eq_real'][0] = rx['sig_eq_real_cma'][0,rx['NSymbCut']:-rx['NSymbCut']-1]
                 rx['sig_eq_real'][1] = rx['sig_eq_real_cma'][1,rx['NSymbCut']:-rx['NSymbCut']-1]
                 rx['sig_eq_real'][2] = rx['sig_eq_real_cma'][2,rx['NSymbCut']:-rx['NSymbCut']-1]
                 rx['sig_eq_real'][3] = rx['sig_eq_real_cma'][3,rx['NSymbCut']:-rx['NSymbCut']-1]
+                rx['NSymbFrame_b4Eq']= rx['NSymbFrame']-rx['NSymbCut_tot']+1
             
             else:
         
-                NSymbTot    = rx['NSymbFrame']-2*rx['NSymbBatch']
-                tmp         =  np.zeros((4,NSymbTot))
-
+                rx['NSymbFrame_b4Eq']= rx['NSymbFrame']-2*rx['NSymbBatch']
                 tmp = rx['sig_eq_real_cma'][:,rx['NSymbBatch']:-rx['NSymbBatch']-1]
                     
-                del rx['sig_eq_real']
+                # del rx['sig_eq_real']
                 rx['sig_eq_real'] = tmp
-                # gen.plot_constellations(rx['sig_eq_real'],polar = 'both')
+                # gen.plot_constellations(rx['sig_eq_real_cma'],polar = 'H', title = "data at remove symbols")
         else:
             tmpH    = rx['{}_cplx_stuffed'.format(what)][0][rx['NSymbBatch']:-rx['NSymbBatch']]
             tmpV    = rx['{}_cplx_stuffed'.format(what)][1][rx['NSymbBatch']:-rx['NSymbBatch']]
@@ -708,7 +713,7 @@ def remove_symbols(rx,what):
             del rx['{}_cplx_stuffed'.format(what)]
             rx['{}_cplx_stuffed'.format(what)] = np.concatenate((tmpH,tmpV),axis = 0)
             
-            # gen.plot_constellations(rx['{}_cplx_stuffed'.format(what)],polar = 'both')
+            # gen.plot_constellations(rx['{}_cplx_stuffed'.format(what)],polar = 'H', title = 'pilots cpr')
 
     return rx
 
