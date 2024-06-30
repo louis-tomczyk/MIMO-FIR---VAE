@@ -1018,14 +1018,14 @@ def set_Nsymbols(tx,fibre,rx):
         print('\n------- if header:')
         print(f"NSymbs_pilots    = {NSymbs_pilots}")
 
-    #     print('Nsymb_data_Batch         = {}'.format(rx["NSymb_data_Batch"]))
-    #     print('NSymb_pilots_tot_Batch   = {}'.format(rx['NSymb_pilots_tot_Batch']))
-    #     print('NSymb_overhead_percent   = {}'.format(rx['NSymb_overhead_percent']))
-    #     print('Effective baud rate      = {}'.format(rx['Rs_eff']))
+        # print('Nsymb_data_Batch         = {}'.format(rx["NSymb_data_Batch"]))
+        # print('NSymb_pilots_tot_Batch   = {}'.format(rx['NSymb_pilots_tot_Batch']))
+        # print('NSymb_overhead_percent   = {}'.format(rx['NSymb_overhead_percent']))
+        # print('Effective baud rate      = {}'.format(rx['Rs_eff']))
 
-    # print('\n------- physics:')
-    # print("fpol                 = {}".format(fibre['fpol']))
-    # print('dnu                  = {}'.format(tx['dnu']))
+    print('\n------- physics:')
+    print("fpol                 = {}".format(fibre['fpol']))
+    print('dnu                  = {}'.format(tx['dnu']))
     print('===================================')
 
 

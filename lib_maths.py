@@ -22,6 +22,7 @@
 #   1.2.3 (2024-06-18) - [NEW] zero_stuffing, cleaning
 #   1.2.4 (2024-06-20) - zero_stuffing: enabling multiple signal processing
 #   1.3.0 (2024-06-27) - [NEW] my_low_pass_filter
+#   1.3.1 (2024-06-30) - [NEW] mse
 #
 # ----- MAIN IDEA -----
 #   Advanced mathematical operations
@@ -53,6 +54,7 @@
 # fft_matrix
 # get_power             (1.2.2)
 # inverse3Dmatrix       (1.1.0)
+# mse                   (1.3.1)
 # my_low_pass_filter    (1.3.0)
 # test_unitarity        (1.2.1)
 # test_unitarity3d      (1.2.1)
@@ -133,6 +135,11 @@ def inverse3Dmatrix(matrix3D):
     return matrix3Dinverse
 
 
+
+#%%
+def mse(x,ref):
+    
+    return np.mean(np.abs(x-ref))
 
 
 

@@ -721,6 +721,54 @@ def my_zeros_tensor(size,device='cpu',dtype=torch.float32,requires_grad=False):
 
 
 #%%
+def organise_files(directory):
+    # Define the main target directories
+    figs_dir = os.path.join(directory, 'figs')
+    mat_dir = os.path.join(directory, 'mat')
+    err_dir = os.path.join(directory, 'err')
+    csv_dir = os.path.join(directory, 'csv')
+
+    # Create the main target directories if they don't exist
+    os.makedirs(figs_dir, exist_ok=True)
+    os.makedirs(mat_dir, exist_ok=True)
+    os.makedirs(err_dir, exist_ok=True)
+    os.makedirs(csv_dir, exist_ok=True)
+
+    # Create subdirectories for images
+    svg_dir = os.path.join(figs_dir, 'svg')
+    poincare_dir = os.path.join(figs_dir, 'poincare')
+    fir_dir = os.path.join(figs_dir, 'fir')
+
+    os.makedirs(svg_dir, exist_ok=True)
+    os.makedirs(poincare_dir, exist_ok=True)
+    os.makedirs(fir_dir, exist_ok=True)
+
+    # Iterate over all files in the given directory
+    for filename in os.listdir(directory):
+        filepath = os.path.join(directory, filename)
+        
+        # Vérifie que l'élément est un fichier (et non un dossier)
+        if os.path.isfile(filepath):
+            if filename.endswith('.svg'):
+                # Move .svg files to the svg subdirectory
+                shutil.move(filepath, os.path.join(svg_dir, filename))
+            elif filename.endswith('.png'):
+                # Determine if the file is 'poincare' or 'fir'
+                if 'poincare' in filename.lower():
+                    shutil.move(filepath, os.path.join(poincare_dir, filename))
+                else:
+                    shutil.move(filepath, os.path.join(fir_dir, filename))
+            elif filename.endswith('.mat'):
+                shutil.move(filepath, os.path.join(mat_dir, filename))
+            elif filename.endswith('.csv'):
+                if 'err' in filename.lower():
+                    shutil.move(filepath, os.path.join(err_dir, filename))
+                else:
+                    shutil.move(filepath, os.path.join(csv_dir, filename))
+            else:
+                print(f'Unrecognized file type: {filename}')
+
+#%%
 
 def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
     

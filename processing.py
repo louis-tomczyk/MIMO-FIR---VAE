@@ -386,7 +386,7 @@ def print_results(loss, frame, tx, fibre, rx, saving):
     else:
         thetak = 0
 
-    #'''
+    '''
     if rx["mimo"].lower() == 'vae':
         if tx['flag_phase_noise'] == 1:
             print("frame %d" % frame,
@@ -418,7 +418,7 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                       '--- Theta    = %.2f'     % (thetak*180/np.pi),
                       '--- <SER>    = %.2e'     % SERmeank,
                       )
-    #'''
+    '''
 
     return array
 

@@ -136,7 +136,7 @@ def receiver(tx,rx,saving):
 
             
         rx              = remove_symbols(rx,'data')
-        rx              = CPR_pilots(tx, rx,'time trace pn')                            # {align,demod,time trace pn}
+        rx              = CPR_pilots(tx, rx,'demod','time trace pn')                            # {align,demod,time trace pn}
         rx              = save_estimations(rx)
         rx              = SNR_estimation(tx, rx)
         rx              = SER_estimation(tx, rx)
@@ -536,19 +536,9 @@ def CPR_pilots(tx,rx,*varargin):
 #     noise filtering
 # =============================================================================
         
-        # ma_filter_params = {
-        #     'type'          : 'moving_average',
-        #     'ma_type'       : 'gaussian',
-        #     'window_size'   : 5,
-        #     'std_dev'       : 2
-        # }
-        
-        ma_filter_params = {
-            'type'          : 'moving_average',
-            'ma_type'       : 'uniform',
-            'window_size'   : 5,
-        }
-        pn_H_filter = maths.my_low_pass_filter(phi_noise_H, ma_filter_params)
+
+    
+        pn_H_filter = maths.my_low_pass_filter(phi_noise_H, tx['pn_filt_par'])
 
         # ------------------------------------------------------------ to check
 
@@ -559,6 +549,7 @@ def CPR_pilots(tx,rx,*varargin):
         if len(varargin) != 0 and "time trace pn" in varargin:
             tmp_pn      = tx['PhaseNoise_unique'][rx['Frame'],1:-1]
             batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
+            
             # tmp_pn_rs = np.reshape(tmp_pn,(rx['NBatchFrame_pilots'],-1))
             # tmp_pn_rp = np.repeat(tmp_pn_rs, rx['NSymb_pilots_cpr'])
             # tmp_pn      = np.reshape(tmp_pn_rp,(1,-1))
@@ -572,14 +563,16 @@ def CPR_pilots(tx,rx,*varargin):
             plt.show()
         # ------------------------------------------------------------ to check
         
+        
+        mse = maths.mse(phi_noise_H,tmp_pn*180/pi)
+        print(f"frame {rx['Frame']}, mse = {mse}")
+
+        
 # =============================================================================
 #     interpolation
 # =============================================================================
 
-        [H_stuffed, V_stuffed]  = maths.zero_stuffing(
-                                          sig_in = [phi_noise_H,phi_noise_V],\
-                                          Nzeros = rx['Nzeros_stuffing'],
-                                          Ntimes = rx['NBatchFrame_pilots'])
+
             
 
         
