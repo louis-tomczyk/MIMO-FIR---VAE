@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.5.1
-#   Date            : 2024-06-20
+#   Version         : 1.5.2
+#   Date            : 2024-07-01
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -29,6 +29,7 @@
 #                      - [REMOVED] plot_const_1/2pol(_2sig), plot_phases
 #                      - [NEW] plot_constellations, to replace the removed ones
 #   1.5.1 (2024-06-20) - plot_constellations: adding the grid
+#   1.5.2 (2024-07-01) - real2complex_fir: torch.Tensor type management
 # 
 # ----- MAIN IDEA -----
 #   Library for plotting functions in (optical) telecommunications
@@ -560,15 +561,22 @@ def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref=0,zoom=0):
 def real2complex_fir(rx):
     
     if type(rx) == dict:
-        h_11_I  = rx['h_est'][0,0,0,:]
-        h_12_I  = rx['h_est'][0,1,0,:]
-        h_21_I  = rx['h_est'][1,0,0,:]
-        h_22_I  = rx['h_est'][1,1,0,:]
+        rx_h_est = rx['h_est']
+        
+    if type(rx_h_est) == torch.Tensor:
+        rx_h_est = rx_h_est.detach().numpy()
+        
+    if type(rx) == dict:
+        
+        h_11_I  = rx_h_est[0,0,0,:]
+        h_12_I  = rx_h_est[0,1,0,:]
+        h_21_I  = rx_h_est[1,0,0,:]
+        h_22_I  = rx_h_est[1,1,0,:]
     
-        h_11_Q  = rx['h_est'][0,0,1,:]
-        h_12_Q  = rx['h_est'][0,1,1,:]
-        h_21_Q  = rx['h_est'][1,0,1,:]
-        h_22_Q  = rx['h_est'][1,1,1,:]
+        h_11_Q  = rx_h_est[0,0,1,:]
+        h_12_Q  = rx_h_est[0,1,1,:]
+        h_21_Q  = rx_h_est[1,0,1,:]
+        h_22_Q  = rx_h_est[1,1,1,:]
     else:
         h_11_I  = rx[0,0,0,:]
         h_12_I  = rx[0,1,0,:]
@@ -585,13 +593,13 @@ def real2complex_fir(rx):
     h_21    = h_21_I+1j*h_21_Q
     h_22    = h_22_I+1j*h_22_Q
     
-    NsampTaps                   = max(rx['h_est'].shape)
+    NsampTaps               = max(rx['h_est'].shape)
     rx['h_est_cplx']        = np.zeros((4,NsampTaps)).astype(dtype=complex)
     
-    rx['h_est_cplx'][0,:]   = h_11.detach().numpy()
-    rx['h_est_cplx'][1,:]   = h_12.detach().numpy()
-    rx['h_est_cplx'][2,:]   = h_21.detach().numpy()
-    rx['h_est_cplx'][3,:]   = h_22.detach().numpy()
+    rx['h_est_cplx'][0,:]   = h_11
+    rx['h_est_cplx'][1,:]   = h_12
+    rx['h_est_cplx'][2,:]   = h_21
+    rx['h_est_cplx'][3,:]   = h_22
     
     rx              = misc.sort_dict_by_keys(rx)
     

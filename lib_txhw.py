@@ -21,6 +21,7 @@
 #   1.2.0 (2024-05-29) - load_ase, load_phase_noise --- replaces 1.1.1 slicing mode from frame-wise 
 #                           to batch-wise
 #                      - [REMOVED] set_phis, included into gen_phase_noise
+#   1.2.1 (2024-07-01) - load_ase: SNR -> tx['SNR']
 #
 # ----- MAIN IDEA -----
 #   Generation and management of phase noise and ASE noise in optical telecommunication systems
@@ -194,14 +195,14 @@ def load_ase(tx,rx):
     # ==> P_noise_tot = 0.01   [mW]
     # ==> P_noise_AB  = 0.0025 [mW]   ---   A in {H,V}, B in {I,Q}
 
-    SNR                 = 10**(tx['SNRdB']/10)
+    tx['SNR']           = 10**(tx['SNRdB']/10)
     
     tx_sig_cplx         = np.zeros((tx['Npolars'],tx['NsampFrame']),dtype = np.complex64)
     tx_sig_cplx[0]      = np.array(tx['sig_real'][0]+1j*tx['sig_real'][1])
     tx_sig_cplx[1]      = np.array(tx['sig_real'][2]+1j*tx['sig_real'][3])
     tx["P_tx_sig"]      = np.mean(np.abs(tx_sig_cplx)**2)    # total power in X+Y polarisations [W]
 
-    tx["P_tx_noise"]    = tx["P_tx_sig"]/2/SNR
+    tx["P_tx_noise"]    = tx["P_tx_sig"]/2/tx['SNR']
     sigma_n             = np.sqrt(tx["P_tx_noise"]*tx["Nsps"])
 
     randn_I             = np.random.randn(tx["Npolars"],tx["NsampFrame"]).astype(np.float32)

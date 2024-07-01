@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.5.2
-#   Date            : 2024-06-27
+#   Version         : 1.6.0
+#   Date            : 2024-07-01
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -40,9 +40,12 @@
 #                        [REMOVED] find_pilots
 #   1.5.2 (2024-06-27) - CPR_pilots: removed decision because of synchro issues
 #                           synchro ok + filtering, varargin to check
-#                       compensate_and_truncate: varargin to check
-#                       decision: varargin to check
-#                       cleaning + "".format(...) -> f"{...}"
+#                        compensate_and_truncate: varargin to check
+#                        decision: varargin to check
+#                        cleaning + "".format(...) -> f"{...}"
+#   1.6.0 (2024-07-01) - mimo, SER_estimation, CPR_pilots, decision: same
+#                        training schemes for cma/vae. Along with processing
+#                        (1.3.0)
 #
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
@@ -136,7 +139,7 @@ def receiver(tx,rx,saving):
 
             
         rx              = remove_symbols(rx,'data')
-        rx              = CPR_pilots(tx, rx,'demod','time trace pn')                            # {align,demod,time trace pn}
+        rx              = CPR_pilots(tx, rx)#,'demod','time trace pn')                            # {align,demod,time trace pn}
         rx              = save_estimations(rx)
         rx              = SNR_estimation(tx, rx)
         rx              = SER_estimation(tx, rx)
@@ -288,106 +291,97 @@ def compensate_and_truncate(tx,rx,*varargin):
 
 #%%
 def decision(tx, rx, *varargin):           
-            
-    if rx['mimo'].lower() == "cma" and rx['Frame'] < rx['FrameChannel']:
-        return rx
+
+    frame   = rx['Frame']
+
+    if rx['mode'].lower() == 'blind':
+        ZHI     = np.round(np.reshape(rx["sig_eq_real"][0, frame], (1, -1)).squeeze(), 4)
+        ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1, frame], (1, -1)).squeeze(), 4)
+        ZVI     = np.round(np.reshape(rx["sig_eq_real"][2, frame], (1, -1)).squeeze(), 4)
+        ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3, frame], (1, -1)).squeeze(), 4)        
+        Prx     = maths.get_power(rx["sig_eq_real"][:, frame],flag_real2cplx=1,flag_flatten=1)
     
     else:
-
-        if rx['mimo'].lower() == "cma":
-            frame   = rx['Frame']-rx['FrameChannel']
-        else:
-            frame   = rx['Frame']
-
-
-        if rx['mode'].lower() == 'blind':
-            ZHI     = np.round(np.reshape(rx["sig_eq_real"][0, frame], (1, -1)).squeeze(), 4)
-            ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1, frame], (1, -1)).squeeze(), 4)
-            ZVI     = np.round(np.reshape(rx["sig_eq_real"][2, frame], (1, -1)).squeeze(), 4)
-            ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3, frame], (1, -1)).squeeze(), 4)        
-            Prx     = maths.get_power(rx["sig_eq_real"][:, frame],flag_real2cplx=1,flag_flatten=1)
-        
-        else:
-            ZHI     = np.round(np.reshape(rx["sig_eq_real"][0], (1, -1)).squeeze(), 4)
-            ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1], (1, -1)).squeeze(), 4)
-            ZVI     = np.round(np.reshape(rx["sig_eq_real"][2], (1, -1)).squeeze(), 4)
-            ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3], (1, -1)).squeeze(), 4)
-            Prx     = maths.get_power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
-        
-        ZHI     = ZHI/np.sqrt(Prx[0])
-        ZHQ     = ZHQ/np.sqrt(Prx[0])
-        ZVI     = ZVI/np.sqrt(Prx[1])
-        ZVQ     = ZVQ/np.sqrt(Prx[1])
-        
-        # checking normalisation
-        # print(maths.get_power(np.array([ZHI+1j*ZHQ,ZVI+1j*ZVQ]))) # should equal 1
-        
-        M       = int(tx['mod'][0:-3])                  # 'M' for M-QAM
-        ZHI_ext = np.tile(ZHI, [int(np.sqrt(M)), 1])
-        ZHQ_ext = np.tile(ZHQ, [int(np.sqrt(M)), 1])
-        ZVI_ext = np.tile(ZVI, [int(np.sqrt(M)), 1])
-        ZVQ_ext = np.tile(ZVQ, [int(np.sqrt(M)), 1])
-
-        # # (1.4.0)
-        X_alphabet  = tx['const_affixes']
-        Px_alphabet = maths.get_power(X_alphabet)
-        Xref        = X_alphabet/np.sqrt(Px_alphabet)
-        Ptx         = maths.get_power(np.reshape(tx["Symb_real"],(4,-1)),flag_real2cplx=1)
-        
-        if tx['nu'] != 0:
-            Xref = Xref/np.sqrt(np.mean(Ptx))
-        
-        Ref     = np.tile(np.unique(np.real(Xref)), [rx['NSymbEq'],1]).transpose()
-
-        Err_HI  = abs(ZHI_ext - Ref).astype(np.float16)
-        Err_HQ  = abs(ZHQ_ext - Ref).astype(np.float16)
-        Err_VI  = abs(ZVI_ext - Ref).astype(np.float16)
-        Err_VQ  = abs(ZVQ_ext - Ref).astype(np.float16)
-
-        if tx["nu"] != 0: # probabilistic shaping
-        
-            if rx['mimo'].lower() != "vae" and type(tx["prob_amps"]) != torch.Tensor:
-                tx["prob_amps"]         = torch.tensor(tx["prob_amps"])
-
-            prob_amps   = np.tile(tx['prob_amps'].unsqueeze(1), [1, rx['NSymbEq']])
-            SNR         = 10**(rx['SNRdB']/10)
-
-            Err_HI      = Err_HI ** 2 - 1/SNR*np.log(prob_amps)
-            Err_HQ      = Err_HQ ** 2 - 1/SNR*np.log(prob_amps)
-            Err_VI      = Err_VI ** 2 - 1/SNR*np.log(prob_amps)
-            Err_VQ      = Err_VQ ** 2 - 1/SNR*np.log(prob_amps)
-
-        tmp_HI  = np.argmin(Err_HI, axis=0)
-        tmp_HQ  = np.argmin(Err_HQ, axis=0)
-        tmp_VI  = np.argmin(Err_VI, axis=0)
-        tmp_VQ  = np.argmin(Err_VQ, axis=0)
+        ZHI     = np.round(np.reshape(rx["sig_eq_real"][0], (1, -1)).squeeze(), 4)
+        ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1], (1, -1)).squeeze(), 4)
+        ZVI     = np.round(np.reshape(rx["sig_eq_real"][2], (1, -1)).squeeze(), 4)
+        ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3], (1, -1)).squeeze(), 4)
+        Prx     = maths.get_power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
     
-        ZHI_dec = tx['amps'][tmp_HI]
-        ZHQ_dec = tx['amps'][tmp_HQ]
-        ZVI_dec = tx['amps'][tmp_VI]
-        ZVQ_dec = tx['amps'][tmp_VQ]
+    ZHI     = ZHI/np.sqrt(Prx[0])
+    ZHQ     = ZHQ/np.sqrt(Prx[0])
+    ZVI     = ZVI/np.sqrt(Prx[1])
+    ZVQ     = ZVQ/np.sqrt(Prx[1])
+    
+    # checking normalisation
+    # print(maths.get_power(np.array([ZHI+1j*ZHQ,ZVI+1j*ZVQ]))) # should equal 1
+    
+    M       = int(tx['mod'][0:-3])                  # 'M' for M-QAM
+    ZHI_ext = np.tile(ZHI, [int(np.sqrt(M)), 1])
+    ZHQ_ext = np.tile(ZHQ, [int(np.sqrt(M)), 1])
+    ZVI_ext = np.tile(ZVI, [int(np.sqrt(M)), 1])
+    ZVQ_ext = np.tile(ZVQ, [int(np.sqrt(M)), 1])
 
-        rx['Symb_real_dec'][0, rx['Frame']] = ZHI_dec
-        rx['Symb_real_dec'][1, rx['Frame']] = ZHQ_dec
-        rx['Symb_real_dec'][2, rx['Frame']] = ZVI_dec
-        rx['Symb_real_dec'][3, rx['Frame']] = ZVQ_dec
-        
+    # # (1.4.0)
+    X_alphabet  = tx['const_affixes']
+    Px_alphabet = maths.get_power(X_alphabet)
+    Xref        = X_alphabet/np.sqrt(Px_alphabet)
+    Ptx         = maths.get_power(np.reshape(tx["Symb_real"],(4,-1)),flag_real2cplx=1)
+    
+    if tx['nu'] != 0:
+        Xref = Xref/np.sqrt(np.mean(Ptx))
+    
+    Ref     = np.tile(np.unique(np.real(Xref)), [rx['NSymbEq'],1]).transpose()
 
-        
-    # ---------------------------------------------------------------- to check
-        if len(varargin) != 0 and varargin is not None:
-            # for checking the result --- time traces
-            if rx["Frame"] >= rx["FrameChannel"]:
-                t = [ZHI,ZHQ,ZVI,ZVQ]
-                r = [ZHI_dec,ZHQ_dec,ZVI_dec,ZVQ_dec]
-                gen.plot_decisions(t, r, 5)
-                
-            # for checking the result --- constellations
-            if rx["Frame"] >= rx["FrameChannel"]:
-                TX = np.reshape(tx["Symb_real"],(4,-1))
-                ZX = np.array([ZHI_dec+1j*ZHQ_dec,ZVI_dec+1j*ZVQ_dec])
-                gen.plot_constellations(TX,ZX, labels =['tx',"zx"])
-    # ---------------------------------------------------------------- to check
+    Err_HI  = abs(ZHI_ext - Ref).astype(np.float16)
+    Err_HQ  = abs(ZHQ_ext - Ref).astype(np.float16)
+    Err_VI  = abs(ZVI_ext - Ref).astype(np.float16)
+    Err_VQ  = abs(ZVQ_ext - Ref).astype(np.float16)
+
+    if tx["nu"] != 0: # probabilistic shaping
+    
+        if rx['mimo'].lower() != "vae" and type(tx["prob_amps"]) != torch.Tensor:
+            tx["prob_amps"]         = torch.tensor(tx["prob_amps"])
+
+        prob_amps   = np.tile(tx['prob_amps'].unsqueeze(1), [1, rx['NSymbEq']])
+        SNR         = 10**(rx['SNRdB']/10)
+
+        Err_HI      = Err_HI ** 2 - 1/SNR*np.log(prob_amps)
+        Err_HQ      = Err_HQ ** 2 - 1/SNR*np.log(prob_amps)
+        Err_VI      = Err_VI ** 2 - 1/SNR*np.log(prob_amps)
+        Err_VQ      = Err_VQ ** 2 - 1/SNR*np.log(prob_amps)
+
+    tmp_HI  = np.argmin(Err_HI, axis=0)
+    tmp_HQ  = np.argmin(Err_HQ, axis=0)
+    tmp_VI  = np.argmin(Err_VI, axis=0)
+    tmp_VQ  = np.argmin(Err_VQ, axis=0)
+
+    ZHI_dec = tx['amps'][tmp_HI]
+    ZHQ_dec = tx['amps'][tmp_HQ]
+    ZVI_dec = tx['amps'][tmp_VI]
+    ZVQ_dec = tx['amps'][tmp_VQ]
+
+    rx['Symb_real_dec'][0, rx['Frame']] = ZHI_dec
+    rx['Symb_real_dec'][1, rx['Frame']] = ZHQ_dec
+    rx['Symb_real_dec'][2, rx['Frame']] = ZVI_dec
+    rx['Symb_real_dec'][3, rx['Frame']] = ZVQ_dec
+    
+
+    
+# ---------------------------------------------------------------- to check
+    if len(varargin) != 0 and varargin is not None:
+        # for checking the result --- time traces
+        if rx["Frame"] >= rx["FrameChannel"]:
+            t = [ZHI,ZHQ,ZVI,ZVQ]
+            r = [ZHI_dec,ZHQ_dec,ZVI_dec,ZVQ_dec]
+            gen.plot_decisions(t, r, 5)
+            
+        # for checking the result --- constellations
+        if rx["Frame"] >= rx["FrameChannel"]:
+            TX = np.reshape(tx["Symb_real"],(4,-1))
+            ZX = np.array([ZHI_dec+1j*ZHQ_dec,ZVI_dec+1j*ZVQ_dec])
+            gen.plot_constellations(TX,ZX, labels =['tx',"zx"])
+# ---------------------------------------------------------------- to check
 
 
     return rx
@@ -398,8 +392,7 @@ def decision(tx, rx, *varargin):
 def CPR_pilots(tx,rx,*varargin):
 
     if rx['mode'].lower() == 'blind'\
-    or "sig_eq_real_cma" not in rx\
-    or rx['Frame'] < rx['FrameChannel']:
+    or "sig_eq_real_cma" not in rx:
         return rx
 
     else:
@@ -561,11 +554,12 @@ def CPR_pilots(tx,rx,*varargin):
             plt.legend()
             # plt.errorbar(batches, phi_noise_H, phi_noise_H_std)
             plt.show()
+            mse = maths.mse(phi_noise_H,tmp_pn*180/pi)
+            print(f"frame {rx['Frame']}, mse = {mse}")
         # ------------------------------------------------------------ to check
         
         
-        mse = maths.mse(phi_noise_H,tmp_pn*180/pi)
-        print(f"frame {rx['Frame']}, mse = {mse}")
+
 
         
 # =============================================================================
@@ -651,7 +645,7 @@ def mimo(tx,rx,saving):
             if rx["Frame"]>rx['FrameChannel']-1:
                 gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:],\
                                         title = f"RX f-{rx['Frame']}")
-            
+
             # gen.plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"Llikelihood")
             # plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"DKL")
             # plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"losses")
@@ -660,27 +654,22 @@ def mimo(tx,rx,saving):
 
     elif rx['mimo'].lower() == "cma" :
 
-        if rx["Frame"]>rx['FrameChannel']-1:
-            rx,loss = kit.CMA(tx,rx)
-            # gen.plot_loss_cma(rx,saving,['kind','law',"std",'linewidth'],"x")
-            # gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{}".format(rx['Frame']))
-        else:
-            loss = []
+        rx,loss = kit.CMA(tx,rx)
+        # gen.plot_loss_cma(rx,saving,['kind','law',"std",'linewidth'],"x")
+        # gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{}".format(rx['Frame']))
 
         return rx,loss
 
     else:
         loss = []
         return rx,loss
-
-
-
+    
+    
 
 #%%
 def remove_symbols(rx,what):
 
-    if rx['Frame'] >= rx['FrameChannel'] and rx['mimo'].lower() != 'vae':
-
+    if rx['mimo'].lower() != 'vae':
         if what.lower() == 'data':
             if rx['mode'].lower() == 'blind':
                 rx['sig_eq_real'][0] = rx['sig_eq_real_cma'][0,rx['NSymbCut']:-rx['NSymbCut']-1]
@@ -710,6 +699,7 @@ def remove_symbols(rx,what):
 
     return rx
 
+
 # %%
 def save_estimations(rx):
 
@@ -720,27 +710,21 @@ def save_estimations(rx):
 #%%
 def SER_estimation(tx,rx):
 
-    
-    if rx['mimo'].lower() == "cma" and rx['Frame'] < rx['FrameChannel']:
+    rx      = decision(tx,rx)
+    tx,rx   = find_shift(tx, rx)
+    tx,rx   = compensate_and_truncate(tx,rx)
 
-        return rx
+    RH      = rx['Symb_SER_real'][0,rx['Frame']]+1j*rx['Symb_SER_real'][1,rx['Frame']]
+    RV      = rx['Symb_SER_real'][2,rx['Frame']]+1j*rx['Symb_SER_real'][3,rx['Frame']]
 
-    else:
-        rx      = decision(tx,rx)
-        tx,rx   = find_shift(tx, rx)
-        tx,rx   = compensate_and_truncate(tx,rx)
-
-        RH      = rx['Symb_SER_real'][0,rx['Frame']]+1j*rx['Symb_SER_real'][1,rx['Frame']]
-        RV      = rx['Symb_SER_real'][2,rx['Frame']]+1j*rx['Symb_SER_real'][3,rx['Frame']]
-
-        TH      = tx['Symb_SER_real'][0,rx['Frame']]+1j*tx['Symb_SER_real'][1,rx['Frame']]
-        TV      = tx['Symb_SER_real'][2,rx['Frame']]+1j*tx['Symb_SER_real'][3,rx['Frame']]
+    TH      = tx['Symb_SER_real'][0,rx['Frame']]+1j*tx['Symb_SER_real'][1,rx['Frame']]
+    TV      = tx['Symb_SER_real'][2,rx['Frame']]+1j*tx['Symb_SER_real'][3,rx['Frame']]
 
 
-        rx["SER_valid"][0,rx['Frame']]  = sum(RH!=TH)/rx['NSymbSER']
-        rx["SER_valid"][1,rx['Frame']]  = sum(RV!=TV)/rx['NSymbSER']
+    rx["SER_valid"][0,rx['Frame']]  = sum(RH!=TH)/rx['NSymbSER']
+    rx["SER_valid"][1,rx['Frame']]  = sum(RV!=TV)/rx['NSymbSER']
 
-        return rx
+    return rx
 
 
 #%% [C1]

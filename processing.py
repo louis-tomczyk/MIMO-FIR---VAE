@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.6
-#   Date            : 2024-06-21
+#   Version         : 1.3.0
+#   Date            : 2024-07-01
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -33,6 +33,8 @@
 #   1.2.5 (2024-06-20) - init_processing: pilots for CPR, see rxdsp.CPR_pilots
 #                           along with rxdsp (1.5.0)
 #   1.2.6 (2024-06-21) - init_processing: avoid 'pilots' with "vae"
+#   1.3.0 (2024-07-01) - init_processing: applying same learning scheme for cma
+#                      - print_results: merging cma/vae display of results
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -111,12 +113,13 @@ def processing(tx, fibre, rx, saving, flags):
     for frame in range(rx['Nframes']):
 
         # print(frame)
-
+        gen.plot_fir(rx)
         rx              = init_train(tx, rx, frame)                            # if vae, otherwise: transparent
         tx              = txdsp.transmitter(tx, rx)
         tx, fibre, rx   = prop.propagation(tx, fibre, rx)
         rx, loss        = rxdsp.receiver(tx,rx,saving)
         array           = print_results(loss, frame, tx, fibre, rx, saving)
+
 
 
     tx, fibre, rx = save_data(tx, fibre, rx, saving, array)
@@ -274,7 +277,7 @@ def init_processing(tx, fibre, rx, saving, device):
     
     else:
         rx['sig_eq_real']   = np.zeros((tx['Npolars']*2,
-                                    rx['NframesChannel'],
+                                    rx['Nframes'],
                                     rx['NSymbEq'])).astype(np.float32)
 
 
@@ -347,25 +350,18 @@ def print_results(loss, frame, tx, fibre, rx, saving):
         SERsvalid       = np.array([SERvalid0, SERvalid1])
         SERmeank        = round(np.mean(SERsvalid), 15)
 
-
     else:
-        if rx['Frame'] >= rx["FrameChannel"]:
-            # frame       = frame - rx['FrameChannel']
-            
-            if rx['mimo'].lower() == "vae":
-                lossk   = torch.std(loss[-1][:]).item()
-            else:
-                lossk   = np.std(loss[-1][:]).item()
-
-            SERvalidH   = round(SER_valid[0, rx['Frame']].item(), 15)
-            SERvalidV   = round(SER_valid[1, rx['Frame']].item(), 15)
-
-            SERsvalid   = np.array([SERvalidH, SERvalidV])
-            SERmeank    = round(np.mean(SERsvalid), 15)
-
+        
+        if rx['mimo'].lower() == "vae":
+            lossk   = torch.std(loss[-1][:]).item()
         else:
-            lossk       = np.NaN
-            SERmeank    = np.NaN
+            lossk   = np.std(loss[-1][:]).item()
+
+        SERvalidH   = round(SER_valid[0, rx['Frame']].item(), 15)
+        SERvalidV   = round(SER_valid[1, rx['Frame']].item(), 15)
+
+        SERsvalid   = np.array([SERvalidH, SERvalidV])
+        SERmeank    = round(np.mean(SERsvalid), 15)
 
 
     SERs.append(SERmeank)
@@ -386,7 +382,7 @@ def print_results(loss, frame, tx, fibre, rx, saving):
     else:
         thetak = 0
 
-    '''
+    #'''
     if rx["mimo"].lower() == 'vae':
         if tx['flag_phase_noise'] == 1:
             print("frame %d" % frame,
@@ -403,22 +399,22 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                   '--- Theta    = %.2f'     % (thetak*180/np.pi),
                   '--- <SER>    = %.2e'     % SERmeank,
                   )
+            
     else:
-        if rx['Frame'] >= rx["FrameChannel"]:
-            if tx['flag_phase_noise'] == 1:
-                print("frame %d" % frame,
-                      '--- loss     = %.3e'     % lossk,
-                      '--- Theta    = %.2f'     % (thetak*180/np.pi),
-                      '--- std(Phi) = %.1f'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
-                      '--- <SER>    = %.2e'     % SERmeank,
-                      )
-            else:
-                print("frame %d" % frame,
-                      '--- loss     = %.3e'     % lossk,
-                      '--- Theta    = %.2f'     % (thetak*180/np.pi),
-                      '--- <SER>    = %.2e'     % SERmeank,
-                      )
-    '''
+        if tx['flag_phase_noise'] == 1:
+            print("frame %d" % frame,
+                  '--- loss     = %.3e'     % lossk,
+                  '--- Theta    = %.2f'     % (thetak*180/np.pi),
+                  '--- std(Phi) = %.1f'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
+                  '--- <SER>    = %.2e'     % SERmeank,
+                  )
+        else:
+            print("frame %d" % frame,
+                  '--- loss     = %.3e'     % lossk,
+                  '--- Theta    = %.2f'     % (thetak*180/np.pi),
+                  '--- <SER>    = %.2e'     % SERmeank,
+                  )
+    #'''
 
     return array
 

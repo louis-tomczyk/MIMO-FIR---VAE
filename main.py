@@ -57,13 +57,17 @@
 # --- LIBRARIES ---
 # =============================================================================
 import numpy as np
+
+# import processing2 as process
+# import lib_txdsp2 as txdsp
+
 import processing as process
-import matplotlib.pyplot as plt
-
-import lib_misc as misc
 import lib_txdsp as txdsp
-import lib_matlab as mb
 
+
+import matplotlib.pyplot as plt
+import lib_misc as misc
+import lib_matlab as mb
 from lib_matlab import clc
 from lib_misc import KEYS as keys
 
@@ -84,9 +88,9 @@ tx,fibre,rx,saving,flags        = misc.init_dict()
 
 tx["NSymbTaps"]                 = 7                                            # must be odd number
 tx["Rs"]                        = 64e9                                         # [Baud] Symbol rate
-tx['SNRdB']                     = 150
+tx['SNRdB']                     = 50
 
-tx['flag_phase_noise']          = 1
+tx['flag_phase_noise']          = 0
 tx['dnu']                       = 1e6
 paramPHI                        = [1e6]                                        # [Hz] laser linewidth
 
@@ -112,8 +116,8 @@ paramPHI                        = [1e6]                                        #
 # -------------------------------------------------------
 
 
-tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
-tx["nu"]                        = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
+tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
+tx["nu"]                        = 0#0.0254                                       # for PCS: exp(-nu*|x|^2)/...
 
 
 # -----------------------------------------------------------------------------
@@ -160,13 +164,12 @@ tx["nu"]                        = 0.0254                                       #
 
 
 rx["NSymbFrame"]        = 20000
-rx['NSymbBatch']        = 500
+rx['NSymbBatch']        = 200
 
-percent_pil             = (tx['NSymbTaps']+5)/rx['NSymbBatch']*100
 
 
 # tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",5,0]]         #ok
-tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",percent_pil,0]]         #ok
+tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",8,0]]         #ok
 
 # tx['PhiLaw']["kind"]  = 'Rwalk'
 # tx['PhiLaw']["law"]   = 'linewidth'
@@ -193,11 +196,11 @@ tx['pn_filt_par']       = {
 ################################## RECEIVER ###################################
 ###############################################################################
 
-rx['mode']              = 'pilots'                                             # {blind, pilots}
-rx["mimo"]              = "cma"                                                # {cma,vae}
+rx['mode']              = 'blind'                                             # {blind, pilots}
+rx["mimo"]              = "vae"                                                # {cma,vae}
 
-rx['SNRdB']             = 40                                                   # {>0}
-rx["lr"]                = 5e-6                                                 # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+rx['SNRdB']             = 25                                                   # {>0}
+rx["lr"]                = 5e-4                                                 # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
 
 
 tauCoh                  = tx['Rs']/2/pi/tx['dnu']
@@ -222,12 +225,12 @@ else:
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NframesChannel]]
 
-# paramPOL                        = np.array([[0],[25],[0]])
+paramPOL                        = np.array([[0],[25],[1]])
 # paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
-paramPOL                        = np.array([[0],[25]])
+# paramPOL                        = np.array([[0],[25]])
 
 # paramLR                         = np.array([10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,200,300,400,500])*1e-6
-paramLR                         = np.array([5])*1e-6
+paramLR                         = np.array([100])*1e-6
 paramFIRlen                     = [7]
 
 

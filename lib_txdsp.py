@@ -670,7 +670,6 @@ def pilot_generation(tx,rx,what_pilots_k,*varargin):
     # ----------------------------------------------------------------------- #
         
 
-#%%
 ###############################################################################
 ################################# generation ##################################
 ###############################################################################
@@ -948,6 +947,12 @@ def set_Nsymbols(tx,fibre,rx):
             else:
                 percentage                      = what_pilots[-2]/100
                 tx['NSymb_{}'.format(pilots_function)] = int(round(percentage*rx['NSymbBatch']))
+                
+                assert tx['NSymb_{}'.format(pilots_function)]>tx['NSymbTaps'],\
+                    "number of pilots symbols"+\
+                    f" (got {tx['NSymb_{}'.format(pilots_function)]}) MUST be >"+\
+                    f" NSymbTaps ({tx['NSymbTaps']})"
+                    
                 tx['pilots_info'][k][-1]        = tx['NSymb_{}'.format(pilots_function)]
                 
             tx['Nsamp_{}'.format(pilots_function)]     = tx['NSymb_{}'.format(pilots_function)]*tx['Nsps']
@@ -956,15 +961,11 @@ def set_Nsymbols(tx,fibre,rx):
             
             NSymbs_pilots += tx['NSymb_{}'.format(pilots_function)]
             
-
-            
-            
         # rx['NSymb_data_Frame']              = rx['NSymbBatch']-tx['NSymb_{}'.format(pilots_function)]
         # rx['NSymb_pilots_tot_Batch']        = NSymbs_pilots
         # rx['NSymb_overhead_percent']        = round(rx['NSymb_pilots_tot_Batch']/rx['NSymb_data_Batch']*100,2)
         # rx['Rs_eff']                        = round(rx['NSymb_data_Batch']/rx['NSymbBatch']*tx['Rs']*1e-9,2)
             
-#%%
 ###############################################################################
 ############################ updating the numbers #############################
 ###############################################################################
@@ -975,7 +976,7 @@ def set_Nsymbols(tx,fibre,rx):
     tx['NsampTaps']         = tx["Nsps"]*tx["NSymbTaps"]-1      # length of FIR filter
     tx["NsampFrame"]        = tx["Nsamp_up"]-(tx['NsampTaps']-1)
 
-#%%
+
 ###############################################################################
 ########################### miscellaneous #####################################
 ###############################################################################
@@ -993,8 +994,6 @@ def set_Nsymbols(tx,fibre,rx):
     if rx['mimo'].lower() != "vae":
         rx['NSymbEq']       -= rx['NSymbCut_tot']-1
         
-        
-
 
 ###############################################################################
 ############################# displaying results ##############################
@@ -1023,12 +1022,10 @@ def set_Nsymbols(tx,fibre,rx):
         # print('NSymb_overhead_percent   = {}'.format(rx['NSymb_overhead_percent']))
         # print('Effective baud rate      = {}'.format(rx['Rs_eff']))
 
-    print('\n------- physics:')
-    print("fpol                 = {}".format(fibre['fpol']))
-    print('dnu                  = {}'.format(tx['dnu']))
+    # print('\n------- physics:')
+    # print("fpol                 = {}".format(fibre['fpol']))
+    # print('dnu                  = {}'.format(tx['dnu']))
     print('===================================')
-
-
 
     tx              = misc.sort_dict_by_keys(tx)
     fibre           = misc.sort_dict_by_keys(fibre)
