@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.6.0
-#   Date            : 2024-07-01
+#   Version         : 1.6.1
+#   Date            : 2024-07-02
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -46,6 +46,10 @@
 #   1.6.0 (2024-07-01) - mimo, SER_estimation, CPR_pilots, decision: same
 #                        training schemes for cma/vae. Along with processing
 #                        (1.3.0)
+#   1.6.1 (2024-07-02) - CPR_pilots: adaptative filtering + Frame-FrameChannel
+#                           for phase noise => Frame, along with processing
+#                        (1.3.1)
+#                        receiver: cleaning
 #
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
@@ -71,7 +75,7 @@
 #        Code Version    : 
 #        Web Address     : https://github.com/kit-cel/vae-equalizer
 #
-#   [C2] Authors        : Jingtian Liu, Élie Awwad, Louis Tomczyk
+#   [C2] Authors        : Jingtian Liu, Élie Awwad, louis Tomczyk
 #       Contact         : elie.awwad@telecom-paris.fr
 #       Affiliation     : Télécom Paris, COMELEC, GTO
 #       Date            : 2024-04-27
@@ -91,11 +95,12 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 
+import lib_general as gen
 import lib_kit as kit
 import lib_matlab as mb
 import lib_maths as maths
-import lib_general as gen
-import lib_rxdsp as rxdsp
+# import tracemalloc
+
 
 from lib_matlab import clc
 from lib_misc import KEYS as keys
@@ -118,84 +123,12 @@ pi = np.pi
 def receiver(tx,rx,saving):
 
         rx, loss        = mimo(tx, rx, saving)
-        
-        # loss            = np.zeros((rx['NSymbFrame']+1,tx['Npolars']))
-
-        # rx['sig_eq_real_cma']       = np.zeros((4,rx['NSymbFrame']+1))
-        # rx['sig_eq_real_cma'][0]    = rx['sig_real'][0,0:-2:tx['Nsps']]
-        # rx['sig_eq_real_cma'][1]    = rx['sig_real'][1,0:-2:tx['Nsps']]
-        # rx['sig_eq_real_cma'][2]    = rx['sig_real'][2,0:-2:tx['Nsps']]
-        # rx['sig_eq_real_cma'][3]    = rx['sig_real'][3,0:-2:tx['Nsps']]
-        
-        # print(rx['Frame'])
-
-        # if rx['Frame'] >= rx['FrameChannel']:
-            # gen.plot_constellations(sig1 = tx['sig_real'],title ='tx')
-            # gen.plot_constellations(sig1 = rx['sig_real'],title ='rx b4 mimo')
-            # gen.plot_constellations(sig1 = rx['sig_eq_real_cma'],title =
-            #                                   'rx after mimo {}'.format(rx['Frame']))  
-
-            # gen.plot_constellations(sig1 = rx['sig_real'], sig2 = rx['sig_eq_real_cma'], polar = 'both', labels = ["b4 cma","after cma"])
-
-            
         rx              = remove_symbols(rx,'data')
-        rx              = CPR_pilots(tx, rx)#,'demod','time trace pn')                            # {align,demod,time trace pn}
+        rx              = CPR_pilots(tx, rx,'time trace pn')                 # {align,demod,time trace pn, time trace pn mse, trace mse}
         rx              = save_estimations(rx)
         rx              = SNR_estimation(tx, rx)
         rx              = SER_estimation(tx, rx)
-        
 
-      
-        
-        # ------------------------------------------------------------------- #
-        # k           = 0
-        
-        # ref_HI      = np.real(tx['Symb_{}_cplx'.format(tx['pilots_info'][0][0])][0])
-        # ref_HQ      = np.imag(tx['Symb_{}_cplx'.format(tx['pilots_info'][0][0])][0])
-        # ref_VI      = np.real(tx['Symb_{}_cplx'.format(tx['pilots_info'][0][0])][1])
-        # ref_VQ      = np.imag(tx['Symb_{}_cplx'.format(tx['pilots_info'][0][0])][1])
-        
-        # TX_HI       = tx['sig_real'][0,k*320+0:k*320+10]
-        # TX_HQ       = tx['sig_real'][1,k*320+0:k*320+10]
-        # TX_VI       = tx['sig_real'][2,k*320+0:k*320+10]
-        # TX_VQ       = tx['sig_real'][3,k*320+0:k*320+10]
-            
-        # RX_HI       = rx['sig_real'][0,k*320+0:k*320+10].numpy()
-        # RX_HQ       = rx['sig_real'][1,k*320+0:k*320+10].numpy()
-        # RX_VI       = rx['sig_real'][2,k*320+0:k*320+10].numpy()
-        # RX_VQ       = rx['sig_real'][3,k*320+0:k*320+10].numpy()
-        
-        # RX_ASE_H    = rx['Noise'][0,k*320+0:k*320+10]
-        # RX_ASE_V    = rx['Noise'][1,k*320+0:k*320+10]
-            
-        # ref_H       = ref_HI+1j*ref_HQ
-        # ref_V       = ref_VI+1j*ref_VQ
-        
-        # TX_H        = TX_HI+1j*TX_HQ
-        # TX_V        = TX_VI+1j*TX_VQ
-        
-        # RX_H        = RX_HI+1j*RX_HQ
-        # RX_V        = RX_VI+1j*RX_VQ
-            
-        # amp_TX_H    = np.abs(TX_H)
-        # amp_TX_V    = np.abs(TX_V)
-        # amp_RX_H    = np.abs(RX_H)
-        # amp_RX_V    = np.abs(RX_V)
-        # amp_RX_ase  = np.abs(RX_ASE_H)
-        # amp_RX_ase  = np.abs(RX_ASE_H)
-        
-        # phi_TX_H    = np.angle(TX_H)
-        # phi_TX_V    = np.angle(TX_V)
-        # phi_RX_H    = np.angle(RX_H)
-        # phi_RX_V    = np.angle(RX_V)
-        
-        # diff_amp_H  = np.abs(amp_RX_H-amp_TX_H)
-        # diff_amp_V  = np.abs(amp_RX_V-amp_TX_V)
-
-        # diff_phi_H  = np.abs(phi_RX_H-phi_TX_H)
-        # diff_phi_V  = np.abs(phi_RX_V-phi_TX_V)
-        # ------------------------------------------------------------------- #
-        
         return rx, loss
 
 
@@ -287,105 +220,6 @@ def compensate_and_truncate(tx,rx,*varargin):
     del rx['tmp']
 
     return tx,rx
-
-
-#%%
-def decision(tx, rx, *varargin):           
-
-    frame   = rx['Frame']
-
-    if rx['mode'].lower() == 'blind':
-        ZHI     = np.round(np.reshape(rx["sig_eq_real"][0, frame], (1, -1)).squeeze(), 4)
-        ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1, frame], (1, -1)).squeeze(), 4)
-        ZVI     = np.round(np.reshape(rx["sig_eq_real"][2, frame], (1, -1)).squeeze(), 4)
-        ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3, frame], (1, -1)).squeeze(), 4)        
-        Prx     = maths.get_power(rx["sig_eq_real"][:, frame],flag_real2cplx=1,flag_flatten=1)
-    
-    else:
-        ZHI     = np.round(np.reshape(rx["sig_eq_real"][0], (1, -1)).squeeze(), 4)
-        ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1], (1, -1)).squeeze(), 4)
-        ZVI     = np.round(np.reshape(rx["sig_eq_real"][2], (1, -1)).squeeze(), 4)
-        ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3], (1, -1)).squeeze(), 4)
-        Prx     = maths.get_power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
-    
-    ZHI     = ZHI/np.sqrt(Prx[0])
-    ZHQ     = ZHQ/np.sqrt(Prx[0])
-    ZVI     = ZVI/np.sqrt(Prx[1])
-    ZVQ     = ZVQ/np.sqrt(Prx[1])
-    
-    # checking normalisation
-    # print(maths.get_power(np.array([ZHI+1j*ZHQ,ZVI+1j*ZVQ]))) # should equal 1
-    
-    M       = int(tx['mod'][0:-3])                  # 'M' for M-QAM
-    ZHI_ext = np.tile(ZHI, [int(np.sqrt(M)), 1])
-    ZHQ_ext = np.tile(ZHQ, [int(np.sqrt(M)), 1])
-    ZVI_ext = np.tile(ZVI, [int(np.sqrt(M)), 1])
-    ZVQ_ext = np.tile(ZVQ, [int(np.sqrt(M)), 1])
-
-    # # (1.4.0)
-    X_alphabet  = tx['const_affixes']
-    Px_alphabet = maths.get_power(X_alphabet)
-    Xref        = X_alphabet/np.sqrt(Px_alphabet)
-    Ptx         = maths.get_power(np.reshape(tx["Symb_real"],(4,-1)),flag_real2cplx=1)
-    
-    if tx['nu'] != 0:
-        Xref = Xref/np.sqrt(np.mean(Ptx))
-    
-    Ref     = np.tile(np.unique(np.real(Xref)), [rx['NSymbEq'],1]).transpose()
-
-    Err_HI  = abs(ZHI_ext - Ref).astype(np.float16)
-    Err_HQ  = abs(ZHQ_ext - Ref).astype(np.float16)
-    Err_VI  = abs(ZVI_ext - Ref).astype(np.float16)
-    Err_VQ  = abs(ZVQ_ext - Ref).astype(np.float16)
-
-    if tx["nu"] != 0: # probabilistic shaping
-    
-        if rx['mimo'].lower() != "vae" and type(tx["prob_amps"]) != torch.Tensor:
-            tx["prob_amps"]         = torch.tensor(tx["prob_amps"])
-
-        prob_amps   = np.tile(tx['prob_amps'].unsqueeze(1), [1, rx['NSymbEq']])
-        SNR         = 10**(rx['SNRdB']/10)
-
-        Err_HI      = Err_HI ** 2 - 1/SNR*np.log(prob_amps)
-        Err_HQ      = Err_HQ ** 2 - 1/SNR*np.log(prob_amps)
-        Err_VI      = Err_VI ** 2 - 1/SNR*np.log(prob_amps)
-        Err_VQ      = Err_VQ ** 2 - 1/SNR*np.log(prob_amps)
-
-    tmp_HI  = np.argmin(Err_HI, axis=0)
-    tmp_HQ  = np.argmin(Err_HQ, axis=0)
-    tmp_VI  = np.argmin(Err_VI, axis=0)
-    tmp_VQ  = np.argmin(Err_VQ, axis=0)
-
-    ZHI_dec = tx['amps'][tmp_HI]
-    ZHQ_dec = tx['amps'][tmp_HQ]
-    ZVI_dec = tx['amps'][tmp_VI]
-    ZVQ_dec = tx['amps'][tmp_VQ]
-
-    rx['Symb_real_dec'][0, rx['Frame']] = ZHI_dec
-    rx['Symb_real_dec'][1, rx['Frame']] = ZHQ_dec
-    rx['Symb_real_dec'][2, rx['Frame']] = ZVI_dec
-    rx['Symb_real_dec'][3, rx['Frame']] = ZVQ_dec
-    
-
-    
-# ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and varargin is not None:
-        # for checking the result --- time traces
-        if rx["Frame"] >= rx["FrameChannel"]:
-            t = [ZHI,ZHQ,ZVI,ZVQ]
-            r = [ZHI_dec,ZHQ_dec,ZVI_dec,ZVQ_dec]
-            gen.plot_decisions(t, r, 5)
-            
-        # for checking the result --- constellations
-        if rx["Frame"] >= rx["FrameChannel"]:
-            TX = np.reshape(tx["Symb_real"],(4,-1))
-            ZX = np.array([ZHI_dec+1j*ZHQ_dec,ZVI_dec+1j*ZVQ_dec])
-            gen.plot_constellations(TX,ZX, labels =['tx',"zx"])
-# ---------------------------------------------------------------- to check
-
-
-    return rx
-
 
 
 #%%
@@ -494,8 +328,8 @@ def CPR_pilots(tx,rx,*varargin):
 #     phase noise: estimation
 # =============================================================================
                 
-        phis_H          = np.angle(tmpHn)*180/pi                               # [deg]
-        phis_V          = np.angle(tmpVn)*180/pi                               # [deg]
+        phis_H          = np.angle(tmpHn)*180/pi                          # [deg]
+        phis_V          = np.angle(tmpVn)*180/pi                          # [deg]
         
         phis_H_mean     = np.mean(phis_H,axis = 1)
         phis_H_std      = np.std(phis_H,axis = 1)
@@ -510,57 +344,94 @@ def CPR_pilots(tx,rx,*varargin):
 # =============================================================================
 #     phase noise: 
 # =============================================================================
-
-        # for k in range(rx['NBatchFrame_pilots']):
-
-        rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],0] = phis_H_mean
-        rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],1] = phis_V_mean
-                                    
-        rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],0] =\
-                                phis_H_std
-                                
-        rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],1] =\
-                                phis_V_std
         
-        phi_noise_H     = rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],0]
-        phi_noise_V     = rx['PhaseNoise_pilots'][rx['Frame']-rx['FrameChannel'],1]
+        rx['PhaseNoise_pilots'][rx['Frame'],0] = phis_H_mean
+        rx['PhaseNoise_pilots'][rx['Frame'],1] = phis_V_mean
+
+                                
+        rx['PhaseNoise_pilots_std'][rx['Frame'],0] =phis_H_std
+        rx['PhaseNoise_pilots_std'][rx['Frame'],1] =phis_V_std
+    
+        phi_noise_H     = rx['PhaseNoise_pilots'][rx['Frame'],0]
+        phi_noise_V     = rx['PhaseNoise_pilots'][rx['Frame'],1]
         
 # =============================================================================
 #     noise filtering
 # =============================================================================
         
-
-    
-        pn_H_filter = maths.my_low_pass_filter(phi_noise_H, tx['pn_filt_par'])
-
-        # ------------------------------------------------------------ to check
-
+        phi_noise_H_std = rx['PhaseNoise_pilots_std'][rx['Frame'],0]
+        phi_noise_V_std = rx['PhaseNoise_pilots_std'][rx['Frame'],1]
         
-        phi_noise_H_std = rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],0]
-        phi_noise_V_std = rx['PhaseNoise_pilots_std'][rx['Frame']-rx['FrameChannel'],1]
+        tmp_pn          = tx['PhaseNoise_unique'][rx['Frame'],1:-1]
+        mse             = np.inf
+        rea             = 0
+        diff_mse        = np.inf
 
-        if len(varargin) != 0 and "time trace pn" in varargin:
-            tmp_pn      = tx['PhaseNoise_unique'][rx['Frame'],1:-1]
-            batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
+        pn_H_filter = maths.my_low_pass_filter(phi_noise_H, tx['pn_filt_par'])
+        pn_V_filter = maths.my_low_pass_filter(phi_noise_V, tx['pn_filt_par'])
+        
+        # maths.plot_PSD(phi_noise_H, tx['fs']/2)
             
-            # tmp_pn_rs = np.reshape(tmp_pn,(rx['NBatchFrame_pilots'],-1))
-            # tmp_pn_rp = np.repeat(tmp_pn_rs, rx['NSymb_pilots_cpr'])
-            # tmp_pn      = np.reshape(tmp_pn_rp,(1,-1))
+        while (mse > tx['pn_filt_par']['err_tolerance'])\
+            and (rea < tx['pn_filt_par']['niter_max'])\
+            and (tx['pn_filt_par']['window_size'] < rx['NBatchFrame']/2)\
+            and (abs(diff_mse)>1e-3):
+    
+            pn_H_filter = maths.my_low_pass_filter(phi_noise_H, tx['pn_filt_par'])
+            pn_V_filter = maths.my_low_pass_filter(phi_noise_V, tx['pn_filt_par'])
+
+            mse_H       = maths.rmse(pn_H_filter,tmp_pn)
+            mse_V       = maths.rmse(pn_V_filter,tmp_pn)
+            mse         = np.round((mse_H+mse_V)/2,3)
+            
+            tx['pn_fil_mses'][rx['Frame'],rea] = mse
+            tx['pn_filt_par']['window_size'] += 1
+            
+            if rea > 0:
+                diff_mse = tx['pn_fil_mses'][rx['Frame'],rea-1]-mse
+            
+            rea += 1
+            
+        # ------------------------------------------------------------ to check           
+            if len(varargin) != 0 and "time trace pn mse" in varargin\
+                and rx['Frame'] >= rx['FrameChannel']:
+                batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
+                
+                plt.figure()
+                plt.plot(batches,tmp_pn*180/pi, label = 'ground truth')
+                plt.plot(batches, phi_noise_H, label = 'estimation raw')
+                plt.plot(batches,pn_H_filter, linestyle = 'dashed',label = "estimation filt")
+                plt.legend()
+                # plt.ylim(np.array([-90,90])/2)
+                plt.title(f"\n frame {rx['Frame']}, mse = {mse}, window = {tx['pn_filt_par']['window_size']}")
+                plt.show()
+       
+        if len(varargin) != 0 and "time trace pn" in varargin\
+            and rx['Frame'] >= rx['FrameChannel']:
+            batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
             
             plt.figure()
             plt.plot(batches,tmp_pn*180/pi, label = 'ground truth')
             plt.plot(batches, phi_noise_H, label = 'estimation raw')
             plt.plot(batches,pn_H_filter, linestyle = 'dashed',label = "estimation filt")
             plt.legend()
-            # plt.errorbar(batches, phi_noise_H, phi_noise_H_std)
+            # plt.ylim(np.array([-90,90])/2)
+            plt.title(f"\n frame {rx['Frame']}, mse = {mse}, window = {tx['pn_filt_par']['window_size']}")
             plt.show()
-            mse = maths.mse(phi_noise_H,tmp_pn*180/pi)
-            print(f"frame {rx['Frame']}, mse = {mse}")
+       
+        if len(varargin) != 0 and "trace mse" in varargin\
+            and rx['Frame'] >= rx['FrameChannel']:
+            batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
+            
+            plt.figure()
+            plt.plot(tx['pn_fil_mses'][rx['Frame']])
+            plt.ylim([0,4])
+            plt.xlim([0,1+rx['NBatchFrame']/2])
+            plt.title(f"\n frame {rx['Frame']}, mse = {mse}, window = {tx['pn_filt_par']['window_size']}")
+            plt.show()
         # ------------------------------------------------------------ to check
         
-        
-
-
+        tx['pn_filt_par']['window_size'] = 1
         
 # =============================================================================
 #     interpolation
@@ -571,6 +442,105 @@ def CPR_pilots(tx,rx,*varargin):
 
         
         return rx
+
+
+#%%
+def decision(tx, rx, *varargin):           
+
+    frame   = rx['Frame']
+
+    if rx['mode'].lower() == 'blind':
+        ZHI     = np.round(np.reshape(rx["sig_eq_real"][0, frame], (1, -1)).squeeze(), 4)
+        ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1, frame], (1, -1)).squeeze(), 4)
+        ZVI     = np.round(np.reshape(rx["sig_eq_real"][2, frame], (1, -1)).squeeze(), 4)
+        ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3, frame], (1, -1)).squeeze(), 4)        
+        Prx     = maths.get_power(rx["sig_eq_real"][:, frame],flag_real2cplx=1,flag_flatten=1)
+    
+    else:
+        ZHI     = np.round(np.reshape(rx["sig_eq_real"][0], (1, -1)).squeeze(), 4)
+        ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1], (1, -1)).squeeze(), 4)
+        ZVI     = np.round(np.reshape(rx["sig_eq_real"][2], (1, -1)).squeeze(), 4)
+        ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3], (1, -1)).squeeze(), 4)
+        Prx     = maths.get_power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
+    
+    ZHI     = ZHI/np.sqrt(Prx[0])
+    ZHQ     = ZHQ/np.sqrt(Prx[0])
+    ZVI     = ZVI/np.sqrt(Prx[1])
+    ZVQ     = ZVQ/np.sqrt(Prx[1])
+    
+    # checking normalisation
+    # print(maths.get_power(np.array([ZHI+1j*ZHQ,ZVI+1j*ZVQ]))) # should equal 1
+    
+    M       = int(tx['mod'][0:-3])                  # 'M' for M-QAM
+    ZHI_ext = np.tile(ZHI, [int(np.sqrt(M)), 1])
+    ZHQ_ext = np.tile(ZHQ, [int(np.sqrt(M)), 1])
+    ZVI_ext = np.tile(ZVI, [int(np.sqrt(M)), 1])
+    ZVQ_ext = np.tile(ZVQ, [int(np.sqrt(M)), 1])
+
+    # # (1.4.0)
+    X_alphabet  = tx['const_affixes']
+    Px_alphabet = maths.get_power(X_alphabet)
+    Xref        = X_alphabet/np.sqrt(Px_alphabet)
+    Ptx         = maths.get_power(np.reshape(tx["Symb_real"],(4,-1)),flag_real2cplx=1)
+    
+    if tx['nu'] != 0:
+        Xref = Xref/np.sqrt(np.mean(Ptx))
+    
+    Ref     = np.tile(np.unique(np.real(Xref)), [rx['NSymbEq'],1]).transpose()
+
+    Err_HI  = abs(ZHI_ext - Ref).astype(np.float16)
+    Err_HQ  = abs(ZHQ_ext - Ref).astype(np.float16)
+    Err_VI  = abs(ZVI_ext - Ref).astype(np.float16)
+    Err_VQ  = abs(ZVQ_ext - Ref).astype(np.float16)
+
+    if tx["nu"] != 0: # probabilistic shaping
+    
+        if rx['mimo'].lower() != "vae" and type(tx["prob_amps"]) != torch.Tensor:
+            tx["prob_amps"]         = torch.tensor(tx["prob_amps"])
+
+        prob_amps   = np.tile(tx['prob_amps'].unsqueeze(1), [1, rx['NSymbEq']])
+        SNR         = 10**(rx['SNRdB']/10)
+
+        Err_HI      = Err_HI ** 2 - 1/SNR*np.log(prob_amps)
+        Err_HQ      = Err_HQ ** 2 - 1/SNR*np.log(prob_amps)
+        Err_VI      = Err_VI ** 2 - 1/SNR*np.log(prob_amps)
+        Err_VQ      = Err_VQ ** 2 - 1/SNR*np.log(prob_amps)
+
+    tmp_HI  = np.argmin(Err_HI, axis=0)
+    tmp_HQ  = np.argmin(Err_HQ, axis=0)
+    tmp_VI  = np.argmin(Err_VI, axis=0)
+    tmp_VQ  = np.argmin(Err_VQ, axis=0)
+
+    ZHI_dec = tx['amps'][tmp_HI]
+    ZHQ_dec = tx['amps'][tmp_HQ]
+    ZVI_dec = tx['amps'][tmp_VI]
+    ZVQ_dec = tx['amps'][tmp_VQ]
+
+    rx['Symb_real_dec'][0, rx['Frame']] = ZHI_dec
+    rx['Symb_real_dec'][1, rx['Frame']] = ZHQ_dec
+    rx['Symb_real_dec'][2, rx['Frame']] = ZVI_dec
+    rx['Symb_real_dec'][3, rx['Frame']] = ZVQ_dec
+    
+
+    
+# ---------------------------------------------------------------- to check
+    if len(varargin) != 0 and varargin is not None:
+        # for checking the result --- time traces
+        if rx["Frame"] >= rx["FrameChannel"]:
+            t = [ZHI,ZHQ,ZVI,ZVQ]
+            r = [ZHI_dec,ZHQ_dec,ZVI_dec,ZVQ_dec]
+            gen.plot_decisions(t, r, 5)
+            
+        # for checking the result --- constellations
+        if rx["Frame"] >= rx["FrameChannel"]:
+            TX = np.reshape(tx["Symb_real"],(4,-1))
+            ZX = np.array([ZHI_dec+1j*ZHQ_dec,ZVI_dec+1j*ZVQ_dec])
+            gen.plot_constellations(TX,ZX, labels =['tx',"zx"])
+# ---------------------------------------------------------------- to check
+
+
+    return rx
+
 
 
 
@@ -632,8 +602,16 @@ def find_shift(tx,rx):
 
 
 #%% [C1]
-def mimo(tx,rx,saving):
+def mimo(tx,rx,saving,*varargin):
 
+    # ---------------------------------------------------------------- to check
+    if len(varargin) != 0 and 'b4' in varargin:
+        gen.plot_constellations(sig1 = rx['sig_real'],title =
+                                          f"rx b4 mimo {rx['Frame']}")
+    # ---------------------------------------------------------------- to check
+    
+    
+    
     if rx['mimo'].lower() == "vae":
         with torch.set_grad_enabled(True):
             for BatchNo in range(rx["NBatchFrame"]):
@@ -641,28 +619,44 @@ def mimo(tx,rx,saving):
                 rx              = kit.train_vae(BatchNo,rx,tx)
                 rx,loss         = kit.compute_vae_loss(tx,rx)
                 maths.update_fir(loss,rx['optimiser'])
+    
+    
+    
+    # ---------------------------------------------------------------- to check
+        if len(varargin) != 0 and "loss" in varargin:
+                gen.plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"Llikelihood")
+                gen.plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"DKL")
+                gen.plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"losses")
+    # ---------------------------------------------------------------- to check
 
-            if rx["Frame"]>rx['FrameChannel']-1:
-                gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:],\
-                                        title = f"RX f-{rx['Frame']}")
 
-            # gen.plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"Llikelihood")
-            # plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"DKL")
-            # plot_loss_batch(rx,saving,['kind','law',"std",'linewidth'],"losses")
-
-        return rx,loss
 
     elif rx['mimo'].lower() == "cma" :
-
         rx,loss = kit.CMA(tx,rx)
-        # gen.plot_loss_cma(rx,saving,['kind','law',"std",'linewidth'],"x")
-        # gen.plot_constellations(rx['sig_eq_real'],polar='both', title = "RX f-{}".format(rx['Frame']))
 
-        return rx,loss
+
+
+    # ---------------------------------------------------------------- to check
+        if len(varargin) != 0 and "loss" in varargin:
+            gen.plot_loss_cma(rx,saving,['kind','law',"std",'linewidth'],"x")
+    # ---------------------------------------------------------------- to check
+                
 
     else:
         loss = []
-        return rx,loss
+        
+        
+        
+    # ---------------------------------------------------------------- to check        
+    if len(varargin) != 0 and "after" in varargin:
+        gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:],\
+                                title =f"rx after mimo {rx['Frame']}")
+
+    if len(varargin) != 0 and "fir" in varargin:
+        gen.plot_fir(rx, title =f"fir after mimo {rx['Frame']}")
+    # ---------------------------------------------------------------- to check
+    
+    return rx,loss
     
     
 

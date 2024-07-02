@@ -35,6 +35,8 @@
 #   1.2.6 (2024-06-21) - init_processing: avoid 'pilots' with "vae"
 #   1.3.0 (2024-07-01) - init_processing: applying same learning scheme for cma
 #                      - print_results: merging cma/vae display of results
+#   1.3.1 (2024-07-02) - init_processing: Frame-FrameChannel for phase noise =>
+#                                           Frame, along with rxdsp (1.6.1)
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -112,15 +114,11 @@ def processing(tx, fibre, rx, saving, flags):
 
     for frame in range(rx['Nframes']):
 
-        # print(frame)
-        gen.plot_fir(rx)
         rx              = init_train(tx, rx, frame)                            # if vae, otherwise: transparent
         tx              = txdsp.transmitter(tx, rx)
         tx, fibre, rx   = prop.propagation(tx, fibre, rx)
         rx, loss        = rxdsp.receiver(tx,rx,saving)
         array           = print_results(loss, frame, tx, fibre, rx, saving)
-
-
 
     tx, fibre, rx = save_data(tx, fibre, rx, saving, array)
 
@@ -234,12 +232,7 @@ def init_processing(tx, fibre, rx, saving, device):
         rx['NBatchFrame_pilots']= rx['NBatchFrame']-2
         rx['NSymb_pilots_cpr']  = tx['NSymb_pilots_cpr']-tx['NSymbTaps']
         rx['Nzeros_stuffing']   = rx['NSymbBatch']-rx['NSymb_pilots_cpr']
-        # rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes']-rx['FrameChannel'],\
-        #                                     tx['Npolars'],
-        #                                     rx['NBatchFrame_pilots'],
-        #                                     rx['NSymb_pilots_cpr']))
-        rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes']-rx['FrameChannel'],\
-                                            tx['Npolars'],
+        rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes'],tx['Npolars'],\
                                             rx['NBatchFrame_pilots']))
         rx['PhaseNoise_pilots_std'] = np.zeros(rx['PhaseNoise_pilots'].shape)
             
@@ -249,13 +242,6 @@ def init_processing(tx, fibre, rx, saving, device):
 # =============================================================================
 # OUTPUT
 # =============================================================================
-
-    # OUTPUTS
-    # if rx["mimo"].lower() == "cma":
-    #     rx["out_cpe"] = dict()
-    #     for k in range(rx["Nframes"]-rx['FrameChannel']):
-    #         rx['out_cpe'][str(k)] = dict()
-
 
     rx["H_est_l"]           = []
     rx["H_lins"]            = []

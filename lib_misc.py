@@ -383,9 +383,9 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
 
     file_name += ".xml"
 
-    # create the xml file
-    tree = ET.ElementTree(root)
-    tree.write(file_name, encoding="utf-8", xml_declaration=True)
+    # # create the xml file
+    # tree = ET.ElementTree(root)
+    # tree.write(file_name, encoding="utf-8", xml_declaration=True)
     
     os.chdir("../")
 

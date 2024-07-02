@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.4.1
-#   Date            : 2024-06-30
+#   Version         : 1.4.2
+#   Date            : 2024-07-02
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -24,6 +24,7 @@
 #   1.4.0 (2024-06-27) - folder management: no more temp folders
 #                        instead create_xml_file adds the realisation number
 #   1.4.1 (2024-06-30) - phase noise filter parameters
+#   1.4.2 (2024-07-02) - phase noise adaptative filter parameters
 #
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -58,19 +59,19 @@
 # =============================================================================
 import numpy as np
 
-# import processing2 as process
-# import lib_txdsp2 as txdsp
+from processing import processing
+from lib_txdsp import set_Nsymbols
+from matplotlib.pyplot import close
 
-import processing as process
-import lib_txdsp as txdsp
-
-
-import matplotlib.pyplot as plt
-import lib_misc as misc
-import lib_matlab as mb
+from lib_matlab import PWD
 from lib_matlab import clc
 from lib_misc import KEYS as keys
+from torch import cuda
 
+from datetime import date
+
+import gc
+import lib_misc as misc
 pi = np.pi
 clc()
 np.set_printoptions(linewidth=160)
@@ -79,7 +80,7 @@ np.set_printoptions(linewidth=160)
 # --- PARAMETERS ---
 # =============================================================================
 
-date                            = '2024-06-29'
+date                            = date.today().strftime("%Y-%m-%d")
 tx,fibre,rx,saving,flags        = misc.init_dict()
 
 ###############################################################################
@@ -90,8 +91,8 @@ tx["NSymbTaps"]                 = 7                                            #
 tx["Rs"]                        = 64e9                                         # [Baud] Symbol rate
 tx['SNRdB']                     = 50
 
-tx['flag_phase_noise']          = 0
-tx['dnu']                       = 1e6
+tx['flag_phase_noise']          = 1
+# tx['dnu']                       = 1e6
 paramPHI                        = [1e6]                                        # [Hz] laser linewidth
 
 # -----------------------------------------------------------------------------
@@ -163,13 +164,13 @@ tx["nu"]                        = 0#0.0254                                      
 #                            ['cpr','rand',"same","same","4QAM",3,0]]
 
 
-rx["NSymbFrame"]        = 20000
-rx['NSymbBatch']        = 200
+rx["NSymbFrame"]        = int(12800)
+rx['NSymbBatch']        = int(160)
 
 
 
 # tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",5,0]]         #ok
-tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",8,0]]         #ok
+tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]         #ok
 
 # tx['PhiLaw']["kind"]  = 'Rwalk'
 # tx['PhiLaw']["law"]   = 'linewidth'
@@ -178,39 +179,43 @@ tx['PhiLaw']["law"]     = 'lin'
 tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
 tx["PhiLaw"]['End']     = 25*pi/180                                            # [rad]
 
-win_width               = 10
+win_width               = 1
 tx['pn_filt_par']       = {
         'type'          : 'moving_average',
         'ma_type'       : 'gaussian',
         'window_size'   : win_width,
-        'std_dev'       : win_width/6
+        'std_dev'       : win_width/1,
+        'err_tolerance' : 5e-1,
+        'niter_max'     : int(1e2)
 }
 
 # tx['pn_filt_par'] = {
 #     'type'          : 'moving_average',
 #     'ma_type'       : 'uniform',
-#     'window_size'   : 10,
+#     'window_size'   : int(1),
+#     'err_tolerance' : 5e-1,
+#     'niter_max'     : int(1e2)
 # }
 
 ###############################################################################
 ################################## RECEIVER ###################################
 ###############################################################################
 
-rx['mode']              = 'blind'                                             # {blind, pilots}
-rx["mimo"]              = "vae"                                                # {cma,vae}
+rx['mode']              = 'pilots'                                             # {blind, pilots}
+rx["mimo"]              = "cma"                                                # {cma,vae}
 
 rx['SNRdB']             = 25                                                   # {>0}
-rx["lr"]                = 5e-4                                                 # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+# rx["lr"]                = 1e-5                                                 # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
 
 
-tauCoh                  = tx['Rs']/2/pi/tx['dnu']
-print(tauCoh)
+# tauCoh                  = tx['Rs']/2/pi/tx['dnu']
+# print(tauCoh)
 
 
 
 
 if tx['Rs'] == 64e9:
-    rx["FrameChannel"]  = 15
+    rx["FrameChannel"]  = 5
     rx["SymbScale"]     = 100
 else:
     rx["FrameChannel"]  = 40
@@ -225,12 +230,12 @@ else:
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NframesChannel]]
 
-paramPOL                        = np.array([[0],[25],[1]])
+paramPOL                        = np.array([[0],[10],[1]])
 # paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
 # paramPOL                        = np.array([[0],[25]])
 
 # paramLR                         = np.array([10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,200,300,400,500])*1e-6
-paramLR                         = np.array([100])*1e-6
+paramLR                         = np.array([10])*1e-6
 paramFIRlen                     = [7]
 
 
@@ -271,8 +276,7 @@ else:
 # =============================================================================
 def process_data(nrea,npol,nphi,tx,fibre,rx):
 
-    path = mb.PWD(show=False)
-
+    path = PWD(show=False)
         
     if len(paramPOL) == 3:      # linear evolution
         RangeTheta                      = paramPOL[1,npol] - paramPOL[0,npol]
@@ -282,8 +286,8 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
         Nframes_Channel                 = rx["FrameChannel"]+deltaN_Channel
         slope                           = (paramPOL[1,npol]-paramPOL[0,npol])/Nframes_Channel
         print(slope)
-        fibre["ThetasLaw"]['Start']     = (paramPOL[0,npol])*np.pi/180
-        fibre["ThetasLaw"]['End']       = (paramPOL[1,npol])*np.pi/180
+        fibre["ThetasLaw"]['Start']     = (paramPOL[0,npol])*pi/180
+        fibre["ThetasLaw"]['End']       = (paramPOL[1,npol])*pi/180
     else:
         Nframes_Channel                 = paramPOL[-1]
         fibre["ThetasLaw"]['theta_std'] = paramPOL[npol][0]
@@ -292,10 +296,10 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
     rx["Nframes"]                       = int(rx["FrameChannel"] + Nframes_Channel)
     tx["dnu"]                           = paramPHI[nphi]                       # [Hz]
     
-    tx,fibre, rx                        = txdsp.set_Nsymbols(tx,fibre,rx)
+    tx,fibre, rx                        = set_Nsymbols(tx,fibre,rx)
 
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,nrea)[2:-4]
-    tx,fibre,rx                         = process.processing(tx,fibre,rx,saving,flags)
+    tx,fibre,rx                         = processing(tx,fibre,rx,saving,flags)
         
     misc.save2mat(tx,fibre,rx,saving)
 
@@ -303,9 +307,9 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
         misc.plot_2y_axes(saving,"iteration",'Thetas','SER',['svg'])
     else:
         misc.plot_3y_axes(saving,"iteration",'SNR','Thetas','SER',['svg'])
-    
 
-    plt.close("all")
+
+    close("all")
     
     misc.replace_string_in_filenames(path, "NSymbBatch","NSbB")
     misc.replace_string_in_filenames(path, "NSymbFrame","NSbF")
@@ -339,6 +343,9 @@ for nphi in range(len(paramPHI)):
                     
                     if "thetadiffs" in fibre:
                         del fibre['thetadiffs']
+                        
+                        
+cuda.empty_cache()
 
 
 #%%
@@ -346,7 +353,7 @@ for nphi in range(len(paramPHI)):
 misc.move_files_to_folder(int(date[2:4]))
 misc.merge_data_folders(saving)
 
-path = mb.PWD(show=False)+f'/data-{date[2:]}'
+path = PWD(show=False)+f'/data-{date[2:]}'
 misc.remove_n_characters_from_filenames(path, 20)
 
 misc.organise_files(path)

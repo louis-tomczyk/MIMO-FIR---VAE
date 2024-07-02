@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.0
-#   Date            : 2024-06-27
+#   Version         : 1.3.2
+#   Date            : 2024-07-02
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -22,7 +22,8 @@
 #   1.2.3 (2024-06-18) - [NEW] zero_stuffing, cleaning
 #   1.2.4 (2024-06-20) - zero_stuffing: enabling multiple signal processing
 #   1.3.0 (2024-06-27) - [NEW] my_low_pass_filter
-#   1.3.1 (2024-06-30) - [NEW] mse
+#   1.3.1 (2024-06-30) - [NEW] mae
+#   1.3.2 (2024-07-02) - [NEW] mse, rmse
 #
 # ----- MAIN IDEA -----
 #   Advanced mathematical operations
@@ -54,10 +55,12 @@
 # fft_matrix
 # get_power             (1.2.2)
 # inverse3Dmatrix       (1.1.0)
-# mse                   (1.3.1)
+# mae                   (1.3.1)
+# mse                   (1.3.2)
 # my_low_pass_filter    (1.3.0)
 # test_unitarity        (1.2.1)
 # test_unitarity3d      (1.2.1)
+# rmse                  (1.3.2)
 # update_fir            (1.0.0)
 # zero_stuffing         (1.2.3)
 # =============================================================================
@@ -137,9 +140,55 @@ def inverse3Dmatrix(matrix3D):
 
 
 #%%
-def mse(x,ref):
+def mae(x,ref):
     
     return np.mean(np.abs(x-ref))
+
+#%%
+def mse(x,ref):
+    
+    return np.mean((x-ref)**2)
+
+
+
+#%%
+def plot_PSD(signal,fs,*order):
+    
+    signal = signal/np.sqrt(np.mean(np.abs(signal)**2))
+    N       = signal.size
+    freq    = np.fft.fftfreq(N,1/fs)
+    sig_fft = np.fft.fft(signal/N)
+    
+    freq1   = np.log10(freq[freq>0])
+    indexes = freq>=0
+    
+    sig_fft = sig_fft[indexes]
+    sig_fft = sig_fft[sig_fft != 0]
+    sig_fft = sig_fft[1:]
+    
+    plt.figure()
+    plt.semilogx(10*np.log10(np.abs(sig_fft)**2))
+
+    if len(order) != 0:
+        f1  = 100
+        f2  = 10*f1
+        a   = -50
+        b   = 20*order
+        plt.semilogx([f1,f1],[-150,-20],color = 'black')
+        plt.semilogx([f2,f2],[-150,-20],color = 'black')
+        plt.semilogx([f1/10,f2],[a,a],color = 'black')
+        plt.semilogx([f1/10,f2],[a-b,a-b],color = 'black')
+    
+    
+    plt.xlabel('frequency [Hz]')
+    plt.ylabel('PSD [dB/Hz]')
+    plt.show()
+    
+    
+    
+#%%
+def rmse(x,ref):
+    return np.sqrt(np.mean((x-ref)**2))
 
 
 

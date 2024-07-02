@@ -105,7 +105,7 @@ from lib_maths import get_power as power
 
 
 #%%
-def transmitter(tx,rx):
+def transmitter(tx,rx,*varargin):
 
     tx          = shaping_filter(tx)
     tx          = data_generation(tx,rx)
@@ -118,18 +118,16 @@ def transmitter(tx,rx):
     tx          = data_shaping(tx)#,rx)                                        # uncomment to check
 
         
-
-    # let the vae learn the rrc filter
     if rx["Frame"] >= rx["FrameChannel"]:
         tx      = txhw.load_ase(tx,rx)
 
         if tx['flag_phase_noise']:
             tx      = txhw.load_phase_noise(tx,rx)#'pn const','pn time trace')     # uncomment to check
 
-        # gen.plot_constellations(tx['sig_real'],\
-        # title = f"tx, frame = {rx['Frame']},\
-        # pn = {round(180/pi*np.mean(tx['PhaseNoise'][0,:,rx['Frame']]),3)}")
     
+    if len(varargin)!= 0 and "plot" in varargin:
+        gen.plot_constellations(sig1 = tx['sig_real'],title ='tx')
+        
     tx          = misc.sort_dict_by_keys(tx)
     return tx
 
@@ -247,8 +245,9 @@ def data_shaping(tx,*varargin):
         # y         = conv(x,h,'valid) of len(x) = N, len(h) = M
         # len(y)    = N-M+1
         #
-        # formula: mode full    y[n] = sum_(k=0^{n})   x[k]   . h[n-k]
-        # formula: mode valid   y[n] = sum_(k=0^{M-1}) x[k+n] . h[n-k]
+        # formula: mode full    y[n] = sum_{k=0^n)              x[k]   . h[n-k]
+        # formula: mode valid   y[n] = sum_{k=0^{M-1}}          x[k+n] . h[n-k]
+        # formula: mode same    y[n] = sum_{k = max(0,n+1-M)}   x[k]   . h[n-k]
 
         x1 = tx['Nsamp_pilots_cpr']-tx['NsampTaps']+1
         for k in range(5):
@@ -918,8 +917,7 @@ def set_Nsymbols(tx,fibre,rx):
         NsymbRemoved        = rx['NSymbFrame']%rx["NSymbBatch"]
         rx['NSymbFrame']    = int(rx['NSymbFrame'] - NsymbRemoved)
         Nsymb_added_net     -= NsymbRemoved
-        
-#%%
+
 ###############################################################################
 ############################# pilots management ###############################
 ###############################################################################
@@ -1015,7 +1013,7 @@ def set_Nsymbols(tx,fibre,rx):
     # spaces such as the printed lines on the shell are aligned
     if rx['mode'].lower() != "blind":
         print('\n------- if header:')
-        print(f"NSymbs_pilots    = {NSymbs_pilots}")
+        print(f"NSymbs_pilots       = {NSymbs_pilots}")
 
         # print('Nsymb_data_Batch         = {}'.format(rx["NSymb_data_Batch"]))
         # print('NSymb_pilots_tot_Batch   = {}'.format(rx['NSymb_pilots_tot_Batch']))
