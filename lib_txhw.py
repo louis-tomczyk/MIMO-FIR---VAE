@@ -119,7 +119,7 @@ def gen_phase_noise(tx,rx):
 
             else:
                 if tx["PhiLaw"]["law"]      == "lin":
-                    PhiStart                = tx["PhiLaw"]["Start"]
+                    PhiStart                = tx["PhiLaw"]["Start"]            # [rad]
                     PhiEnd                  = tx["PhiLaw"]["End"]
                     tx["PhiLaw"]["slope"]   = (PhiEnd-PhiStart)/tx["NsampFrame"]
 
@@ -141,7 +141,7 @@ def gen_phase_noise(tx,rx):
     
                     
             tx["PhaseNoise"][1]     = tx["PhaseNoise"][0]
-            tx['pn_fil_mses']       = np.zeros((rx['Nframes'],tx['pn_filt_par']['niter_max']))
+            tx['pn_fil_losses']     = np.zeros((rx['Nframes'],tx['pn_filt_par']['niter_max']))
             
             # for checking
             # for frame in range(rx['FrameChannel']-1,rx['FrameChannel']+2):

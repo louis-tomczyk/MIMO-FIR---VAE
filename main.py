@@ -24,7 +24,7 @@
 #   1.4.0 (2024-06-27) - folder management: no more temp folders
 #                        instead create_xml_file adds the realisation number
 #   1.4.1 (2024-06-30) - phase noise filter parameters
-#   1.4.2 (2024-07-02) - phase noise adaptative filter parameters
+#   1.4.2 (2024-07-02) - phase noise adaptative filter parameters + correction
 #
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system

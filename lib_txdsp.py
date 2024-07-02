@@ -1013,7 +1013,7 @@ def set_Nsymbols(tx,fibre,rx):
     # spaces such as the printed lines on the shell are aligned
     if rx['mode'].lower() != "blind":
         print('\n------- if header:')
-        print(f"NSymbs_pilots       = {NSymbs_pilots}")
+        print(f"NSymbs_pilots        = {NSymbs_pilots}")
 
         # print('Nsymb_data_Batch         = {}'.format(rx["NSymb_data_Batch"]))
         # print('NSymb_pilots_tot_Batch   = {}'.format(rx['NSymb_pilots_tot_Batch']))

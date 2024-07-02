@@ -48,7 +48,7 @@
 #                        (1.3.0)
 #   1.6.1 (2024-07-02) - CPR_pilots: adaptative filtering + Frame-FrameChannel
 #                           for phase noise => Frame, along with processing
-#                        (1.3.1)
+#                        (1.3.1) + correction
 #                        receiver: cleaning
 #
 # ----- MAIN IDEA -----
@@ -122,9 +122,9 @@ pi = np.pi
 #%%
 def receiver(tx,rx,saving):
 
-        rx, loss        = mimo(tx, rx, saving)
+        rx, loss        = mimo(tx, rx, saving,'b4','after')
         rx              = remove_symbols(rx,'data')
-        rx              = CPR_pilots(tx, rx,'time trace pn')                 # {align,demod,time trace pn, time trace pn mse, trace mse}
+        rx              = CPR_pilots(tx, rx,'corr')                 # {align,demod,time trace pn, time trace pn loss, trace loss}
         rx              = save_estimations(rx)
         rx              = SNR_estimation(tx, rx)
         rx              = SER_estimation(tx, rx)
@@ -230,15 +230,15 @@ def CPR_pilots(tx,rx,*varargin):
         return rx
 
     else:
-        what_pilots             = tx['pilots_info'][0]
-        pilots_function         = what_pilots[0].lower()
-        pilots_changes          = what_pilots[2].lower()
-        tx_pilots               = tx['Symb_{}_cplx'.format(pilots_function)]
-
 # =============================================================================
 #     maintenance
 # =============================================================================
 
+        what_pilots             = tx['pilots_info'][0]
+        pilots_function         = what_pilots[0].lower()
+        pilots_changes          = what_pilots[2].lower()
+        tx_pilots               = tx['Symb_{}_cplx'.format(pilots_function)]
+        
         rx['NSymb_pilots_cpr']  = tx['NSymb_pilots_cpr']-tx['NSymbTaps']
 
         if pilots_changes != "batchwise":
@@ -303,143 +303,135 @@ def CPR_pilots(tx,rx,*varargin):
     # ---------------------------------------------------------------- to check
             
         del tx_pilots_H_all, tx_pilots_V_all
-        del rx_HI, rx_HQ, rx_VI, rx_VQ, rx_H, rx_V
+        del rx_HI, rx_HQ, rx_VI, rx_VQ#, rx_H, rx_V
         del rx_H_rs, rx_V_rs
 
 
 # =============================================================================
-#       conjugaison
+#     phase noise: estimation
 # =============================================================================
 
-
-        tmpH = rx_H_pilots*np.conj(tx_pilots_H_roll[:,:rx['NSymb_pilots_cpr']])
-        tmpV = rx_V_pilots*np.conj(tx_pilots_V_roll[:,:rx['NSymb_pilots_cpr']])
+        # conjugaison to remove modulation
+        tmpH    = rx_H_pilots*np.conj(tx_pilots_H_roll[:,:rx['NSymb_pilots_cpr']])
+        tmpV    = rx_V_pilots*np.conj(tx_pilots_V_roll[:,:rx['NSymb_pilots_cpr']])
         
-        tmpHn = tmpH/power(tmpH)
-        tmpVn = tmpV/power(tmpV)
+        # normalisation [optional]
+        tmpH   = tmpH/power(tmpH)
+        tmpV   = tmpV/power(tmpV)
         
         # ------------------------------------------------------------ to check
         if len(varargin) != 0 and 'demod' in varargin:
-            gen.plot_constellations(sig1 = tmpHn, sig2 = tmpVn,\
+            gen.plot_constellations(sig1 = tmpH, sig2 = tmpV,\
                 labels= ['H','V'], title = f"cpr_pilots, frame {rx['Frame']}")
         # ------------------------------------------------------------ to check
-
-# =============================================================================
-#     phase noise: estimation
-# =============================================================================
                 
-        phis_H          = np.angle(tmpHn)*180/pi                          # [deg]
-        phis_V          = np.angle(tmpVn)*180/pi                          # [deg]
-        
-        phis_H_mean     = np.mean(phis_H,axis = 1)
-        phis_H_std      = np.std(phis_H,axis = 1)
+        # averaging over the pilots within the same batches
+        phis_H_mean     = np.mean(np.angle(tmpH)*180/pi,axis = 1)             # [deg]
+        phis_V_mean     = np.mean(np.angle(tmpV)*180/pi,axis = 1)             # [deg]
 
-        phis_V_mean     = np.mean(phis_V,axis = 1)
-        phis_V_std      = np.std(phis_V,axis = 1)
-
-        del tmpHn, tmpVn, tx_pilots, rx_H_pilots, rx_V_pilots
+        del tmpH, tmpV, tx_pilots, rx_H_pilots, rx_V_pilots
         del tx_pilots_H, tx_pilots_V, tx_pilots_H_roll, tx_pilots_V_roll
 
         
+        rx['PhaseNoise_pilots'][rx['Frame'],0]      = phis_H_mean
+        rx['PhaseNoise_pilots'][rx['Frame'],1]      = phis_V_mean
+     
 # =============================================================================
-#     phase noise: 
+#     adaptative noise filtering
 # =============================================================================
-        
-        rx['PhaseNoise_pilots'][rx['Frame'],0] = phis_H_mean
-        rx['PhaseNoise_pilots'][rx['Frame'],1] = phis_V_mean
 
-                                
-        rx['PhaseNoise_pilots_std'][rx['Frame'],0] =phis_H_std
-        rx['PhaseNoise_pilots_std'][rx['Frame'],1] =phis_V_std
-    
-        phi_noise_H     = rx['PhaseNoise_pilots'][rx['Frame'],0]
-        phi_noise_V     = rx['PhaseNoise_pilots'][rx['Frame'],1]
-        
-# =============================================================================
-#     noise filtering
-# =============================================================================
-        
-        phi_noise_H_std = rx['PhaseNoise_pilots_std'][rx['Frame'],0]
-        phi_noise_V_std = rx['PhaseNoise_pilots_std'][rx['Frame'],1]
-        
-        tmp_pn          = tx['PhaseNoise_unique'][rx['Frame'],1:-1]
-        mse             = np.inf
-        rea             = 0
-        diff_mse        = np.inf
-
-        pn_H_filter = maths.my_low_pass_filter(phi_noise_H, tx['pn_filt_par'])
-        pn_V_filter = maths.my_low_pass_filter(phi_noise_V, tx['pn_filt_par'])
-        
-        # maths.plot_PSD(phi_noise_H, tx['fs']/2)
+        rea             = 0        
+        loss            = np.inf
+        diff_loss       = np.inf
             
-        while (mse > tx['pn_filt_par']['err_tolerance'])\
+        while (loss > tx['pn_filt_par']['err_tolerance'])\
             and (rea < tx['pn_filt_par']['niter_max'])\
             and (tx['pn_filt_par']['window_size'] < rx['NBatchFrame']/2)\
-            and (abs(diff_mse)>1e-3):
+            and (abs(diff_loss)>1e-3):
     
-            pn_H_filter = maths.my_low_pass_filter(phi_noise_H, tx['pn_filt_par'])
-            pn_V_filter = maths.my_low_pass_filter(phi_noise_V, tx['pn_filt_par'])
+            pn_H_filter = maths.my_low_pass_filter(phis_H_mean, tx['pn_filt_par'])
+            pn_V_filter = maths.my_low_pass_filter(phis_V_mean, tx['pn_filt_par'])
 
-            mse_H       = maths.rmse(pn_H_filter,tmp_pn)
-            mse_V       = maths.rmse(pn_V_filter,tmp_pn)
-            mse         = np.round((mse_H+mse_V)/2,3)
+            loss_H      = maths.mse(pn_H_filter,tx['PhaseNoise_unique'][rx['Frame'],1:-1])
+            loss_V      = maths.mse(pn_V_filter,tx['PhaseNoise_unique'][rx['Frame'],1:-1])
+            loss        = np.round((loss_H+loss_V)/2,3)
             
-            tx['pn_fil_mses'][rx['Frame'],rea] = mse
+            tx['pn_fil_losses'][rx['Frame'],rea] = loss
             tx['pn_filt_par']['window_size'] += 1
             
             if rea > 0:
-                diff_mse = tx['pn_fil_mses'][rx['Frame'],rea-1]-mse
+                diff_loss = tx['pn_fil_losses'][rx['Frame'],rea-1]-loss
             
             rea += 1
             
         # ------------------------------------------------------------ to check           
-            if len(varargin) != 0 and "time trace pn mse" in varargin\
-                and rx['Frame'] >= rx['FrameChannel']:
+            if len(varargin) != 0 and "time trace pn loss" in varargin:#\
+                # and rx['Frame'] >= rx['FrameChannel']:
                 batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
                 
                 plt.figure()
-                plt.plot(batches,tmp_pn*180/pi, label = 'ground truth')
-                plt.plot(batches, phi_noise_H, label = 'estimation raw')
+                plt.plot(batches,tx['PhaseNoise_unique'][rx['Frame'],1:-1]*180/pi, label = 'ground truth')
+                plt.plot(batches, phis_H_mean, label = 'estimation raw')
                 plt.plot(batches,pn_H_filter, linestyle = 'dashed',label = "estimation filt")
                 plt.legend()
                 # plt.ylim(np.array([-90,90])/2)
-                plt.title(f"\n frame {rx['Frame']}, mse = {mse}, window = {tx['pn_filt_par']['window_size']}")
+                plt.title(f"\n frame {rx['Frame']}, loss = {loss}, window = {tx['pn_filt_par']['window_size']}")
                 plt.show()
-       
-        if len(varargin) != 0 and "time trace pn" in varargin\
-            and rx['Frame'] >= rx['FrameChannel']:
+        # ------------------------------------------------------------ to check
+        # end-while
+        
+        # ------------------------------------------------------------ to check
+        if len(varargin) != 0 and "time trace pn" in varargin:#\
+            # and rx['Frame'] >= rx['FrameChannel']:
             batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
             
             plt.figure()
-            plt.plot(batches,tmp_pn*180/pi, label = 'ground truth')
-            plt.plot(batches, phi_noise_H, label = 'estimation raw')
+            plt.plot(batches,tx['PhaseNoise_unique'][rx['Frame'],1:-1]*180/pi, label = 'ground truth')
+            plt.plot(batches,phis_H_mean, label = 'estimation raw')
             plt.plot(batches,pn_H_filter, linestyle = 'dashed',label = "estimation filt")
             plt.legend()
             # plt.ylim(np.array([-90,90])/2)
-            plt.title(f"\n frame {rx['Frame']}, mse = {mse}, window = {tx['pn_filt_par']['window_size']}")
+            plt.title(f"\n frame {rx['Frame']}, loss = {loss}, window = {tx['pn_filt_par']['window_size']}")
             plt.show()
        
-        if len(varargin) != 0 and "trace mse" in varargin\
-            and rx['Frame'] >= rx['FrameChannel']:
+        if len(varargin) != 0 and "trace loss" in varargin:#\
+            # and rx['Frame'] >= rx['FrameChannel']:
             batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
             
             plt.figure()
-            plt.plot(tx['pn_fil_mses'][rx['Frame']])
-            plt.ylim([0,4])
+            plt.plot(tx['pn_fil_losses'][rx['Frame']])
             plt.xlim([0,1+rx['NBatchFrame']/2])
-            plt.title(f"\n frame {rx['Frame']}, mse = {mse}, window = {tx['pn_filt_par']['window_size']}")
+            plt.title(f"\n frame {rx['Frame']}, loss = {loss}, window = {tx['pn_filt_par']['window_size']}")
             plt.show()
         # ------------------------------------------------------------ to check
         
-        tx['pn_filt_par']['window_size'] = 1
+        # reseting fot the next frames
+        tx['pn_filt_par']['window_size']        = 1
+
+        rx['PhaseNoise_pilots'][rx['Frame'],0]  = pn_H_filter
+        rx['PhaseNoise_pilots'][rx['Frame'],1]  = pn_V_filter
         
 # =============================================================================
-#     interpolation
+#     correction
 # =============================================================================
 
+        pn_H_filter = np.repeat(pn_H_filter,rx['NSymbBatch'],axis = 0)*pi/180
+        pn_V_filter = np.repeat(pn_V_filter,rx['NSymbBatch'],axis = 0)*pi/180
+        
+        rx_H_corrected = rx_H*np.exp(-1j*pn_H_filter)
+        rx_V_corrected = rx_V*np.exp(-1j*pn_V_filter)
+        
+        # ------------------------------------------------------------ to check
+        if len(varargin) != 0 and 'corr' in varargin:
+            gen.plot_constellations(sig1 = rx_H_corrected, sig2 = rx_V_corrected,\
+                labels= ['H','V'], title = f"cpr_pilots correction, frame {rx['Frame']}")
+        # ------------------------------------------------------------ to check
 
-            
 
+        rx['sig_eq_real'][0] = np.real(rx_H_corrected)
+        rx['sig_eq_real'][1] = np.imag(rx_H_corrected)
+        rx['sig_eq_real'][2] = np.real(rx_V_corrected)
+        rx['sig_eq_real'][3] = np.imag(rx_V_corrected)
         
         return rx
 
@@ -645,12 +637,15 @@ def mimo(tx,rx,saving,*varargin):
     else:
         loss = []
         
-        
-        
+
     # ---------------------------------------------------------------- to check        
     if len(varargin) != 0 and "after" in varargin:
-        gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame'],:,:],\
+        if rx['mimo'].lower() == "cma" :
+            gen.plot_constellations(rx['sig_eq_real_cma'],\
                                 title =f"rx after mimo {rx['Frame']}")
+        else:
+            gen.plot_constellations(rx['sig_eq_real'][:,rx['Frame']],\
+                                title =f"rx after mimo {rx['Frame']}")            
 
     if len(varargin) != 0 and "fir" in varargin:
         gen.plot_fir(rx, title =f"fir after mimo {rx['Frame']}")
@@ -679,7 +674,9 @@ def remove_symbols(rx,what):
                     
                 # del rx['sig_eq_real']
                 rx['sig_eq_real'] = tmp
-                # gen.plot_constellations(rx['sig_eq_real_cma'],polar = 'H', title = "data at remove symbols")
+                # gen.plot_constellations(sig1 = rx['sig_eq_real_cma'],\
+                #                         sig2 = rx['sig_eq_real'],\
+                #                         polar = 'H', title = "data at remove symbols")
         else:
             tmpH    = rx['{}_cplx_stuffed'.format(what)][0][rx['NSymbBatch']:-rx['NSymbBatch']]
             tmpV    = rx['{}_cplx_stuffed'.format(what)][1][rx['NSymbBatch']:-rx['NSymbBatch']]
