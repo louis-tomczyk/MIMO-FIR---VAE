@@ -1,95 +1,112 @@
+%%
 % ---------------------------------------------
 % ----- INFORMATIONS -----
 %   Function name   : processing_0_python2matlab
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-06
-%   Version         : 2.0.0
+%   Date            : 2024-06-29
+%   Version         : 1.0.0
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
 %
-% ----- CHANGE LOG -----
-%   2023-10-09 (1.0.0)
-%   2024-03-04 (1.1.0) [NEW] plot poincare sphere
-%   2024-03-29 (1.1.1) data.FrameChannel -> data.FrameChannel
-%   2024-04-18 (1.1.3) import_data
-%   2024-04-19 (1.1.4) <Err Theta>
-%   ------------------
-%   2024-07-06 (2.0.0)  encapsulation into modules
-%                       [REMOVED] check_if_fibre_prop
-% 
 % ----- MAIN IDEA -----
-%   See VAE ability to tract the State of Polarisation
-%   of a beam propagating into an optical fibre.
 %
 % ----- INPUTS -----
 % ----- BIBLIOGRAPHY -----
 %   Functions           :
-%   Author              : Diane PRATO
-%   Author contact      : diane.prato@telecom-paris.fr
-%   Date                : 2023-06
-%   Title of program    : plot_H
-%   Code version        : 1.0
+%   Author              :
+%   Author contact      :
+%   Date                :
+%   Title of program    :
+%   Code version        :
 %   Type                : 
 %   Web Address         : 
 % ----------------------------------------------
 %%
+addpath ./lib
 
-%% MAINTENANCE
-rst
+Ndraws      = 3;
+params      = input("value? ");
+path_root   = pwd();
+Nparams     = 19;
+what_charac = "csv";
+averages    = zeros(Nparams,Ndraws);
+stds        = zeros(Nparams,Ndraws);
 
-cd(strcat('../python/data-',Date,"/mat"))
-caps.myInitPath     = pwd();
-[Dat,caps]          = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
+for k = 1:Ndraws
 
-Nfiles              = length(Dat);
-ErrMean             = zeros(Nfiles,1);
-ErrStd              = zeros(Nfiles,1);
-ErrRms              = zeros(Nfiles,1);
-what_carac          = 'End';  % {dnu, Slope, End,std}
-Carac               = get_value_from_filename_in(caps.PathSave,what_carac,caps.Fn);
-cd(caps.myInitPath)
+    what        = sprintf("NSymbTaps %i/draw%i",params,k);
+    path        = strcat(path_root,'/../data/data-2024-06/',what,'/',what_charac);
+    cd(path)
+    
+    [Dat,Fn,~]  = import_data({'.csv'});
 
+    if strcmpi(what_charac,"csv")
+        for i = 1:length(Fn)
+        
+            data    = Dat{i};
+            SER     = data.SER;
+        
+            if length(SER) >= 5
+                last_5_SER = SER(end-4:end);
+            else
+                error('not enough SER values in %s.', filenames{i});
+            end
+            
+            averages(i,k)   = mean(last_5_SER);
+            stds(i,k)       = std(last_5_SER);
+        
+        end
+    else
+        averages(:,k)   = Dat{1}.Var2(1:end-1);
+        stds(:,k)       = Dat{1}.Var3(1:end-1);
+    end
+    
+    
 
-caps.flags.fir       = 1;
-caps.flags.poincare  = 1;
-caps.flags.SOP       = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
-
-for kdata = 1:length(Dat)
-
-
-caps                = extract_infos(caps,Dat,kdata);
-[thetas_est, H_est] = channel_estimation(Dat,caps);
-thetas_gnd          = extract_ground_truth(Dat,caps);
-metrics             = get_metrics(thetas_est,thetas_gnd,caps);
-
-plot_results(caps,H_est, thetas_gnd, thetas_est, metrics);
-
+    cd(path_root)
 
 end
 
-cd ../err
-M           = [Carac,metrics.ErrMean,metrics.ErrStd,metrics.ErrRms];
-M(end+1,:)  = [0,median(metrics.ErrMean),median(metrics.ErrStd),median(metrics.ErrRms)];
-writematrix(M,strcat('<Err Theta>-',caps.filename,'.csv'))
-cd(myRootPath)
+
+disp("############# averages #############")
+disp(averages)
+disp("############### stds ###############")
+disp(stds)
+
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
-% ----- CONTENTS -----             
-%   import_data
-%   get_value_from_filename_in
-%   get_number_from_string_in
+% ----- CONTENTS -----
+%   default_plots               
+%   import_data                 acceptedFormats                 [allData, allFilenames, allPathnames]
+%   get_value_from_filename_in  folderPath,quantity,varargin    out
+%   get_number_from_string_in   stringIn,what,varargin          out
+%   check_if_fibre_prop         h                               bool
 % ---------------------------------------------
 
+function default_plots()
+    set(groot,'defaultAxesTickLabelInterpreter','latex'); 
+    set(groot,'defaulttextinterpreter','latex');
+    set(groot,'defaultLegendInterpreter','latex');
+    set(groot,'defaultFigureUnits','normalized')
+    set(groot,'defaultFigurePosition',[0 0 1 1])
+    set(groot,'defaultAxesFontSize', 18);
+    set(groot,'defaultfigurecolor',[1 1 1])
+    set(groot,'defaultAxesFontWeight', 'bold')
+end
+%-----------------------------------------------------
 
-% function [allData, allFilenames, allPathnames] = import_data(acceptedFormats,varargin)
-function [allData, caps] = import_data(acceptedFormats,caps,varargin)
+
+function [allData, allFilenames, allPathnames] = import_data(acceptedFormats,varargin)
     if nargin < 1
         acceptedFormats = {};
     end
@@ -120,6 +137,8 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
             'Select files',...
             'MultiSelect', 'on');
     end
+
+
 
     % Convert to cell array if needed
     if ~iscell(filenames)
@@ -184,69 +203,5 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
         allFilenames{i} = filenames{i};
         allPathnames{i} = pathname;
     end
-
-    caps.Fn         = allFilenames;
-    caps.PathSave   = allPathnames;
-end
-%-----------------------------------------------------
-
-function out = get_value_from_filename_in(folderPath,quantity,varargin)
-
-    cd(folderPath{1})
-  
-    if nargin == 2
-        nfiles          = length(dir(pwd))-2;
-        folder_struct   = dir(pwd);
-        out             = zeros(nfiles,1);
-
-        for k=1:nfiles
-            filename    = folder_struct(k+2).name;
-            out(k)      = get_number_from_string_in(filename,quantity);
-        end
-
-    else
-        nfiles          = length(varargin{1});
-        out             = zeros(nfiles,1);
-        for k=1:nfiles
-            out(k)      = get_number_from_string_in(varargin{1}{k},quantity);
-        end
-    end
-
-    out = sort(out);
-    
-end
-%-----------------------------------------------------
-
-function out = get_number_from_string_in(stringIn,what,varargin)
-
-    stringIn    = char(stringIn);
-    iwhat       = strfind(stringIn,what);
-
-    if nargin == 2
-        iendwhat    = iwhat+length(what);
-        idashes     = strfind(stringIn,'-');
-        [~,itmp]    = max(idashes-iendwhat>0);
-        idashNext   = idashes(itmp);
-        strTmp      = stringIn(iendwhat+1:idashNext-1);
-    else
-        if nargin > 2
-            if iwhat-varargin{1}<1
-                istart = 1;
-            else
-                istart = iwhat-varargin{1};
-            end
-            if nargin == 4
-                if iwhat+varargin{2}>length(stringIn)
-                    iend = length(stringIn);
-                else
-                    iend = iwhat+varargin{2};
-                end
-            end
-            strTmp  = stringIn(istart:iend);
-        end
-    end
-
-    indexes = regexp(strTmp,'[0123456789.]');
-    out     = str2double(strTmp(indexes));
 end
 %-----------------------------------------------------
