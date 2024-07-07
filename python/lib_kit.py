@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.1.3
-#   Date            : 2024-06-21
+#   Version         : 1.1.4
+#   Date            : 2024-07-05
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -20,6 +20,8 @@
 #   1.1.1 (2024-05-22) - CMA, use numpy instead of torch, saves memory & time
 #   1.1.2 (2024-06-06) - [REMOVED] init_dict, moved to misc
 #   1.1.3 (2024-06-21) - train_self -> train_vae
+#   1.1.4 (2024-07-05) - cma, twoXtwoFIR: changing sig_eq_real -> sig_mimo_real
+#                        along with rxdsp (1.6.2), processing (1.3.2)
 #
 # ----- MAIN IDEA -----
 #   Library for CMA equalizer in (optical) telecommunications
@@ -89,7 +91,7 @@ pi = np.pi
 # - SER_estimation
 # - SER_IQflip
 # - soft_dec
-# - train_self
+# - train_vae
 # - twoXtwoFIR
 # =============================================================================
 
@@ -198,11 +200,11 @@ def CMA(tx,rx): # Constant Modulus Algorithm
     rx['CMA']['losses'][str(rx['Frame'])] = loss
 
 
-    rx['sig_eq_real_cma']       = np.zeros((4,out.shape[-1]))
-    rx['sig_eq_real_cma'][0]    = out[0,0]
-    rx['sig_eq_real_cma'][1]    = out[0,1]
-    rx['sig_eq_real_cma'][2]    = out[1,0]
-    rx['sig_eq_real_cma'][3]    = out[1,1]
+    rx['sig_mimo_real']       = np.zeros((4,out.shape[-1]))
+    rx['sig_mimo_real'][0]    = out[0,0]
+    rx['sig_mimo_real'][1]    = out[0,1]
+    rx['sig_mimo_real'][2]    = out[1,0]
+    rx['sig_mimo_real'][3]    = out[1,1]
     
     
     return rx, loss
@@ -408,12 +410,10 @@ def compute_vae_loss(tx,rx):
     ynorm2      = torch.sum(rxsig[:,:,mh:-mh]**2, dim=(1,2))
     yIT         = rxsig[:,0,mh:-mh]
     yQT         = rxsig[:,1,mh:-mh]
-    DI          = D_real
-    DQ          = D_imag
     DInorm2     = torch.sum(D_real**2, dim=1)
-    DQnorm2     = torch.sum(D_imag**2, dim=1)    
+    DQnorm2     = torch.sum(D_imag**2, dim=1)
     E           = DInorm2+DQnorm2+Etmp
-    C           = ynorm2-2*torch.sum(yIT*DI+yQT*DQ,dim=1)+E
+    C           = ynorm2-2*torch.sum(yIT*D_real+yQT*D_imag,dim=1)+E
     
     Llikelihood = torch.sum((rx["NsampBatch"]-Mh)*torch.log(C))
     DKL         = torch.sum(q[0,:,mh:-mh]*torch.log(q[0,:,mh:-mh]/TT+ 1e-12) \
@@ -856,6 +856,9 @@ class twoXtwoFIR(nn.Module):
         amp_lev_mat     = tx["amps"].repeat(rx["NSymbBatch"],1).transpose(0,1)
         amp_lev_mat_sq  = amp_lev_mat**2
         
+        if type(rx["minibatch_real"]) != torch.Tensor:
+            rx["minibatch_real"] = torch.tensor(rx["minibatch_real"])
+            
         # NsampBatch      = rx["minibatch_real"][:,0].shape[1]  
         YHI             = rx["minibatch_real"][0].view(1,rx['NsampBatch'])
         YHQ             = rx["minibatch_real"][1].view(1,rx['NsampBatch'])
@@ -873,16 +876,16 @@ class twoXtwoFIR(nn.Module):
         ZHQ             = out_Q[0,:]
         ZVQ             = out_Q[1,:]
         
-        rx['sig_eq_real'][0,rx['Frame'],rx['BatchNo'],:] = ZHI.detach().numpy()
-        rx['sig_eq_real'][1,rx['Frame'],rx['BatchNo'],:] = ZHQ.detach().numpy()
-        rx['sig_eq_real'][2,rx['Frame'],rx['BatchNo'],:] = ZVI.detach().numpy()
-        rx['sig_eq_real'][3,rx['Frame'],rx['BatchNo'],:] = ZVQ.detach().numpy()
+        rx["sig_mimo_real"][0,rx['Frame'],rx['BatchNo'],:] = ZHI.detach().numpy()
+        rx["sig_mimo_real"][1,rx['Frame'],rx['BatchNo'],:] = ZHQ.detach().numpy()
+        rx["sig_mimo_real"][2,rx['Frame'],rx['BatchNo'],:] = ZVI.detach().numpy()
+        rx["sig_mimo_real"][3,rx['Frame'],rx['BatchNo'],:] = ZVQ.detach().numpy()
         
         
-        # rx['sig_eq_real'][0,rx['BatchNo'],:] = ZHI.detach().numpy()
-        # rx['sig_eq_real'][1,rx['BatchNo'],:] = ZHQ.detach().numpy()
-        # rx['sig_eq_real'][2,rx['BatchNo'],:] = ZVI.detach().numpy()
-        # rx['sig_eq_real'][3,rx['BatchNo'],:] = ZVQ.detach().numpy()
+        # rx["sig_eq_real"][0,rx['BatchNo'],:] = ZHI.detach().numpy()
+        # rx["sig_eq_real"][1,rx['BatchNo'],:] = ZHQ.detach().numpy()
+        # rx["sig_eq_real"][2,rx['BatchNo'],:] = ZVI.detach().numpy()
+        # rx["sig_eq_real"][3,rx['BatchNo'],:] = ZVQ.detach().numpy()
         
         # Soft demapping
         # correction term for PCS: + nu_sc * amp_levels**2 -- see [2]

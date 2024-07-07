@@ -75,7 +75,7 @@ def load_ase(tx,rx):
     # ==> P_noise_AB  = 0.0025 [mW]   ---   A in {H,V}, B in {I,Q}    
 
     rx['SNR']           = 10**(rx['SNRdB']/10)
-    rx["noise_var"]     = torch.full((2,), tx['pow_mean']/rx['SNR']/2)
+    rx["noise_var"]     = torch.full((2,), tx['const_pow_mean']/rx['SNR']/2)
 
     rx_sig_cplx         = np.zeros((tx['Npolars'],tx['NsampFrame']),dtype = np.complex64)
     rx_sig_cplx[0]      = np.array(rx['sig_real'][0]+1j*rx['sig_real'][1])

@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.0
-#   Date            : 2024-07-01
+#   Version         : 1.3.3
+#   Date            : 2024-07-07
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -36,7 +36,16 @@
 #   1.3.0 (2024-07-01) - init_processing: applying same learning scheme for cma
 #                      - print_results: merging cma/vae display of results
 #   1.3.1 (2024-07-02) - init_processing: Frame-FrameChannel for phase noise =>
-#                                           Frame, along with rxdsp (1.6.1)
+#                                         Frame, along with rxdsp (1.6.1)
+#   1.3.2 (2024-07-05) - init_processing: imported from rxdsp.compensate_and_
+#                           truncate definition of t/rx['Symb_SER_real']
+#                           as I was erasing decided symbols at each frame b4.
+#                           along with rxdsp (1.6.2)
+#                        cleaning names: sig_eq = sig_mimo_cut + sig_cpr while
+#                           same name for multiple different vectors. along
+#                           with kit (1.1.4)
+#   1.3.3 (2024-07-07) - init_processing: front end normalisation according to
+#                           mimo algorithm
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -195,6 +204,16 @@ def init_processing(tx, fibre, rx, saving, device):
     tx['mimo']              = rx['mimo'] # usefull for txdsp.pilot_generation
     tx['NSymbBatch']        = rx['NSymbBatch']
     tx['NsampBatch']        = rx['NsampBatch']
+    
+    # useless condition for now
+    if rx['mimo'].lower() == "cma":
+        tx['norm_power'] = 0
+        rx['norm_power'] = 0
+
+    else:
+        tx['norm_power'] = 0
+        rx['norm_power'] = 0
+
 
 # =============================================================================
 # INITIALISATION OF CHANNEL MATRIX
@@ -230,15 +249,19 @@ def init_processing(tx, fibre, rx, saving, device):
     if rx['mode'].lower() != 'blind':
         # we remove the first and last batch of each frame for edges effects
         rx['NBatchFrame_pilots']= rx['NBatchFrame']-2
-        rx['NSymb_pilots_cpr']  = tx['NSymb_pilots_cpr']-tx['NSymbTaps']
         rx['Nzeros_stuffing']   = rx['NSymbBatch']-rx['NSymb_pilots_cpr']
         rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes'],tx['Npolars'],\
                                             rx['NBatchFrame_pilots']))
         rx['PhaseNoise_pilots_std'] = np.zeros(rx['PhaseNoise_pilots'].shape)
             
-        rx['NSymbEq']           = rx["NSymbFrame"]-2*rx['NSymbBatch']
-
-
+        rx['NSymbEq']   = rx["NSymbFrame"]-2*rx['NSymbBatch']        
+        rx['NSymbSER']  = rx['NSymbEq'] - rx['NBatchFrame_pilots']*(rx['NSymb_pilots_cpr'])
+            
+    else:
+        if rx['mimo'].lower() == "vae":
+            rx['NSymbSER'] = rx["NSymbFrame"]
+        else:
+            rx['NSymbSER'] = rx["NSymbFrame"]-rx['NSymbCut_tot']+1
 # =============================================================================
 # OUTPUT
 # =============================================================================
@@ -256,21 +279,24 @@ def init_processing(tx, fibre, rx, saving, device):
 
 
     if rx['mimo'].lower() == "vae":
-        rx['sig_eq_real']   = np.zeros((tx['Npolars']*2,
+        rx["sig_mimo_real"]   = np.zeros((tx['Npolars']*2,
                                     rx['Nframes'],
                                     rx['NBatchFrame'],
                                     rx['NSymbBatch'])).astype(np.float32)
     
-    else:
-        rx['sig_eq_real']   = np.zeros((tx['Npolars']*2,
-                                    rx['Nframes'],
-                                    rx['NSymbEq'])).astype(np.float32)
-
-
-
+    
     rx['Symb_real_dec']     = np.zeros((tx['Npolars']*2,
                                         rx['Nframes'],
-                                        rx['NSymbEq']),dtype = np.float16)
+                                        rx['NSymbSER']),dtype = np.float16)
+            
+            
+    tx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,
+                                    rx['Nframes'],
+                                    rx['NSymbSER'])).astype(np.float16)
+    
+    rx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,
+                                    rx['Nframes'],
+                                    rx['NSymbSER'])).astype(np.float16)
     
     rx["SER_valid"]         = np.zeros((2, rx['Nframes']),dtype = np.float128)
     rx['Pnoise_est']        = np.zeros((tx["Npolars"],

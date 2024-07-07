@@ -57,21 +57,22 @@
 #%% ===========================================================================
 # --- LIBRARIES ---
 # =============================================================================
-import numpy as np
-
-from processing import processing
-from lib_txdsp import set_Nsymbols
-from matplotlib.pyplot import close
-
-from lib_matlab import PWD
-from lib_matlab import clc
-from lib_misc import KEYS as keys
-from torch import cuda
-
-from datetime import date
-
 import gc
-import lib_misc as misc
+import numpy            as np
+import lib_misc         as misc
+
+from processing         import processing
+from lib_txdsp          import set_Nsymbols
+from matplotlib.pyplot  import close
+
+from lib_matlab         import PWD
+from lib_matlab         import clc
+from lib_misc           import KEYS as keys
+from torch              import cuda
+from lib_maths          import get_power
+from datetime           import date
+
+
 pi = np.pi
 clc()
 np.set_printoptions(linewidth=160)
@@ -117,9 +118,11 @@ paramPHI                        = [1e6]                                        #
 # -------------------------------------------------------
 
 
-tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
-tx["nu"]                        = 0#0.0254                                       # for PCS: exp(-nu*|x|^2)/...
+# tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
+# tx["nu"]                        = 0.038718                                       # for PCS: exp(-nu*|x|^2)/...
 
+tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
+tx["nu"]                        = 0.16225                                       # for PCS: exp(-nu*|x|^2)/...
 
 # -----------------------------------------------------------------------------
 # Pilots management
@@ -179,23 +182,16 @@ tx['PhiLaw']["law"]     = 'lin'
 tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
 tx["PhiLaw"]['End']     = 25*pi/180                                            # [rad]
 
-win_width               = 1
+win_width               = 10
 tx['pn_filt_par']       = {
         'type'          : 'moving_average',
-        'ma_type'       : 'gaussian',
+        'ma_type'       : 'gaussian',                                          # {uniform, gaussian}
         'window_size'   : win_width,
-        'std_dev'       : win_width/1,
+        'std_dev'       : win_width/6,                                         # only for gaussian
         'err_tolerance' : 5e-1,
-        'niter_max'     : int(1e2)
+        'niter_max'     : int(1e2),
+        'adaptative'    : 1                                                    # {1 == yes, 0 ==  no}
 }
-
-# tx['pn_filt_par'] = {
-#     'type'          : 'moving_average',
-#     'ma_type'       : 'uniform',
-#     'window_size'   : int(1),
-#     'err_tolerance' : 5e-1,
-#     'niter_max'     : int(1e2)
-# }
 
 ###############################################################################
 ################################## RECEIVER ###################################
@@ -205,17 +201,15 @@ rx['mode']              = 'pilots'                                             #
 rx["mimo"]              = "cma"                                                # {cma,vae}
 
 rx['SNRdB']             = 25                                                   # {>0}
-# rx["lr"]                = 1e-5                                                 # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+# rx["lr"]                = 1e-5                                                 # {>0,<1e-2} {cma ~ 1e-5, vae ~ 5e-4}
 
 
 # tauCoh                  = tx['Rs']/2/pi/tx['dnu']
 # print(tauCoh)
 
 
-
-
 if tx['Rs'] == 64e9:
-    rx["FrameChannel"]  = 5
+    rx["FrameChannel"]  = 15
     rx["SymbScale"]     = 100
 else:
     rx["FrameChannel"]  = 40
@@ -230,12 +224,12 @@ else:
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NframesChannel]]
 
-paramPOL                        = np.array([[0],[10],[1]])
+paramPOL                        = np.array([[0],[25],[1]])
 # paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
-# paramPOL                        = np.array([[0],[25]])
+# paramPOL                        = np.array([[0],[10]])
 
 # paramLR                         = np.array([10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,200,300,400,500])*1e-6
-paramLR                         = np.array([10])*1e-6
+paramLR                         = np.array([10])*1e-6                           # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
 paramFIRlen                     = [7]
 
 
@@ -288,6 +282,7 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
         print(slope)
         fibre["ThetasLaw"]['Start']     = (paramPOL[0,npol])*pi/180
         fibre["ThetasLaw"]['End']       = (paramPOL[1,npol])*pi/180
+        
     else:
         Nframes_Channel                 = paramPOL[-1]
         fibre["ThetasLaw"]['theta_std'] = paramPOL[npol][0]

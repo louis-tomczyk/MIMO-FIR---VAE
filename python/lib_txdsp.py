@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.3
-#   Date            : 2024-06-27
+#   Version         : 1.2.4
+#   Date            : 2024-07-05
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -32,6 +32,7 @@
 #                                 varargins for checking steps
 #                         set_Nsymbols: number of pilots
 #                         transmitter: flag phase noise
+#   1.2.4 (2024-07-05)  - transmitter: not normalising output if vae
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -80,6 +81,8 @@ import lib_misc as misc
 import lib_general as gen
 import lib_txhw as txhw
 import lib_matlab as mb
+import lib_maths as maths
+
 
 pi = np.pi
 
@@ -128,7 +131,12 @@ def transmitter(tx,rx,*varargin):
     if len(varargin)!= 0 and "plot" in varargin:
         gen.plot_constellations(sig1 = tx['sig_real'],title ='tx')
         
-    tx          = misc.sort_dict_by_keys(tx)
+
+    if tx['norm_power'] == 1:
+        tx['sig_real'] = maths.normalise_power(tx['sig_real'])
+
+    tx              = misc.sort_dict_by_keys(tx)
+    
     return tx
 
 
@@ -192,9 +200,9 @@ def data_generation(tx,rx,*what_pilots):
                                    dtype=np.complex64)
     tx["sig_cplx_up"][:,::tx["Nsps"]]   = data_I + 1j*data_Q
     
-    pow_I           = np.mean(np.abs(data_I)**2)
-    pow_Q           = np.mean(np.abs(data_Q)**2)
-    tx['sig_power'] = pow_I+pow_Q
+    pow_I           = np.mean(power(data_I))
+    pow_Q           = np.mean(power(data_Q))
+    tx['data_power']= pow_I+pow_Q
 
     mask_start      = int(tx['NsampTaps']/2)
     mask_end        = rx["NSymbFrame"]+tx["NSymbTaps"]-1
@@ -411,7 +419,7 @@ def get_constellation(tx,rx,*what_pilots):
         tx["N_amps"]            = N_amps
         
         # mean power of the constellation
-        tx["pow_mean"]          = pow_mean
+        tx["const_pow_mean"]    = pow_mean
         tx["Symb_Probs"]        = Symb_Probs
         tx['Prob_ring']         = Prob_ring
         tx['nu_sc']             = nu_sc
@@ -638,7 +646,7 @@ def pilot_generation(tx,rx,what_pilots_k,*varargin):
         pow_pilots_I            = np.mean(np.abs(pilots_I)**2)
         pow_pilots_Q            = np.mean(np.abs(pilots_Q)**2)
         pow_pilots_tot          = pow_pilots_I+pow_pilots_Q
-        tx['sig_pilots_ratio']  = np.sqrt(tx['sig_power']/pow_pilots_tot)
+        tx['sig_pilots_ratio']  = np.sqrt(tx['data_power']/pow_pilots_tot)
 
         pilots_cplx  = (pilots_I + 1j*pilots_Q)*tx['sig_pilots_ratio']
         # pilots_cplx             = (pilots_I + 1j*pilots_Q)*10
@@ -959,6 +967,8 @@ def set_Nsymbols(tx,fibre,rx):
             
             NSymbs_pilots += tx['NSymb_{}'.format(pilots_function)]
             
+        tx['NSymb_pilots_net'] = NSymbs_pilots - tx['NSymbTaps']
+            
         # rx['NSymb_data_Frame']              = rx['NSymbBatch']-tx['NSymb_{}'.format(pilots_function)]
         # rx['NSymb_pilots_tot_Batch']        = NSymbs_pilots
         # rx['NSymb_overhead_percent']        = round(rx['NSymb_pilots_tot_Batch']/rx['NSymb_data_Batch']*100,2)
@@ -989,9 +999,11 @@ def set_Nsymbols(tx,fibre,rx):
     rx["NSymbCut_tot"]      = 2*rx['NSymbCut']+1
     
     rx['NSymbEq']           = rx["NSymbFrame"]
+    
     if rx['mimo'].lower() != "vae":
         rx['NSymbEq']       -= rx['NSymbCut_tot']-1
-        
+
+
 
 ###############################################################################
 ############################# displaying results ##############################

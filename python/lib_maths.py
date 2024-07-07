@@ -150,6 +150,37 @@ def mse(x,ref):
     return np.mean((x-ref)**2)
 
 
+#%%
+def normalise_power(x,real_or_complex = 'real'):
+    
+    if type(x) == torch.Tensor:
+        x     = x.numpy()
+
+    P       = get_power(x)
+    Npolar  = int(len(P)/2)
+    
+    if real_or_complex.lower() == 'real' and Npolar == 1:
+        xnorm = x/np.sqrt(np.mean(P))
+        
+    elif real_or_complex.lower() == 'real' and Npolar == 2:
+        xHnorm  = x[0:2]/np.sqrt(np.sum(P[0:2]))
+        xVnorm  = x[2:4]/np.sqrt(np.sum(P[2:4]))
+        xnorm   = np.concatenate((xHnorm,xVnorm),axis = 0)
+        
+        
+    elif real_or_complex.lower() == 'cplx' and Npolar == 1:
+        xHnorm  = x[0:2]/np.sqrt(np.sum(P[0:2]))
+        xVnorm  = x[2:4]/np.sqrt(np.sum(P[2:4]))
+        xnorm   = np.concatenate((xHnorm,xVnorm),axis = 0)
+        
+    return xnorm
+
+
+        
+        
+
+
+
 
 #%%
 def plot_PSD(signal,fs,*order):

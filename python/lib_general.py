@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.5.2
-#   Date            : 2024-07-01
+#   Version         : 1.5.3
+#   Date            : 2024-07-05
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -30,6 +30,8 @@
 #                      - [NEW] plot_constellations, to replace the removed ones
 #   1.5.1 (2024-06-20) - plot_constellations: adding the grid
 #   1.5.2 (2024-07-01) - real2complex_fir: torch.Tensor type management
+#   1.5.3 (2024-07-05) - plot_decision, plot_xcorr_2x2: suptile frame number
+#   1.5.4 (2024-07-06) - plot_decision: flexibility in t/r types
 # 
 # ----- MAIN IDEA -----
 #   Library for plotting functions in (optical) telecommunications
@@ -274,32 +276,60 @@ def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', 
     plt.show()
 
 #%%
-def plot_decisions(t,r,Nplots):
+def plot_decisions(t,r,Nplots,frame, NSymb = 100, title = ''):
     
-    for k in range(Nplots):
-        a = k*100
+   if type(t) == list:
+        tmp1    = t[0][0].reshape((1,-1))
+        tmp2    = t[1][0].reshape((1,-1))
+        tmp3    = t[2][0].reshape((1,-1))
+        tmp4    = t[3][0].reshape((1,-1))
+        del t
+        t       = np.concatenate((tmp1,tmp2,tmp3,tmp4), axis = 0)
+        
+   if type(r) == list:
+        tmp1    = r[0][0].reshape((1,-1))
+        tmp2    = r[1][0].reshape((1,-1))
+        tmp3    = r[2][0].reshape((1,-1))
+        tmp4    = r[3][0].reshape((1,-1))
+        del r
+        r       = np.concatenate((tmp1,tmp2,tmp3,tmp4), axis = 0)
+        
+   Ymin = -2
+   YLIM = [Ymin,-Ymin]
+   for k in range(Nplots):
+        a = k*NSymb
         b = a+25
         plt.figure()
         plt.subplot(2,2,1)
-        plt.plot(t[0][a:b])
-        plt.plot(r[0][a:b],linestyle="dashed")
+        plt.plot(t[0][a:b], label = 'tx')
+        plt.plot(r[0][a:b], label = 'dec',linestyle="dashed")
+        plt.ylim(YLIM)
+        plt.legend()
         plt.title('HI = a = {} --- b = {}'.format(a,b))
-
+        
         plt.subplot(2,2,2)
-        plt.plot(t[1][a:b])
-        plt.plot(r[1][a:b],linestyle="dashed")
+        plt.plot(t[1][a:b], label = 'tx')
+        plt.plot(r[1][a:b], label = 'dec',linestyle="dashed")
+        plt.ylim(YLIM)
+        plt.legend()
         plt.title('HQ = a = {} --- b = {}'.format(a,b))
-
+        
         plt.subplot(2,2,3)
-        plt.plot(t[2][a:b])
-        plt.plot(r[2][a:b],linestyle="dashed")
+        plt.plot(t[2][a:b], label = 'tx')
+        plt.plot(r[2][a:b], label = 'dec',linestyle="dashed")
+        plt.ylim(YLIM)
+        plt.legend()
         plt.title('VI = a = {} --- b = {}'.format(a,b))
-
+        
         plt.subplot(2,2,4)
-        plt.plot(t[3][a:b])
-        plt.plot(r[3][a:b],linestyle="dashed")
+        plt.plot(t[3][a:b], label = 'tx')
+        plt.plot(r[3][a:b], label = 'dec',linestyle="dashed")
+        plt.ylim(YLIM)
+        plt.legend()
         plt.title('VQ = a = {} --- b = {}'.format(a,b))
         
+        plt.suptitle(f"{title} - frame = {frame}")
+        plt.tight_layout()
         plt.show()
 
 
@@ -513,7 +543,7 @@ def plot_losses(Losses,OSNRdBs,title):
 
 #%%
 
-def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref=0,zoom=0):
+def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title = '',ref=0,zoom=0):
 
     assert sig_11.shape == sig_12.shape == sig_21.shape == sig_22.shape
     
@@ -523,7 +553,7 @@ def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref=0,zoom=0):
     
     plt.subplot(2,2,1)
     plt.plot(x,sig_11)
-    plt.title(title+ ' 11')
+    plt.title('11')
     
     if ref == 1:
         plt.plot([0,0],[-250,max(abs(sig_11))],c='black',linestyle = "dotted")
@@ -532,7 +562,7 @@ def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref=0,zoom=0):
 
     plt.subplot(2,2,2)
     plt.plot(x,sig_12)
-    plt.title(title+ ' 12')
+    plt.title('12')
     if ref == 1:
         plt.plot([0,0],[-250,max(abs(sig_12))],c='black',linestyle = "dotted")
         if zoom == 1:
@@ -540,7 +570,7 @@ def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref=0,zoom=0):
 
     plt.subplot(2,2,3)
     plt.plot(x,sig_21)
-    plt.title(title+ ' 21')
+    plt.title('21')
     if ref == 1:
         plt.plot([0,0],[-250,max(abs(sig_21))],c='black',linestyle = "dotted")
         if zoom == 1:
@@ -548,13 +578,16 @@ def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title,ref=0,zoom=0):
 
     plt.subplot(2,2,4)
     plt.plot(x,sig_22)
-    plt.title(title+ ' 22')
+    plt.title('22')
     
     if ref == 1:
         plt.plot([0,0],[-250,max(abs(sig_22))],c='black',linestyle = "dotted")
         if zoom == 1:
             plt.xlim(-100,100)
 
+    if title != '':
+        plt.suptitle(title)
+        
     plt.show()
 
 #%%
