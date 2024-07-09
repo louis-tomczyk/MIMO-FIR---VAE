@@ -4,8 +4,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-06
-%   Version         : 2.0.0
+%   Date            : 2024-07-09
+%   Version         : 2.0.1
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -20,6 +20,7 @@
 %   ------------------
 %   2024-07-06 (2.0.0)  encapsulation into modules
 %                       [REMOVED] check_if_fibre_prop
+%   2024-07-09 (2.0.1)  phase estimation
 % 
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -43,32 +44,45 @@ rst
 
 cd(strcat('../python/data-',Date,"/mat"))
 caps.myInitPath     = pwd();
+
 [Dat,caps]          = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
 
 Nfiles              = length(Dat);
 ErrMean             = zeros(Nfiles,1);
 ErrStd              = zeros(Nfiles,1);
 ErrRms              = zeros(Nfiles,1);
-what_carac          = 'End';  % {dnu, Slope, End,std}
+what_carac          = 'dnu';  % {dnu, Slope, End,std}
 Carac               = get_value_from_filename_in(caps.PathSave,what_carac,caps.Fn);
 cd(caps.myInitPath)
 
 
-caps.flags.fir       = 1;
-caps.flags.poincare  = 1;
-caps.flags.SOP       = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
-
-for kdata = 1:length(Dat)
-
-
-caps                = extract_infos(caps,Dat,kdata);
-[thetas_est, H_est] = channel_estimation(Dat,caps);
-thetas_gnd          = extract_ground_truth(Dat,caps);
-metrics             = get_metrics(thetas_est,thetas_gnd,caps);
-
-plot_results(caps,H_est, thetas_gnd, thetas_est, metrics);
+caps.flags.fir          = 1;
+caps.flags.poincare     = 0;
+caps.flags.SOP          = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
+caps.flags.plot.phi     = 1;
+caps.thetas_method      = 'eig';
+caps.flags.norm.phi     = 0;
 
 
+% fprintf("f,tap,com,diagR,diagI\n")
+for tap = 7:7
+%     fprintf('\n\n\n')
+
+    caps.tap = tap;
+
+    for kdata = 1:length(Dat)
+    
+        caps                            = extract_infos(caps,Dat,kdata);
+        [thetas_est,phis_est, H_est]    = channel_estimation(Dat,caps);
+        thetas_gnd                      = extract_ground_truth(Dat,caps);
+        metrics                         = get_metrics(thetas_est,thetas_gnd,caps);
+        
+        if caps.flags.plot.phi
+            plot_results(caps,H_est, thetas_gnd, thetas_est,phis_est, metrics);
+        else
+            plot_results(caps,H_est, thetas_gnd, thetas_est,0, metrics);
+        end
+    end
 end
 
 cd ../err
@@ -87,8 +101,6 @@ cd(myRootPath)
 %   get_number_from_string_in
 % ---------------------------------------------
 
-
-% function [allData, allFilenames, allPathnames] = import_data(acceptedFormats,varargin)
 function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     if nargin < 1
         acceptedFormats = {};
@@ -188,6 +200,9 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     caps.Fn         = allFilenames;
     caps.PathSave   = allPathnames;
 end
+
+
+
 %-----------------------------------------------------
 
 function out = get_value_from_filename_in(folderPath,quantity,varargin)
