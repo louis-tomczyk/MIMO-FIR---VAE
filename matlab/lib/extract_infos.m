@@ -4,13 +4,17 @@
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
 %   Arxivs          :
-%   Date            : 2024-07-06
-%   Version         : 1.0.0
+%   Date            : 2024-07-09
+%   Version         : 1.0.1
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
-% 
+%
+% ----- CHANGE LOG -----
+%   2024-07-06 (1.0.0) creation
+%   2024-07-09 (1.0.1) caps: closing figures + number of frames
+%
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
 % ----- OUTPUTS -----
@@ -50,6 +54,7 @@ caps.frames         = linspace(1,caps.Nframes-caps.FrameChannel,caps.Nframes-cap
 caps.FIRlength      = double(data.NtapsTX);
 caps.FIRtaps        = linspace(1,caps.FIRlength,caps.FIRlength)-caps.FIRlength/2;
 caps.kdata          = kdata;
+caps.NFramesChannel = caps.Nframes-caps.FrameChannel;
 
 if length(caps.Fn) > 1
     caps.flags.close = 1;

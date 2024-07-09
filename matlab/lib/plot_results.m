@@ -1,4 +1,3 @@
-%%
 % ---------------------------------------------
 % ----- INFORMATIONS -----
 %   Author          : louis tomczyk
@@ -72,6 +71,9 @@ cd(caps.myInitPath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----
+%   plot_fir            (1.1.0)
+%   plot_phi            (1.1.0)
+%   plot_SOP            (1.1.0)
 %   prepare_plots
 % ---------------------------------------------
 
@@ -140,7 +142,7 @@ hold on
     end
 
     title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
-        caps.thetas_method, caps.tap,metrics.ErrMean(caps.kdata),metrics.ErrStd(caps.kdata)))
+        caps.method.thetas, caps.tap,metrics.ErrMean(caps.kdata),metrics.ErrStd(caps.kdata)))
 % ---------------------------------------------
 
 
@@ -148,12 +150,11 @@ hold on
 
 function f2 = plot_phi(caps,phis_est)
 
-Nf  = caps.Nframes-caps.FrameChannel;
 f2 = figure(1);
 if caps.flags.plot.phi
     subplot(2,2,4)
 
-    phi_ground = linspace(0,10,Nf);
+    phi_ground = linspace(0,10,caps.NFramesChannel);
     hold on
     plot(caps.frames,phi_ground,'--',color = ones(1,3)*0.83,LineWidth=2)
     scatter(caps.frames,phis_est(caps.FrameChannel+1:end),100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
