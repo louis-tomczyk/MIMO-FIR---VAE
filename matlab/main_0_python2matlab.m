@@ -60,8 +60,9 @@ caps.flags.fir          = 1;
 caps.flags.poincare     = 0;
 caps.flags.SOP          = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
 caps.flags.plot.phi     = 1;
-caps.thetas_method      = 'eig';
-caps.flags.norm.phi     = 0;
+caps.method.thetas      = 'eig';
+caps.method.phis        = 'eig';
+caps.method.norm.phi     = 0;
 
 
 % fprintf("f,tap,com,diagR,diagI\n")
