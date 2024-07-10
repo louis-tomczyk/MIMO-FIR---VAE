@@ -41,29 +41,31 @@
 % ---------------------------------------------
 %%
 
-function [thetas_est,phis_est, H_est, f, Sest,FIRest] = channel_estimation(Dat,caps)
+function [thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(Dat,caps)
 
 data        = Dat{caps.kdata};
 H_est       = zeros(2,2,caps.FIRlength);
-thetas_est  = zeros(1,data.Nframes-data.FrameChannel-1);
-phis_est    = zeros(1,data.Nframes-data.FrameChannel-1);
-H_est_f     = zeros([data.Nframes-data.FrameChannel,size(H_est)]);
+thetas.est  = zeros(caps.NFramesChannel-1,1);
+H_est_f     = zeros([caps.NFramesChannel,size(H_est)]);
 
+if caps.flags.plot.phi
+    phis.est    = zeros(caps.NFramesChannel-1,1);
+else
+    phis = NaN;
+end
 
-for k = 1:data.Nframes
-    caps.frame              = k;
-    H_est                   = extract_Hest(data,k,caps.FIRlength);
-    phis_est(k)             = extract_phis_est(H_est,caps);         % [deg]
+for k = 1:caps.NFramesChannel
+    caps.frame              = caps.FrameChannel+k;
+    H_est                   = extract_Hest(data,caps.frame,caps.FIRlength);
+    [thetas.est(k),H_est_f] = extract_thetas_est(H_est,k,H_est_f,caps);  % [deg]
 
-    [thetas_est(k),H_est_f] = extract_thetas_est(H_est,k,H_est_f,caps);  % [deg]
-
-%     fprintf('frame = %i, theta = %.2f\n',double(k),thetas_est(k))
+    if caps.flags.plot.phi
+        phis.est(k)             = extract_phis_est(H_est,caps);         % [deg]
+    end
 
 end
 
 
-
-thetas_est = thetas_est(data.FrameChannel+1:end);                   % [deg]
 
 FIRest.HH = squeeze(H_est_f(data.FrameChannel+1:end,1,1,:));
 FIRest.HV = squeeze(H_est_f(data.FrameChannel+1:end,1,2,:));

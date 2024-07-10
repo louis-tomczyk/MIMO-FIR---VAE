@@ -3,9 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Arxivs          :
-%   Date            : 2024-07-09
-%   Version         : 1.1.0
+%   Date            : 2024-07-10
+%   Version         : 1.1.1
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -15,6 +14,7 @@
 %   2024-07-06 (1.0.0)  creation
 %   2024-07-09 (1.1.0)  [NEW] plot_SOP, plot_FIR, plot_phi
 %                       plot_results: encapsulation + plot phase estimation
+%   2024-07-10 (1.1.1)  flexibility and naming standardisation
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -40,19 +40,27 @@
 % ---------------------------------------------
 %%
 
-function plot_results(caps,H_est, thetas_gnd, thetas_est,phis_est,metrics)
+function plot_results(caps,H_est,thetas,metrics,varargin)
+
+if ~isempty(varargin)
+    phis.gnd    = varargin{1}.gnd;
+    phis.est    = varargin{1}.est;
+end
+
 
 H_ests_norm = prepare_plots(H_est);
 
 if caps.flags.fir
 
     plot_fir(caps,H_ests_norm);
-    plot_SOP(caps,thetas_est,thetas_gnd,metrics);
-    f2 = plot_phi(caps,phis_est);
-    
+    f = plot_SOP(caps,thetas,metrics);
+
+    if ~isempty(varargin)
+        f = plot_phi(caps,phis);
+    end
 
     cd ../figs/fir
-    exportgraphics(f2,sprintf("%s.png",caps.filename))
+    exportgraphics(f,sprintf("%s.png",caps.filename))
     cd(caps.myInitPath)
     pause(0.25)
 
@@ -63,7 +71,12 @@ if caps.flags.fir
 end
 
 cd ../err
-writematrix(metrics.Err,strcat('Err Theta-',caps.filename,'.csv'))
+writematrix(metrics.Err.thetas,strcat('Err Theta-',caps.filename,'.csv'))
+
+if ~isempty(varargin)
+    writematrix(metrics.Err.phis,strcat('Err Phi-',caps.filename,'.csv'))
+end
+
 cd(caps.myInitPath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -90,9 +103,9 @@ H_ests_norm = H_ests_abs/norm_factor;
 % ---------------------------------------------
 
 
-function f2 = plot_fir(caps,H_ests_norm)
+function f = plot_fir(caps,H_ests_norm)
 
-f2 = figure(1);
+f = figure(1);
     subplot(2,2,1);
         hold on
         plot(caps.FIRtaps,abs(H_ests_norm(:,1)),LineWidth=5,Color='k')
@@ -113,9 +126,9 @@ f2 = figure(1);
 
 
 
-function f2 = plot_SOP(caps,thetas_est,thetas_gnd,metrics)
+function f = plot_SOP(caps,thetas,metrics)
 
-f2 = figure(1);
+f = figure(1);
 if caps.flags.plot.phi
     subplot(2,2,3)
 else
@@ -123,41 +136,41 @@ else
 end
 
 hold on
-    if strcmpi(caps.flags.SOP,'error per frame')
-        scatter(caps.frames,thetas_est-thetas_gnd(3,:),100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
-        xlabel("frame")
-        ylabel("$\hat{\theta}-\theta$ [deg]")
+if strcmpi(caps.flags.SOP,'error per frame')
+    scatter(caps.Frames,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    xlabel("frame")
+    ylabel("$\hat{\theta}-\theta$ [deg]")
 
-    elseif strcmpi(caps.flags.SOP,'error per theta')
-        scatter(thetas_gnd(3,:),thetas_est-thetas_gnd(3,:),100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
-        xlabel("$\theta$ [deg]")
-        ylabel("$\hat{\theta}-\theta$ [deg]")
+elseif strcmpi(caps.flags.SOP,'error per theta')
+    scatter(thetas.gnd,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    xlabel("$\theta$ [deg]")
+    ylabel("$\hat{\theta}-\theta$ [deg]")
 
-    elseif strcmpi(caps.flags.SOP,'comparison per frame')
-        plot(caps.frames,thetas_gnd(3,:),'color',[1,1,1]*0.83, LineWidth=5)
-        scatter(caps.frames,thetas_est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
-        legend("ground truth","estimation",Location="northwest")
-        xlabel("frame")
-        ylabel("$\hat{\theta},\theta$ [deg]")
-    end
+elseif strcmpi(caps.flags.SOP,'comparison per frame')
+    plot(caps.Frames,thetas.gnd,'color',[1,1,1]*0.83, LineWidth=5)
+    scatter(caps.Frames,thetas.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    legend("ground truth","estimation",Location="northwest")
+    xlabel("frame")
+    ylabel("$\hat{\theta},\theta$ [deg]")
+end
 
-    title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
-        caps.method.thetas, caps.tap,metrics.ErrMean(caps.kdata),metrics.ErrStd(caps.kdata)))
+title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
+      caps.method.thetas, caps.tap, ...
+      metrics.thetas.ErrMean(caps.kdata),metrics.thetas.ErrStd(caps.kdata)))
 % ---------------------------------------------
 
 
 
 
-function f2 = plot_phi(caps,phis_est)
+function f = plot_phi(caps,phis)
 
-f2 = figure(1);
+f = figure(1);
 if caps.flags.plot.phi
     subplot(2,2,4)
 
-    phi_ground = linspace(0,10,caps.NFramesChannel);
     hold on
-    plot(caps.frames,phi_ground,'--',color = ones(1,3)*0.83,LineWidth=2)
-    scatter(caps.frames,phis_est(caps.FrameChannel+1:end),100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    plot(caps.Frames,phis.gnd,'--',color = ones(1,3)*0.83,LineWidth=2)
+    scatter(caps.Frames,phis.est(caps.FrameChannel+1:end),100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("frame")
     ylabel("$\hat{\phi}$ [deg]")
     
