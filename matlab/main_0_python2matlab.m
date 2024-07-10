@@ -4,8 +4,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-09
-%   Version         : 2.0.1
+%   Date            : 2024-07-10
+%   Version         : 2.0.2
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -21,6 +21,7 @@
 %   2024-07-06 (2.0.0)  encapsulation into modules
 %                       [REMOVED] check_if_fibre_prop
 %   2024-07-09 (2.0.1)  phase estimation
+%   2024-07-10 (2.0.2)  flexibility and naming standardisation
 % 
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -59,37 +60,44 @@ cd(caps.myInitPath)
 caps.flags.fir          = 1;
 caps.flags.poincare     = 0;
 caps.flags.SOP          = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
-caps.flags.plot.phi     = 1;
+caps.flags.plot.phi     = 0;
 caps.method.thetas      = 'eig';
 caps.method.phis        = 'eig';
 caps.method.norm.phi     = 0;
 
 
-% fprintf("f,tap,com,diagR,diagI\n")
 for tap = 7:7
-%     fprintf('\n\n\n')
 
     caps.tap = tap;
 
     for kdata = 1:length(Dat)
     
-        caps                            = extract_infos(caps,Dat,kdata);
-        [thetas_est,phis_est, H_est]    = channel_estimation(Dat,caps);
-        thetas_gnd                      = extract_ground_truth(Dat,caps);
-        metrics                         = get_metrics(thetas_est,thetas_gnd,caps);
+        caps                    = extract_infos(caps,Dat,kdata);
+        [thetas,phis, H_est]    = channel_estimation(Dat,caps);
+        [thetas, phis]          = extract_ground_truth(Dat,caps,thetas,phis);
         
         if caps.flags.plot.phi
-            plot_results(caps,H_est, thetas_gnd, thetas_est,phis_est, metrics);
+            metrics             = get_metrics(caps,thetas,phis);
+            plot_results(caps,H_est, thetas,metrics,phis);
         else
-            plot_results(caps,H_est, thetas_gnd, thetas_est,0, metrics);
+            metrics             = get_metrics(caps,thetas);
+            plot_results(caps,H_est, thetas,metrics);
         end
+
+
     end
 end
 
 cd ../err
-M           = [Carac,metrics.ErrMean,metrics.ErrStd,metrics.ErrRms];
-M(end+1,:)  = [0,median(metrics.ErrMean),median(metrics.ErrStd),median(metrics.ErrRms)];
-writematrix(M,strcat('<Err Theta>-',caps.filename,'.csv'))
+Mthetas             = [Carac,metrics.thetas.ErrMean,metrics.thetas.ErrStd,metrics.thetas.ErrRms];
+Mthetas(end+1,:)    = [0,median(metrics.thetas.ErrMean),median(metrics.thetas.ErrStd),median(metrics.thetas.ErrRms)];
+writematrix(Mthetas,strcat('<Err Theta>-',caps.filename,'.csv'))
+
+if caps.flags.plot.phi
+    Mphis             = [Carac,metrics.phis.ErrMean,metrics.phis.ErrStd,metrics.phis.ErrRms];
+    Mphis(end+1,:)    = [0,median(metrics.phis.ErrMean),median(metrics.phis.ErrStd),median(metrics.phis.ErrRms)];
+    writematrix(Mphis,strcat('<Err Phi>-',caps.filename,'.csv'))
+end
 cd(myRootPath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
