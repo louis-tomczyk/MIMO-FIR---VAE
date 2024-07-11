@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.4.2
-#   Date            : 2024-07-02
+#   Version         : 1.4.4
+#   Date            : 2024-07-11
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -25,6 +25,9 @@
 #                        instead create_xml_file adds the realisation number
 #   1.4.1 (2024-06-30) - phase noise filter parameters
 #   1.4.2 (2024-07-02) - phase noise adaptative filter parameters + correction
+#   1.4.3 (2024-07-10) - naming normalisation (*frame*-> *Frame*)
+#   1.4.4 (2024-07-11) - file naming managed in 'create_xml_file', along with
+#                           misc (1.4.0)
 #
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -88,13 +91,11 @@ tx,fibre,rx,saving,flags        = misc.init_dict()
 ################################ TRANSMITTER ##################################
 ###############################################################################
 
-tx["NSymbTaps"]                 = 7                                            # must be odd number
 tx["Rs"]                        = 64e9                                         # [Baud] Symbol rate
 tx['SNRdB']                     = 50
 
 tx['flag_phase_noise']          = 1
-# tx['dnu']                       = 1e6
-paramPHI                        = [1e6]                                        # [Hz] laser linewidth
+paramPHI                        = [1e5]                                        # [Hz] laser linewidth
 
 # -----------------------------------------------------------------------------
 # Entropies table
@@ -119,10 +120,10 @@ paramPHI                        = [1e6]                                        #
 
 
 # tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
-# tx["nu"]                        = 0.038718                                       # for PCS: exp(-nu*|x|^2)/...
+# tx["nu"]                        = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
 
 tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
-tx["nu"]                        = 0.16225                                       # for PCS: exp(-nu*|x|^2)/...
+tx["nu"]                        = 0.1089375                                       # for PCS: exp(-nu*|x|^2)/...
 
 # -----------------------------------------------------------------------------
 # Pilots management
@@ -175,12 +176,12 @@ rx['NSymbBatch']        = int(160)
 # tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",5,0]]         #ok
 tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]         #ok
 
-# tx['PhiLaw']["kind"]  = 'Rwalk'
-# tx['PhiLaw']["law"]   = 'linewidth'
-tx['PhiLaw']["kind"]    = 'func'
-tx['PhiLaw']["law"]     = 'lin'
-tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
-tx["PhiLaw"]['End']     = 25*pi/180                                            # [rad]
+tx['PhiLaw']["kind"]  = 'Rwalk'
+tx['PhiLaw']["law"]   = 'linewidth'
+# tx['PhiLaw']["kind"]    = 'func'
+# tx['PhiLaw']["law"]     = 'lin'
+# tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
+# tx["PhiLaw"]['End']     = 5*pi/180                                            # [rad]
 
 win_width               = 10
 tx['pn_filt_par']       = {
@@ -190,8 +191,11 @@ tx['pn_filt_par']       = {
         'std_dev'       : win_width/6,                                         # only for gaussian
         'err_tolerance' : 5e-1,
         'niter_max'     : int(1e2),
-        'adaptative'    : 1                                                    # {1 == yes, 0 ==  no}
+        'adaptative'    : 0                                                    # {1 == yes, 0 ==  no}
 }
+
+# if tx['flag_phase_noise'] == 0:
+#     tx['dnu'] = 0
 
 ###############################################################################
 ################################## RECEIVER ###################################
@@ -209,7 +213,7 @@ rx['SNRdB']             = 25                                                   #
 
 
 if tx['Rs'] == 64e9:
-    rx["FrameChannel"]  = 15
+    rx["FrameChannel"]  = 5
     rx["SymbScale"]     = 100
 else:
     rx["FrameChannel"]  = 40
@@ -222,14 +226,19 @@ else:
 
 
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
-# if polarisation linewdith --- [[std],[NframesChannel]]
+# if polarisation linewdith --- [[std],[NFramesChannel]]
 
-paramPOL                        = np.array([[0],[25],[1]])
+paramPOL                        = np.array([[0],[10],[1]])
 # paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
-# paramPOL                        = np.array([[0],[10]])
+# paramPOL                        = np.array([[0],[25]])
 
 # paramLR                         = np.array([10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,200,300,400,500])*1e-6
-paramLR                         = np.array([10])*1e-6                           # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+
+if rx['mimo'].lower() == "cma":
+    paramLR                         = np.array([10])*1e-6                      # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+else:
+    paramLR                         = np.array([500])*1e-6                     # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+
 paramFIRlen                     = [7]
 
 
@@ -269,48 +278,39 @@ else:
 # --- FUNCTIONS ---
 # =============================================================================
 def process_data(nrea,npol,nphi,tx,fibre,rx):
-
-    path = PWD(show=False)
         
     if len(paramPOL) == 3:      # linear evolution
-        RangeTheta                      = paramPOL[1,npol] - paramPOL[0,npol]
-        SlopeTheta                      = paramPOL[2,npol]
+        RangeTheta                  = paramPOL[1,npol] - paramPOL[0,npol]
+        Sth                         = paramPOL[2,npol]
         
-        deltaN_Channel                  = np.floor(RangeTheta/SlopeTheta)-rx["FrameChannel"]
-        Nframes_Channel                 = rx["FrameChannel"]+deltaN_Channel
-        slope                           = (paramPOL[1,npol]-paramPOL[0,npol])/Nframes_Channel
-        print(slope)
-        fibre["ThetasLaw"]['Start']     = (paramPOL[0,npol])*pi/180
-        fibre["ThetasLaw"]['End']       = (paramPOL[1,npol])*pi/180
+        deltaN_Channel              = np.floor(RangeTheta/Sth)-rx["FrameChannel"]
+        NFrames_Channel             = rx["FrameChannel"]+deltaN_Channel
+        Sth                         = (paramPOL[1,npol]-paramPOL[0,npol])/NFrames_Channel
+        fibre["ThetasLaw"]['Start'] = (paramPOL[0,npol])*pi/180
+        fibre["ThetasLaw"]['End']   = (paramPOL[1,npol])*pi/180
         
     else:
-        Nframes_Channel                 = paramPOL[-1]
+        NFrames_Channel                 = paramPOL[-1]
         fibre["ThetasLaw"]['theta_std'] = paramPOL[npol][0]
         fibre['fpol']                   = paramPOL[npol][0]
 
-    rx["Nframes"]                       = int(rx["FrameChannel"] + Nframes_Channel)
+    rx["NFrames"]                       = int(rx["FrameChannel"] + NFrames_Channel)
     tx["dnu"]                           = paramPHI[nphi]                       # [Hz]
     
     tx,fibre, rx                        = set_Nsymbols(tx,fibre,rx)
 
-    saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,nrea)[2:-4]
+    saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,nrea)
     tx,fibre,rx                         = processing(tx,fibre,rx,saving,flags)
         
     misc.save2mat(tx,fibre,rx,saving)
 
-    if rx['mimo'].lower() == "cma":
+    if tx['flag_phase_noise'] == 0:
         misc.plot_2y_axes(saving,"iteration",'Thetas','SER',['svg'])
     else:
-        misc.plot_3y_axes(saving,"iteration",'SNR','Thetas','SER',['svg'])
+        misc.plot_3y_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
 
 
-    close("all")
-    
-    misc.replace_string_in_filenames(path, "NSymbBatch","NSbB")
-    misc.replace_string_in_filenames(path, "NSymbFrame","NSbF")
-    misc.replace_string_in_filenames(path, "NsampTaps","NspT")
-    misc.truncate_lr_in_filename(path)
-    
+    # close("all")
         
     return tx,fibre,rx
 

@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.3
-#   Date            : 2024-07-07
+#   Version         : 1.3.4
+#   Date            : 2024-07-10
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -46,6 +46,10 @@
 #                           with kit (1.1.4)
 #   1.3.3 (2024-07-07) - init_processing: front end normalisation according to
 #                           mimo algorithm
+#   1.3.4 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
+#                        along with main (1.4.3)
+#                      - init_processing: saving per frame/bacth?
+#   1.3.5 (2024-07-11) - save_data: managing phase noise
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -110,7 +114,8 @@ import timeit
 from lib_matlab import clc
 from lib_misc import KEYS as keys
 from lib_maths import get_power as power
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+device  = 'cuda' if torch.cuda.is_available() else 'cpu'
+pi      = np.pi
 
 #%% ===========================================================================
 # --- FUNCTIONS ---
@@ -121,7 +126,7 @@ def processing(tx, fibre, rx, saving, flags):
 
     tx, fibre, rx       = init_processing(tx, fibre, rx, saving, device)
 
-    for frame in range(rx['Nframes']):
+    for frame in range(rx['NFrames']):
 
         rx              = init_train(tx, rx, frame)                            # if vae, otherwise: transparent
         tx              = txdsp.transmitter(tx, rx)
@@ -148,7 +153,19 @@ def init_processing(tx, fibre, rx, saving, device):
         
     assert not flag_incoherence, "pilots aided equalisation is for CMA only\
                                 check rx['mimo'] in main.py"
+
+    if 'save_channel_gnd' not in rx:
+        rx['save_channel_gnd'] = 0
+        
+    rx['save_channel_frame'] = 1
     
+    if tx['flag_phase_noise']:
+        rx['save_channel_batch'] = 1
+        
+    else:
+        rx['save_channel_batch'] = 1
+
+        
     if "channel" not in fibre:
         fibre['channel']    = "linear"
     
@@ -175,15 +192,15 @@ def init_processing(tx, fibre, rx, saving, device):
     rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
     rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']
 
-    rx["NframesChannel"]    = rx["Nframes"]-rx["FrameChannel"]   
-    rx["NframesTraining"]   = rx["Nframes"]-rx["NframesChannel"]
+    rx["NFramesChannel"]    = rx["NFrames"]-rx["FrameChannel"]   
+    rx["NFramesTraining"]   = rx["NFrames"]-rx["NFramesChannel"]
      
-    rx["NBatchesChannel"]   = rx["NframesChannel"]*rx['NBatchFrame'] 
-    rx["NBatchesTot"]       = rx["Nframes"]*rx['NBatchFrame']
+    rx["NBatchesChannel"]   = rx["NFramesChannel"]*rx['NBatchFrame'] 
+    rx["NBatchesTot"]       = rx["NFrames"]*rx['NBatchFrame']
     rx["NBatchesTraining"]  = rx["NBatchesTot"]-rx['NBatchesChannel']
 
     
-    tx['NsampChannel']      = tx['NsampFrame']*rx['NframesChannel']
+    tx['NsampChannel']      = tx['NsampFrame']*rx['NFramesChannel']
     tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel'] 
 
 # =============================================================================
@@ -200,7 +217,7 @@ def init_processing(tx, fibre, rx, saving, device):
             tx, rx           = txdsp.get_constellation(tx, rx, tx['pilots_info'][k])
 
         
-    tx["PhaseNoise"]        = np.zeros((tx['Npolars'],tx['NsampFrame'], rx['Nframes']))
+    tx["PhaseNoise"]        = np.zeros((tx['Npolars'],tx['NsampFrame'], rx['NFrames']))
     tx['mimo']              = rx['mimo'] # usefull for txdsp.pilot_generation
     tx['NSymbBatch']        = rx['NSymbBatch']
     tx['NsampBatch']        = rx['NsampBatch']
@@ -208,7 +225,7 @@ def init_processing(tx, fibre, rx, saving, device):
     # useless condition for now
     if rx['mimo'].lower() == "cma":
         tx['norm_power'] = 0
-        rx['norm_power'] = 0
+        rx['norm_power'] = 1
 
     else:
         tx['norm_power'] = 0
@@ -250,7 +267,7 @@ def init_processing(tx, fibre, rx, saving, device):
         # we remove the first and last batch of each frame for edges effects
         rx['NBatchFrame_pilots']= rx['NBatchFrame']-2
         rx['Nzeros_stuffing']   = rx['NSymbBatch']-rx['NSymb_pilots_cpr']
-        rx['PhaseNoise_pilots'] = np.zeros((rx['Nframes'],tx['Npolars'],\
+        rx['PhaseNoise_pilots'] = np.zeros((rx['NFrames'],tx['Npolars'],\
                                             rx['NBatchFrame_pilots']))
         rx['PhaseNoise_pilots_std'] = np.zeros(rx['PhaseNoise_pilots'].shape)
             
@@ -266,41 +283,47 @@ def init_processing(tx, fibre, rx, saving, device):
 # OUTPUT
 # =============================================================================
 
-    rx["H_est_l"]           = []
-    rx["H_lins"]            = []
+    rx["h_est_frame"]       = []
+
+    if rx['save_channel_batch']:
+        rx["h_est_batch"]   = []
+
+    if rx['save_channel_gnd']:
+        rx["h_gnd"]         = []
+        
     rx["Losses"]            = []
     rx["SNRdBs"]            = []
     rx["SERs"]              = []
 
 
-    rx["SNRdB_est"]         = np.zeros(rx['Nframes'])
+    rx["SNRdB_est"]         = np.zeros(rx['NFrames'])
     rx['sig_real']          = torch.zeros((tx['Npolars']*2,tx['NsampFrame']))
 
 
 
     if rx['mimo'].lower() == "vae":
         rx["sig_mimo_real"]   = np.zeros((tx['Npolars']*2,
-                                    rx['Nframes'],
+                                    rx['NFrames'],
                                     rx['NBatchFrame'],
                                     rx['NSymbBatch'])).astype(np.float32)
     
     
     rx['Symb_real_dec']     = np.zeros((tx['Npolars']*2,
-                                        rx['Nframes'],
+                                        rx['NFrames'],
                                         rx['NSymbSER']),dtype = np.float16)
             
             
     tx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,
-                                    rx['Nframes'],
+                                    rx['NFrames'],
                                     rx['NSymbSER'])).astype(np.float16)
     
     rx['Symb_SER_real'] = np.zeros((tx['Npolars']*2,
-                                    rx['Nframes'],
+                                    rx['NFrames'],
                                     rx['NSymbSER'])).astype(np.float16)
     
-    rx["SER_valid"]         = np.zeros((2, rx['Nframes']),dtype = np.float128)
+    rx["SER_valid"]         = np.zeros((2, rx['NFrames']),dtype = np.float128)
     rx['Pnoise_est']        = np.zeros((tx["Npolars"],
-                                        rx['Nframes']),dtype = np.float32)
+                                        rx['NFrames']),dtype = np.float32)
 
 
     tx      = misc.sort_dict_by_keys(tx)
@@ -314,7 +337,7 @@ def init_processing(tx, fibre, rx, saving, device):
 # %%
 def init_train(tx, rx, frame):
 
-    # if rx["N_lrhalf"] > rx["Nframes"]: # [C1]
+    # if rx["N_lrhalf"] > rx["NFrames"]: # [C1]
 
     #     rx["lr_scheduled"] = rx["lr"] * 0.5
     #     rx['optimiser'].param_groups[0]['lr'] = rx["lr_scheduled"]
@@ -327,9 +350,9 @@ def init_train(tx, rx, frame):
             rx['out_train']             = misc.my_zeros_tensor((tx["Npolars"], 2*tx["N_amps"], rx["NSymbFrame"]))
             rx['Pnoise_batches']        = misc.my_zeros_tensor((tx["Npolars"], rx['NBatchFrame']))
             rx['out_const']             = misc.my_zeros_tensor((tx["Npolars"], 2, rx["NSymbFrame"]))
-            rx['losses_subframe']       = misc.my_zeros_tensor((rx["Nframes"], rx['NBatchFrame']))
-            rx['DKL_subframe']          = misc.my_zeros_tensor((rx["Nframes"], rx['NBatchFrame']))
-            rx['Llikelihood_subframe']  = misc.my_zeros_tensor((rx["Nframes"], rx['NBatchFrame']))
+            rx['losses_subframe']       = misc.my_zeros_tensor((rx["NFrames"], rx['NBatchFrame']))
+            rx['DKL_subframe']          = misc.my_zeros_tensor((rx["NFrames"], rx['NBatchFrame']))
+            rx['Llikelihood_subframe']  = misc.my_zeros_tensor((rx["NFrames"], rx['NBatchFrame']))
 
             rx['net'].train()
             rx['optimiser'].zero_grad()
@@ -387,7 +410,6 @@ def print_results(loss, frame, tx, fibre, rx, saving):
         array   = np.concatenate((Iteration, Losses, SNRdBs, SERs), axis=1)
     else:
         array   = np.concatenate((Iteration,Losses,SERs),axis=1)
-        # array = np.concatenate((Iteration, Losses), axis=1)
 
     if rx['Frame'] >= rx["FrameChannel"]:
         thetak = fibre['thetas'][rx['Frame']][1]+fibre['thetas'][rx['Frame']][0]
@@ -435,26 +457,33 @@ def print_results(loss, frame, tx, fibre, rx, saving):
 #%%
 def save_data(tx, fibre, rx, saving, array):
 
-    Thetas_IN   = np.array([fibre["thetas"][k][0] for k in range(rx["Nframes"])])
-    Thetas_OUT  = np.array([fibre["thetas"][k][1] for k in range(rx["Nframes"])])
+    Thetas_IN   = np.array([fibre["thetas"][k][0] for k in range(rx["NFrames"])])
+    Thetas_OUT  = np.array([fibre["thetas"][k][1] for k in range(rx["NFrames"])])
     thetas      = list((Thetas_IN+Thetas_OUT)*180/np.pi)
     Thetas      = misc.list2vector(thetas)
-
-    # PhisAll         = tx['PhaseNoise'][0, :, :]
-    # PhiMeanFrame    = np.mean(PhisAll,axis=0)
-    # PhiStdFrame     = np.expand_dims(np.std(PhisAll, axis=0), axis=1)
-    # array2          = np.concatenate((array, Thetas, PhiStdFrame), axis=1)
-    array2          = np.concatenate((array, Thetas), axis=1)
-
+    
+    if not tx['flag_phase_noise']:
+        array2          = np.concatenate((array, Thetas), axis=1)
+    elif tx['flag_phase_noise']:
+        Phis            = tx['PhaseNoise_unique'][:,rx['NBatchFrame']-1].reshape((-1,1))*180/pi
+        array2          = np.concatenate((array, Thetas, Phis), axis=1)
 
     if rx["mimo"].lower() == "vae":
-        # misc.array2csv(array2, saving["filename"], ["iteration",
-        #                 "loss", "SNR", "SER", "Thetas", 'std(Phi)'])
-        misc.array2csv(array2, saving["filename"], ["iteration",
-                       "loss", "SNR", "SER", "Thetas"])
+        if tx['flag_phase_noise'] == 0:
+            misc.array2csv(array2, saving["filename"],\
+                           ["iteration","loss", "SNR", "SER", "Thetas"])
+        else:
+            misc.array2csv(array2, saving["filename"],\
+                           ["iteration","loss", "SNR", "SER", "Thetas",'Phis'])
+                
     else:
-        misc.array2csv(array2, saving["filename"], ["iteration", "loss", "SER", "Thetas"])
-        # misc.array2csv(array2, saving["filename"], ["iteration", "loss", "SER"])
+        if tx['flag_phase_noise'] == 0:
+            misc.array2csv(array2, saving["filename"],\
+                           ["iteration", "loss", "SER", "Thetas"])
+
+        else:
+            misc.array2csv(array2, saving["filename"],\
+                           ["iteration","loss", "SER", "Thetas",'Phis'])
 
     tx      = misc.sort_dict_by_keys(tx)
     fibre   = misc.sort_dict_by_keys(fibre)

@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.2
-#   Date            : 2024-07-02
+#   Version         : 1.2.3
+#   Date            : 2024-07-10
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -24,6 +24,8 @@
 #   1.2.1 (2024-07-01) - load_ase: SNR -> tx['SNR']
 #   1.2.2 (2024-07-02) - gen_phase_noise: tx["PhiLaw"]["law"]  == "linewidth",
 #                           corrected the variance
+#   1.2.3 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
+#                        along with main (1.4.3)
 #
 # ----- MAIN IDEA -----
 #   Generation and management of phase noise and ASE noise in optical telecommunication systems
@@ -97,13 +99,13 @@ def gen_phase_noise(tx,rx):
         # --------------------------------------- BATCH-WISE
         if tx['PhaseNoise_mode'] == "batch-wise":
 
-            tmp_phase_noise = np.zeros((1,rx['Nframes'],rx['NBatchFrame']))
+            tmp_phase_noise = np.zeros((1,rx['NFrames'],rx['NBatchFrame']))
             if tx["PhiLaw"]['kind']         == 'Rwalk':
 
                 tmp_last_phase  = 0
                 
                 # set angles by batches
-                for k in range(rx['NframesChannel']):
+                for k in range(rx['NFramesChannel']):
 
                     if tx["PhiLaw"]["law"]      == "linewidth":
                         tx['VAR_Phase']         = 2*pi*tx['dnu']/tx['fs']
@@ -114,34 +116,35 @@ def gen_phase_noise(tx,rx):
 
 
                 # circshift to put the zeros phases where they should be
-                tmp_phase_noise[0]      = np.roll(tmp_phase_noise[0], -rx['NframesChannel'], axis = 0) # axis 0 = rows
+                tmp_phase_noise[0]      = np.roll(tmp_phase_noise[0], -rx['NFramesChannel'], axis = 0) # axis 0 = rows
                 
 
             else:
                 if tx["PhiLaw"]["law"]      == "lin":
                     PhiStart                = tx["PhiLaw"]["Start"]            # [rad]
                     PhiEnd                  = tx["PhiLaw"]["End"]
-                    tx["PhiLaw"]["slope"]   = (PhiEnd-PhiStart)/tx["NsampFrame"]
+                    tx["PhiLaw"]["Sph"]     = (PhiEnd-PhiStart)/tx["NsampFrame"]
 
-                    tmp_training            = np.linspace(PhiStart,PhiEnd,rx["NBatchFrame"]*rx['NframesChannel'])
-                    tmp_channel             = np.zeros((rx["NBatchFrame"]*rx['NframesTraining']))
+                    tmp_training            = np.linspace(PhiStart,PhiEnd,rx["NBatchFrame"]*rx['NFramesChannel'])
+                    tmp_channel             = np.zeros((rx["NBatchFrame"]*rx['NFramesTraining']))
 
                     tmp                     = np.concatenate((tmp_channel,tmp_training),axis = 0)
-                    tmp_phase_noise[0]      = np.reshape(tmp,(rx['Nframes'],-1))
+                    tmp_phase_noise[0]      = np.reshape(tmp,(rx['NFrames'],-1))
             
 
             tx["PhaseNoise_unique"] = tmp_phase_noise[0].squeeze()
             tmp_pn                  = np.repeat(tmp_phase_noise[0],rx['NsampBatch'],axis=1)
-            tmp_pn_rs               = np.reshape(tmp_pn,(rx['Nframes'],-1))
+            tmp_pn_rs               = np.reshape(tmp_pn,(rx['NFrames'],-1))
             
             Nexcess_symbs           = abs(tx['NsampFrame']-rx['NsampBatch']*rx['NBatchFrame'])
-            for k in range(rx['Nframes']):
+            for k in range(rx['NFrames']):
                 tmp                 = tmp_pn_rs[k,-Nexcess_symbs-1:-1]
                 tx["PhaseNoise"][0,:,k] = np.concatenate((tmp_pn_rs[k], tmp),axis = 0)
     
-                    
             tx["PhaseNoise"][1]     = tx["PhaseNoise"][0]
-            tx['pn_fil_losses']     = np.zeros((rx['Nframes'],tx['pn_filt_par']['niter_max']))
+            
+            # phase noise estimation after filtering
+            tx['pn_fil_losses']     = np.zeros((rx['NFrames'],tx['pn_filt_par']['niter_max']))
             
             # for checking
             # for frame in range(rx['FrameChannel']-1,rx['FrameChannel']+2):
@@ -167,14 +170,14 @@ def gen_phase_noise(tx,rx):
                 if tx["PhiLaw"]["law"]      == "lin":
                     PhiStart                = tx["PhiLaw"]["Start"]
                     PhiEnd                  = tx["PhiLaw"]["End"]
-                    tx["PhiLaw"]["slope"]   = (PhiEnd-PhiStart)/tx["Nsamp_PhaseNoise"]
+                    tx["PhiLaw"]["Sph"]     = (PhiEnd-PhiStart)/tx["Nsamp_PhaseNoise"]
                     
                     tx["PhaseNoise"][0,tx['Nsamp_training']:]   = np.linspace(PhiStart,PhiEnd,tx["Nsamp_PhaseNoise"])
                     tx["PhaseNoise"][1,tx['Nsamp_training']:]   = np.linspace(PhiStart,PhiEnd,tx["Nsamp_PhaseNoise"])
     
     
-            tmp                 = np.zeros((2,tx['NsampFrame'],rx['Nframes'])).astype(np.float32)
-            for k in range(rx['Nframes']):
+            tmp                 = np.zeros((2,tx['NsampFrame'],rx['NFrames'])).astype(np.float32)
+            for k in range(rx['NFrames']):
                 tmp[:,:,k]      = tx['PhaseNoise'][:,k*tx["NsampFrame"]:(k+1)*tx["NsampFrame"]]
     
             tx['PhaseNoise']    = tmp
@@ -245,7 +248,7 @@ def load_phase_noise(tx,rx,*varargin):
     tx['sig_real'][3]   = torch.tensor(np.imag(tx_sig_cplx[1]))
 
     if len(varargin) != 0 and 'pn time trace' in varargin:
-        for k in range(rx['Nframes']):
+        for k in range(rx['NFrames']):
             pns = round(tx['PhaseNoise'][0,0,k]*180/pi,3)
             pne = round(tx['PhaseNoise'][0,-1,k]*180/pi,3)
             

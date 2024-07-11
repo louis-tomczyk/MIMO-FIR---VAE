@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.0
-#   Date            : 2024-06-28
+#   Version         : 1.4.0
+#   Date            : 2024-07-11
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -30,9 +30,21 @@
 #                       set_saving_params: no temporary folder anymore
 #                       create_xml_file: adding the realisation number to the
 #                       file name
+#   1.3.1 (2024-07-10)  naming normalisation (*frame*-> *Frame*).
+#                           along with main (1.4.3)
+#                       save2mat: adding fields for matlab processing
+#                           along with main_0_python2matlab.m (2.0.2)
+#   1.4.0 (2024-07-11)  [NEW]   find_string_in_list
+#                       create_xml_file: managing phase noise
+#                       replace_string_in_filenames, truncate_lr_in_filename
+#                           allowing filenames as input instead of only paths
+#                       plot_3y_axes: semilogy if SER as entry
+#                       organise_files: managing xml files
+#                       save2mat: exporting phase noise esitmation with cpr
+#                       find_string -> find_substring
 # 
 # ----- MAIN IDEA -----
-#   Miscellaneous functions for logistics and plots^
+#   Miscellaneous functions for logistics and plots
 # 
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
@@ -78,7 +90,7 @@ from tkinter import filedialog
 import re
 
 import lib_general as gen
-import lib_matlab as mat
+import lib_matlab as mb
 pi = np.pi
 
 
@@ -92,7 +104,8 @@ pi = np.pi
 # - create_xml_file
 # - convert_byte                        (1.2.0)
 # - extract_values_from_filename
-# - find_string
+# - find_substring
+# - find_string_in_list                 (1.4.0)
 # - get_total_size                      (1.2.0)
 # - import_data
 # - init_dict
@@ -249,22 +262,30 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
     sections    = ["TX","CHANNEL","RX"]
     
     if tx['nu'] != 0:
-        TX      = ["mod","nu","Nsps", "Rs","NsampTaps",'dnu','SNRdB']
+        TX      = ["mod","nu","Nsps", "Rs","NsampTaps",'SNRdB','law']
     else:
-        TX      = ["mod", "Nsps", "Rs","NsampTaps",'dnu','SNRdB']
+        TX      = ["mod", "Nsps", "Rs","NsampTaps",'SNRdB','law']
 
-    CHANNEL     = ["tauPMD", "tauCD", "kind","law"]
-    RX          = ["mimo",'lr',"Nframes", "NSymbBatch", "FrameChannel", "NSymbFrame","SNR_dB"]
+
+    if rx['mode'].lower() == 'pilots':
+        TX.append("Nplts")
+
+
+    CHANNEL     = ["tauPMD", "tauCD", "law"]
+    RX          = ["mimo",'lr',"NFrames", "NSymbBatch", "FrameChannel", "NSymbFrame","SNR_dB"]
     fields_list = [TX, CHANNEL, RX]
     
     if tx['nu'] != 0:
-        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu','SNRdB',"CD","PMD",'kind','law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu','SNRdB',"CD","PMD",'law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
     else:
-        saving_list = ["mimo",'lr','Rs','mod','dnu','SNRdB',"CD","PMD",'kind','law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        saving_list = ["mimo",'lr','Rs','mod','dnu','SNRdB',"CD","PMD",'law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
         
+        
+    if rx['mode'].lower() == 'pilots':
+        saving_list.insert(5, "Nplts")
+
     CHANNELpar  = [np.round(fibre["tauPMD"]*1e12,0),           # [ps]
                    np.round(np.sqrt(fibre["tauCD"])*1e12,0),   # [ps]
-                   fibre["ThetasLaw"]["kind"],
                    fibre["ThetasLaw"]["law"]]
     
     if fibre["ThetasLaw"]["kind"] == "Rwalk":
@@ -306,14 +327,14 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
     elif fibre["ThetasLaw"]["kind"] == "func":
         if fibre["ThetasLaw"]["law"] == "lin":
             saving_list.insert(11,'End')
-            saving_list.insert(12,'Slope')
+            saving_list.insert(12,'Sth')
 
             CHANNEL.append('End')
-            CHANNEL.append('Slope')
+            CHANNEL.append('Sth')
             
-            Slope = (fibre["ThetasLaw"]['End']-fibre["ThetasLaw"]['Start'])/(rx['Nframes']-rx['FrameChannel']) # [rad]
-            CHANNELpar.append(np.round(fibre["ThetasLaw"]['End']*180/pi,1))
-            CHANNELpar.append(np.round(Slope*180/pi,2))
+            Sth = (fibre["ThetasLaw"]['End']-fibre["ThetasLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
+            CHANNELpar.append(int(fibre["ThetasLaw"]['End']*180/pi))
+            CHANNELpar.append(np.round(Sth*180/pi,2))
             
 
 
@@ -321,18 +342,40 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
                    tx["Nsps"],
                    int(tx["Rs"]*1e-9),
                    tx['NsampTaps'],
-                   int(tx["dnu"]*1e-3),
-                   tx['SNRdB']]
+                   tx['SNRdB'],
+                   int(tx["dnu"]*1e-3) if tx['PhiLaw']["kind"] == "Rwalk"\
+                       else tx['PhiLaw']["law"]
+                   ]
+    
+
+    if tx['flag_phase_noise'] == 1:
+        if tx["PhiLaw"]["kind"] == "func":
+            if tx["PhiLaw"]["law"] == "lin":
+                saving_list.insert(6,'End')
+                saving_list.insert(7,'Sph')
+    
+                TX.append('End')
+                TX.append('Sph')
+                
+                Sph = (tx["PhiLaw"]['End']-tx["PhiLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
+                TXpar.append(int(tx["PhiLaw"]['End']*180/pi))
+                TXpar.append(np.round(Sph*180/pi,2))
     
     
+    if tx["flag_phase_noise"] == 1:
+        TXpar.insert(len(TXpar), tx['pilots_info'][0][-1])
+        
     if tx["nu"] != 0:
-        TXpar.insert(1, tx['nu'])
+        TXpar.insert(1, round(tx['nu'],3))
+        
+    if rx['mode'].lower() == 'pilots':
+        TXpar.insert(len(TX), tx['pilots_info'][0][-1])
     
 
     
     RXpar       = [rx['mimo'],
                    rx['lr']*1000,
-                   rx["Nframes"],
+                   rx["NFrames"],
                    rx["NSymbBatch"],
                    rx["FrameChannel"],
                    np.round(rx["NSymbFrame"]*1e-3,2),
@@ -356,13 +399,11 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
             field_element.text  = str(field_value)
 
     # file name creation
-    current_time    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    filename    = datetime.now().strftime("%y-%m-%d %H:%M:%S")
     
-
-    file_name       = current_time
     
     if len(varargin) != 0:
-        file_name   = file_name + f'   {varargin[0]}'
+        filename  += f'   {varargin[0]}'
         
     for name in saving_list:
         # print("\n"*3)
@@ -373,24 +414,30 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
             # print(section_fields)
             
             if name in section_fields:
-                # print(name)
                 index = section_fields.index(name)
             
                 # Uses the index to get the value corresponding to the field in params_lists
                 value = params_list[fields_list.index(section_fields)][index]
                 # print(value)
-                file_name += f" - {name} {value}"
+                filename += f" - {name} {value}"
 
-    file_name += ".xml"
+    filename += ".xml"
+
+
+    filename = replace_string_in_filenames(filename, "NSymbBatch","NSbB")
+    filename = replace_string_in_filenames(filename, "NSymbFrame","NSbF")
+    filename = replace_string_in_filenames(filename, "NsampTaps","NspT")
+    filename = truncate_lr_in_filename(filename)
+    
 
     # # create the xml file
-    # tree = ET.ElementTree(root)
-    # tree.write(file_name, encoding="utf-8", xml_declaration=True)
+    tree = ET.ElementTree(root)
+    tree.write(filename, encoding="utf-8", xml_declaration=True)
     
     os.chdir("../")
 
     # print(file_name[:-4])
-    return file_name
+    return filename[:-4]
 
 
 
@@ -422,8 +469,23 @@ def extract_values_from_filename(filename):
 
 
 #%%
+def find_string_in_list(string,mylist):
+    
+    assert string in mylist, f"{string} not in the list"
+    
+    indexes = []
+    k       = 0
+    
+    while k < len(mylist):
+        if string == mylist[k]:
+            indexes.append(k)
+        k += 1
+        
+    return indexes
 
-def find_string(pattern, mystring):
+#%%
+
+def find_substring(pattern, mystring):
     
     pattern_ind     = [0,0]
     pattern_ind[0]  = mystring.find(pattern)
@@ -431,7 +493,6 @@ def find_string(pattern, mystring):
     pattern_ind[1]  = pattern_ind[0]+Nchars
     
     return pattern_ind
-
 
 
 #%% [C1] + ChatGPT
@@ -525,7 +586,7 @@ def init_dict():
     fibre['ThetasLaw']  = dict()
     tx["PhiLaw"]        = dict()
 
-    for field_name in ["mod","Nsps","Rs","nu","NsampTaps",'dnu']:
+    for field_name in ["mod","Nsps","Rs","nu","NsampTaps"]:
         tx[field_name] = 0
         
     #for field_name in ["channel",'PMD','CD','phiIQ','theta1','theta_std']:
@@ -533,7 +594,7 @@ def init_dict():
         fibre[field_name] = 0
     
         
-    for field_name in ['SNRdB',"NSymbBatch","N_lrhalf","Nframes","FrameChannel","Nmax_SymbFrame","mimo"]:
+    for field_name in ['SNRdB',"NSymbBatch","N_lrhalf","NFrames","FrameChannel","Nmax_SymbFrame","mimo"]:
         rx[field_name] = 0
         
     rx["Frame"]             = 0
@@ -542,7 +603,7 @@ def init_dict():
     tx["nu"]                = 0                     # [0] [0.0270955] [0.0872449] [0.1222578]
     rx["N_lrhalf"]          = 170
 
-    saving['root_path'] = mat.PWD(show = False)
+    saving['root_path'] = mb.PWD(show = False)
     saving['merge_path']= saving['root_path']+'/data-'+str(date.today())
 
     tx      = sort_dict_by_keys(tx)
@@ -727,13 +788,15 @@ def organise_files(directory):
     mat_dir = os.path.join(directory, 'mat')
     err_dir = os.path.join(directory, 'err')
     csv_dir = os.path.join(directory, 'csv')
-
+    xml_dir = os.path.join(directory, 'xml')
+    
     # Create the main target directories if they don't exist
     os.makedirs(figs_dir, exist_ok=True)
     os.makedirs(mat_dir, exist_ok=True)
     os.makedirs(err_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
-
+    os.makedirs(xml_dir, exist_ok=True)
+    
     # Create subdirectories for images
     svg_dir = os.path.join(figs_dir, 'svg')
     poincare_dir = os.path.join(figs_dir, 'poincare')
@@ -760,6 +823,8 @@ def organise_files(directory):
                     shutil.move(filepath, os.path.join(fir_dir, filename))
             elif filename.endswith('.mat'):
                 shutil.move(filepath, os.path.join(mat_dir, filename))
+            elif filename.endswith('.xml'):
+                shutil.move(filepath, os.path.join(xml_dir, filename))
             elif filename.endswith('.csv'):
                 if 'err' in filename.lower():
                     shutil.move(filepath, os.path.join(err_dir, filename))
@@ -953,30 +1018,41 @@ def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
 
         fig, ax1    = plt.subplots(figsize=(10, 6.1423))
 
-        ax1.plot(x, y1, color='tab:blue',linestyle='dashed',linewidth = 2)
+        if yaxis_left.lower() == "ser":
+            ax1.semilogy(x, y1, color='tab:blue')
+        else:
+            ax1.plot(x, y1, color='tab:blue',linestyle='dashed',linewidth = 2)
+
         ax1.set_xlabel(xaxis)
         ax1.set_ylabel(yaxis_left, color='tab:blue')
-#        ax1.set_ylim(-1200, 700)
         locs, labels = plt.xticks()  # Get the current locations and labels.
         plt.xticks(np.arange(0, len(y3)+1, step=5))  # Set label locations.
         ax1.tick_params(axis='y', labelcolor='tab:blue')
         
         ax2 = ax1.twinx()
-        ax2.plot(x, y2, color='tab:red')
+        if yaxis_right.lower() == "ser":
+            ax2.semilogy(x, y2, color='tab:red')
+        else:
+            ax2.plot(x, y2, color='tab:red')
+            
         ax2.set_ylabel(yaxis_right, color='tab:red')
-#        ax2.set_ylim(0, 40)
         ax2.tick_params(axis='y', labelcolor='tab:red')
         
         ax3 = ax1.twinx()
         ax3.spines['right'].set_position(('outward', 60))  # adjust axis pos
         ax3.set_ylabel(yaxis_right_2, color='tab:green')
-        ax3.plot(x, y3, color='tab:green')
+        
+        if yaxis_right_2.lower() == "ser":
+            ax3.semilogy(x, y3, color='tab:green',linestyle='dotted',linewidth = 3)
+        else:
+            ax3.plot(x, y3, color='tab:green',linestyle='dotted',linewidth = 3)
+            
         ax3.tick_params(axis='y', labelcolor='tab:green')
-#        ax3.set_ylim(-45,+45)
+
         
         mytext  = ''.join([f"{key}:{values[key]} - "\
                            for key in keys if key in values])
-        text_lim    = 45
+        text_lim    = 50
         
         if len(mytext)>text_lim:
 
@@ -988,9 +1064,9 @@ def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
                 mytext3 = mytext2[text_lim+11:]
                 mytext2 = mytext2[:text_lim+11]
             
-            pos_mytext  = 0.25#len(mytext)/50
-            pos_mytext2 = 0.25#len(mytext2)/50            
-            pos_mytext3 = 0.25#len(mytext3)/50
+            pos_mytext  = 0.375#len(mytext)/50
+            pos_mytext2 = 0.375#len(mytext2)/50            
+            pos_mytext3 = 0.375#len(mytext3)/50
             
         plt.text(0.5-pos_mytext,    1,      mytext,  fontsize=14,\
                  transform=plt.gcf().transFigure)
@@ -999,6 +1075,7 @@ def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
         plt.text(0.5-pos_mytext3,   0.9,    mytext3, fontsize=14,\
                  transform=plt.gcf().transFigure)
         
+
         # Sauvegarder la figure en format image
         if type(extensions) == list:
             for extension in extensions:
@@ -1048,55 +1125,67 @@ def remove_n_characters_from_filenames(directory, n):
             )
 
 #%% ChatGPT
-def replace_string_in_filenames(path, old_string, new_string):
+def replace_string_in_filenames(string, old_string, new_string):
 
-    if not os.path.isdir(path):
-        print(f"path {path} not valid")
-        return
+    if not os.path.isdir(string):
+        what = "filename"
+    else:
+        what = "path"
     
-    for root, dirs, files in os.walk(path):
-        for file_name in files:
-
-            if old_string in file_name:
-
-                new_file_name = file_name.replace(old_string, new_string)
-                old_file_path = os.path.join(root, file_name)
-                new_file_path = os.path.join(root, new_file_name)
-                
-                os.rename(old_file_path, new_file_path)
-   
+    if what == "path":
+        for root, dirs, files in os.walk(string):
+            for filename in files:
+    
+                if old_string in filename:
+    
+                    new_filename = filename.replace(old_string, new_string)
+                    old_filepath = os.path.join(root, filename)
+                    new_filepath = os.path.join(root, new_filename)
+                    
+                    os.rename(old_filepath, new_filepath)
+    else:
+        new_filename = string.replace(old_string, new_string)
+        return new_filename
+        
+        
 #%%
 def save2mat(tx,fibre,rx,saving):
 
 
     name        = saving["filename"]+".mat"
+    
+    
     save_dict   = {
-                'NtapsTX'           : tx['NsampTaps'],
+                'NspTaps'           : tx['NsampTaps'],
                 'nu'                : tx["nu"],
                 'nu_sc'             : tx["nu_sc"],
                 'Rs'                : tx["Rs"],
-#                'theta_in'          : fibre["ThetasLaw"]["theta_in"],
-#                'theta_std'         : fibre["ThetasLaw"]["theta_std"],
-#                'thetas'            : fibre["thetas"],
-                'NSymbBatch'          : rx["NSymbBatch"],
-                'h_channel_liste'   : rx["H_lins"],
-                'h_est_liste'       : rx["H_est_l"],
+                'thetas'            : np.array(fibre["thetas"]), # tensor type not recognised by matlab
+                'NSymbBatch'        : rx["NSymbBatch"],
+                'h_gnd_frame'       : rx["h_gnd"] if rx['save_channel_gnd'] else np.nan,
+                'h_est_frame'       : rx["h_est_frame"],
+                'h_est_batch'       : rx["h_est_batch"] if rx['save_channel_batch'] else np.nan,
                 'lr'                : rx["lr"],
                 'Losses'            : rx["Losses"],
-                'Nframes'           : rx["Nframes"],
+                'NFrames'           : rx["NFrames"],
+                'NFramesTraining'   : rx["NFramesTraining"],
                 'FrameChannel'      : rx["FrameChannel"],
+                'NBatchFrame'       : rx['NBatchFrame'],
+                'NBatchesChannel'   : rx['NBatchesChannel'],
+                'Phis_gnd'          : tx["PhaseNoise_unique"],
                 'SNRdBs'            : rx["SNRdBs"],
                 'SER_means'         : rx["SERs"],
                 'SER_valid'         : rx["SER_valid"],
                 'Var_est'           : rx["Pnoise_est"],
+                'PhaseNoise_est_cpr': rx['PhaseNoise_pilots'] if rx['mode'].lower() == "pilots"\
+                                            else np.nan
                 }
     
+    
     if rx['mimo'].lower() == "vae":
-        save_dict['h_est']      = rx["h_est"].detach().numpy()
         save_dict['Var_real']   = rx["noise_var"].detach().numpy()
 
     else:
-        save_dict['h_est']      = rx["h_est"]
         save_dict['Var_real']   = rx["noise_var"]
         
     io.savemat(name,save_dict)
@@ -1223,28 +1312,38 @@ def string_to_binary(input_string):
         binary_string += binary_char
     return binary_string
 
-        
 
 #%% ChatGPT
-def truncate_lr_in_filename(directory):
+def truncate_lr_in_filename(string):
+    if not os.path.isdir(string):
+        what = "filename"
+    else:
+        what = "path"
+
     lr_pattern = re.compile(r'(lr\s)(\d+\.\d+)')
     
-    for filename in os.listdir(directory):
-        
-        # Search for the pattern in the filename
-        match = lr_pattern.search(filename)
-        
+    if what == 'path':
+        for filename in os.listdir(string):
+            
+            # Search for the pattern in the filename
+            match = lr_pattern.search(filename)
+            
+            if match:
+                lr              = float(match.group(2))
+                lr_trunc        = f'{lr:.2f}'
+                new_filename    = filename.replace(match.group(2), lr_trunc)            
+                old_file        = os.path.join(string, filename)
+                new_file        = os.path.join(string, new_filename)
+                
+                os.rename(old_file, new_file)
+    else:
+        match = lr_pattern.search(string)
         if match:
-            lr          = float(match.group(2))
-            lr_trunc    = f'{lr:.2f}'
-            new_fname   = filename.replace(match.group(2), lr_trunc)            
-            old_file    = os.path.join(directory, filename)
-            new_file    = os.path.join(directory, new_fname)
-            
-            os.rename(old_file, new_file)
-            
+            lr              = float(match.group(2))
+            lr_trunc        = f'{lr:.2f}'
+            new_filename    = string.replace(match.group(2), lr_trunc)
 
-
+        return new_filename
 
 #%%
             

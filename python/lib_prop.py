@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.0.4
-#   Date            : 2024-06-27
+#   Version         : 1.0.5
+#   Date            : 2024-07-10
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -20,6 +20,8 @@
 #   1.0.2 (2024-04-24) - set_thetas: as 04-21, propagation: awgn
 #   1.0.3 (2024-05-27) - simulate dispersion: C/PM-D ---> tauC/PM-D
 #   1.0.4 (2024-06-27) - propagation: varargin to check synchro of pilots
+#   1.0.5 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
+#                        along with main (1.4.3)
 #
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
@@ -196,15 +198,15 @@ def gen_random_theta(fibre):
 #%%
 def set_thetas(tx,fibre,rx):
 
-    fibre["ThetasLaw"]["numel"]         = rx["Nframes"]
-    numel                               = rx["Nframes"]
+    fibre["ThetasLaw"]["numel"]         = rx["NFrames"]
+    numel                               = rx["NFrames"]
 
     if "FrameChannel" not in rx:
-        fibre["ThetasLaw"]["numeltrain"]= int(np.floor(rx["Nframes"]/2))
+        fibre["ThetasLaw"]["numeltrain"]= int(np.floor(rx["NFrames"]/2))
     else:
         fibre["ThetasLaw"]["numeltrain"]=  rx["FrameChannel"]
 
-    fibre["ThetasLaw"]["numelvalid"]    = rx["Nframes"]-fibre["ThetasLaw"]["numeltrain"] 
+    fibre["ThetasLaw"]["numelvalid"]    = rx["NFrames"]-fibre["ThetasLaw"]["numeltrain"] 
 
     numeltrain                          = int(fibre["ThetasLaw"]["numeltrain"])
     numelvalid                          = int(fibre["ThetasLaw"]["numelvalid"])
@@ -215,7 +217,7 @@ def set_thetas(tx,fibre,rx):
         fibre["ThetasLaw"]["law"]       = "gaussian"
 
     # initialisation of the angles
-    fibre["thetas"]                     = np.zeros((rx['Nframes'],tx["Npolars"]))
+    fibre["thetas"]                     = np.zeros((rx['NFrames'],tx["Npolars"]))
 
     # 1: first column is the input angles that are fixed to the 1st training angle phase
     # 2: second colum is filled with the opposite angles to have only PMD and CD
@@ -237,7 +239,7 @@ def set_thetas(tx,fibre,rx):
             if fibre["ThetasLaw"]["law"] == "lin":
                 ThetaStart                              = fibre["ThetasLaw"]["Start"]
                 ThetaEnd                                = fibre["ThetasLaw"]["End"]
-                fibre["ThetasLaw"]["slope"]             = (ThetaEnd-ThetaStart)/numelvalid
+                fibre["ThetasLaw"]["Sth"]               = (ThetaEnd-ThetaStart)/numelvalid
                 fibre["thetas"][numel-numelvalid:,1]    = np.linspace(ThetaStart,ThetaEnd, numelvalid)
     
             # obtention of angle shifts
@@ -295,11 +297,11 @@ def simulate_dispersion(tx,fibre,rx):
                                   [0, 1/exp_pmd*exp_phiIQ[1]]], 
                                  dtype=object)
 
-        H_lin               = R2 @ Diag_pmd @ R1
+        h_gnd               = R2 @ Diag_pmd @ R1
 
         RX_fft              = np.zeros((2,tx["NsampFrame"]), dtype = np.complex64)
-        RX_fft[0,:]         = (H_lin[0,0]*tx_sig_fft[0,:] + H_lin[0,1]*tx_sig_fft[1,:])*exp_cd
-        RX_fft[1,:]         = (H_lin[1,0]*tx_sig_fft[0,:] + H_lin[1,1]*tx_sig_fft[1,:])*exp_cd 
+        RX_fft[0,:]         = (h_gnd[0,0]*tx_sig_fft[0,:] + h_gnd[0,1]*tx_sig_fft[1,:])*exp_cd
+        RX_fft[1,:]         = (h_gnd[1,0]*tx_sig_fft[0,:] + h_gnd[1,1]*tx_sig_fft[1,:])*exp_cd 
 
         rx_sig_cplx         = np.fft.ifft(RX_fft, axis=1).astype(np.complex64)
 
@@ -308,8 +310,9 @@ def simulate_dispersion(tx,fibre,rx):
         rx['sig_real'][2]   = torch.tensor(np.real(rx_sig_cplx[1]), dtype = torch.float32)
         rx['sig_real'][3]   = torch.tensor(np.imag(rx_sig_cplx[1]), dtype = torch.float32)
 
-        
-        rx["H_lins"].append(H_lin)
+
+        if rx['save_channel_gnd']:        
+            rx["h_gnd"].append(h_gnd)
 
         
     else:

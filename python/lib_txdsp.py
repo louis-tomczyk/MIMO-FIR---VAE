@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.4
-#   Date            : 2024-07-05
+#   Version         : 1.2.5
+#   Date            : 2024-07-10
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -33,6 +33,8 @@
 #                         set_Nsymbols: number of pilots
 #                         transmitter: flag phase noise
 #   1.2.4 (2024-07-05)  - transmitter: not normalising output if vae
+#   1.2.5 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
+#                        along with main (1.4.3)
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -536,7 +538,7 @@ def pilot_generation(tx,rx,what_pilots_k,*varargin):
             if (pilots_changes == "same") or ('once' in pilots_function):
                 N_redo = 1
             else:
-                N_redo = rx['Nframes']
+                N_redo = rx['NFrames']
                 
         if not flag_do:
             N_redo      = 0
@@ -989,8 +991,8 @@ def set_Nsymbols(tx,fibre,rx):
 ########################### miscellaneous #####################################
 ###############################################################################
     
-    tx['NSymbTot']          = tx['NSymbFrame']*rx['Nframes']
-    tx['NsampTot']          = tx['NsampFrame']*rx['Nframes']
+    tx['NSymbTot']          = tx['NSymbFrame']*rx['NFrames']
+    tx['NsampTot']          = tx['NsampFrame']*rx['NFrames']
     rx["NsampBatch"]        = rx['NSymbBatch']*tx['Nsps']    
     
 

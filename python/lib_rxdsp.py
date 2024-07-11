@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.7.2
-#   Date            : 2024-07-07
+#   Version         : 1.7.3
+#   Date            : 2024-07-10
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -71,6 +71,8 @@
 #                           + checking plot related to it
 #                       - CPR_pilots: changing adaptive stop condition on diff
 #                           diff -> rel_diff
+#   1.7.3 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
+#                        along with main (1.4.3)
 # 
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
@@ -115,6 +117,7 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import time
 
 import lib_general as gen
 import lib_kit as kit
@@ -149,9 +152,9 @@ def receiver(tx,rx,saving):
     rx              = front_end(rx)
     rx, loss        = mimo(tx, rx, saving)#,'b4','after')
     rx              = remove_symbols(rx,'data')#,'data removal')
-    rx              = CPR_pilots(tx, rx,'trace loss')#,'demod','corr')     # {align,demod,time trace pn, time trace pn loss, trace loss}
+    rx              = CPR_pilots(tx, rx)#, 'demod','corr')#,'trace loss')#,'demod','corr')     # {align,demod,time trace pn, time trace pn loss, trace loss}
     rx              = SNR_estimation(tx, rx)
-    rx              = decision(tx,rx)#,'time decision')                        # {time decision, const decision}
+    rx              = decision(tx,rx)#,"const norm")#,'time decision')         # {time decision, const decision, const norm}
     tx,rx           = find_shift(tx, rx)#,'corr')                              # {corr, err dec}
     tx,rx           = compensate_and_truncate(tx,rx)#, 'err dec')#,'corr')     # {corr, err dec}
     rx              = SER_estimation(tx, rx)#, 'err dec')                      # {err dec}
@@ -291,7 +294,10 @@ def CPR_pilots(tx,rx,*varargin):
         rx_H_rs             = np.reshape(rx_H, (rx['NBatchFrame_pilots'],-1))
         rx_V_rs             = np.reshape(rx_V, (rx['NBatchFrame_pilots'],-1))
 
-        offset_conv = rx['NSymb_pilots_cpr'] - tx['NSymbTaps']
+        # shaping using convolution puts symboles at end of previous batch
+        # and at beginning of current batch. the number of the latter is named
+        # ``offset_conv"
+        offset_conv         = rx['NSymb_pilots_cpr'] - tx['NSymbTaps']
         for k in range(int(rx['NBatchFrame_pilots'])):
             
             pilots_H_begin  = rx_H_rs[k, :offset_conv+1].reshape((1,-1))
@@ -305,25 +311,25 @@ def CPR_pilots(tx,rx,*varargin):
         
         
     # ---------------------------------------------------------------- to check
-        if len(varargin) != 0 and 'align' in varargin:
-            if rx['Frame']> rx['FrameChannel']:
-                for k in range(int(rx['NBatchFrame_pilots']/7)):            
-                    plt.figure()
-                    # 
-                    plt.subplot(1,2,1)
-                    plt.plot(np.real(tx_pilots_H_roll[k]),linewidth=2,label='TX')
-                    plt.plot(np.real(rx_H_pilots[k]),linewidth=2,label = 'RX')
-                    plt.legend()
-                    plt.title("polH")
-                    # 
-                    plt.subplot(1,2,2)
-                    plt.plot(np.real(tx_pilots_V_roll[k]),linewidth=2,label='TX')
-                    plt.plot(np.real(rx_V_pilots[k]),linewidth = 2,label = 'RX')
-                    plt.legend()
-                    plt.title("polV")
-                    # 
-                    plt.suptitle(f"frame = {rx['Frame']}")
-                    plt.show()
+        if len(varargin) != 0 and 'align' in varargin\
+            and rx['Frame']> rx['FrameChannel']:
+            for k in range(int(rx['NBatchFrame_pilots']/7)):            
+                plt.figure()
+                # 
+                plt.subplot(1,2,1)
+                plt.plot(np.real(tx_pilots_H_roll[k]),linewidth=2,label='TX')
+                plt.plot(np.real(rx_H_pilots[k]),linewidth=2,label = 'RX')
+                plt.legend()
+                plt.title("polH")
+                # 
+                plt.subplot(1,2,2)
+                plt.plot(np.real(tx_pilots_V_roll[k]),linewidth=2,label='TX')
+                plt.plot(np.real(rx_V_pilots[k]),linewidth = 2,label = 'RX')
+                plt.legend()
+                plt.title("polV")
+                # 
+                plt.suptitle(f"frame = {rx['Frame']}")
+                plt.show()
     # ---------------------------------------------------------------- to check
             
         del tx_pilots_H_all, tx_pilots_V_all
@@ -340,14 +346,14 @@ def CPR_pilots(tx,rx,*varargin):
         tmpV    = rx_V_pilots*np.conj(tx_pilots_V_roll[:,:rx['NSymb_pilots_cpr']])
         
         # normalisation [optional]
-        tmpH   = tmpH/power(tmpH)
-        tmpV   = tmpV/power(tmpV)
+        tmpH   = tmpH/np.sqrt(power(tmpH))
+        tmpV   = tmpV/np.sqrt(power(tmpV))
         
         # ------------------------------------------------------------ to check
-        if len(varargin) != 0 and 'demod' in varargin:
-            if rx['Frame']> rx['FrameChannel']:
-                gen.plot_constellations(sig1 = tmpH, sig2 = tmpV,\
-                    labels= ['H','V'], title = f"cpr_pilots, frame {rx['Frame']}")
+        if len(varargin) != 0 and 'demod' in varargin\
+            and rx['Frame']> rx['FrameChannel']:
+            gen.plot_constellations(sig1 = tmpH, sig2 = tmpV,\
+                labels= ['H','V'], title = f"cpr_pilots, frame {rx['Frame']}")
         # ------------------------------------------------------------ to check
                 
         # averaging over the pilots within the same batches
@@ -459,8 +465,8 @@ def CPR_pilots(tx,rx,*varargin):
         rx_V_corrected  = rx_V*np.exp(-1j*pn_V_filter)
 
         # ------------------------------------------------------------ to check
-        if len(varargin) != 0 and 'corr' in varargin:
-            if rx['Frame']> rx['FrameChannel']:
+        if len(varargin) != 0 and 'corr' in varargin\
+            and rx['Frame']> rx['FrameChannel']:
                 rx_corrected    = np.concatenate((rx_H_corrected, rx_V_corrected),axis = 0)
                 gen.plot_constellations(sig1 = rx_corrected,sig2 = tx["sig_real"],\
                                         polar = 'H', labels = ['cpr','tx'],
@@ -490,14 +496,14 @@ def decision(tx, rx, *varargin):
             ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1,rx['Frame']], (1, -1)).squeeze(), 4)
             ZVI     = np.round(np.reshape(rx["sig_eq_real"][2,rx['Frame']], (1, -1)).squeeze(), 4)
             ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3,rx['Frame']], (1, -1)).squeeze(), 4)
-            Prx     = maths.get_power(rx["sig_eq_real"][:,rx['Frame']],flag_real2cplx=1,flag_flatten=1)
+            Prx     = power(rx["sig_eq_real"][:,rx['Frame']],flag_real2cplx=1,flag_flatten=1)
         else:
             ZHI     = np.round(np.reshape(rx["sig_eq_real"][0], (1, -1)).squeeze(), 4)
             ZHQ     = np.round(np.reshape(rx["sig_eq_real"][1], (1, -1)).squeeze(), 4)
             ZVI     = np.round(np.reshape(rx["sig_eq_real"][2], (1, -1)).squeeze(), 4)
             ZVQ     = np.round(np.reshape(rx["sig_eq_real"][3], (1, -1)).squeeze(), 4)
 
-            Prx     = maths.get_power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
+            Prx     = power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
     
     else:
         if len(varargin) != 0 and "pilots removal" in varargin:
@@ -524,30 +530,28 @@ def decision(tx, rx, *varargin):
     # ---------------------------------------------------------------- to check
     # checking normalisation
     ZHnorm  = np.array([ZHInorm+1j*ZHQnorm,ZVInorm+1j*ZVQnorm])
-    assert abs(sum(maths.get_power(ZHnorm))-2) <= 1e-1,\
-        f'power should be close to 1 per polar, got {maths.get_power(ZHnorm)}'
+    assert abs(sum(power(ZHnorm))-2) <= 1e-1,\
+        f'power should be close to 1 per polar, got {power(ZHnorm)}'
     del ZHnorm
     # ---------------------------------------------------------------- to check
 
-    M       = int(tx['mod'][0:-3])                  # 'M' for M-QAM
-    ZHI_ext = np.tile(ZHInorm, [int(np.sqrt(M)), 1])
-    ZHQ_ext = np.tile(ZHQnorm, [int(np.sqrt(M)), 1])
-    ZVI_ext = np.tile(ZVInorm, [int(np.sqrt(M)), 1])
-    ZVQ_ext = np.tile(ZVQnorm, [int(np.sqrt(M)), 1])
+    M           = int(tx['mod'][0:-3])                  # 'M' for M-QAM
+    ZHI_ext     = np.tile(ZHInorm, [int(np.sqrt(M)), 1])
+    ZHQ_ext     = np.tile(ZHQnorm, [int(np.sqrt(M)), 1])
+    ZVI_ext     = np.tile(ZVInorm, [int(np.sqrt(M)), 1])
+    ZVQ_ext     = np.tile(ZVQnorm, [int(np.sqrt(M)), 1])
         
     X_alphabet  = tx['const_affixes']
-    Px_alphabet = maths.get_power(X_alphabet)
+    Px_alphabet = power(X_alphabet)
     Xref        = X_alphabet/np.sqrt(Px_alphabet)
-    Ptx         = maths.get_power(np.reshape(tx["Symb_real"],(4,-1)),\
-                                  flag_real2cplx=1)
+    Ptx         = power(np.reshape(tx["Symb_real"],(4,-1)), flag_real2cplx=1)
     
     if tx['nu'] != 0:
-        Xref = Xref/np.sqrt(np.mean(Ptx))
-
+        Xref    = Xref/np.sqrt(np.mean(Ptx))
 
     # ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and "const norm" in varargin:
-        if rx['Frame']> rx['FrameChannel']:
+    if len(varargin) != 0 and "const norm" in varargin\
+        and rx['Frame']> rx['FrameChannel']:
             ZXnorm      = np.array([ZHInorm+1j*ZHQnorm,ZVInorm+1j*ZVQnorm]).squeeze()
             Xref_check  = Xref.reshape((1,-1))
         
@@ -594,9 +598,8 @@ def decision(tx, rx, *varargin):
     rx['Symb_real_dec'][1, rx['Frame']] = ZHQ_dec
     rx['Symb_real_dec'][2, rx['Frame']] = ZVI_dec
     rx['Symb_real_dec'][3, rx['Frame']] = ZVQ_dec
-    
 
-# ---------------------------------------------------------------- to check
+    # ---------------------------------------------------------------- to check
     if len(varargin) != 0 and "time decision" in varargin:
         if rx["Frame"] >= rx["FrameChannel"]:
             t = [ZHInorm,ZHQnorm,ZVInorm,ZVQnorm]
@@ -611,7 +614,7 @@ def decision(tx, rx, *varargin):
             TX = np.reshape(tx["sig_real"],(4,-1))
             gen.plot_constellations(TX,ZXnorm, labels =['tx',"eq"],\
                                 title = f"rxdsp.decision - frame {rx['Frame']}")
-# ---------------------------------------------------------------- to check
+    # ---------------------------------------------------------------- to check
 
     return rx
 
@@ -710,7 +713,14 @@ def mimo(tx,rx,saving,*varargin):
                 rx              = kit.train_vae(BatchNo,rx,tx)
                 rx,loss         = kit.compute_vae_loss(tx,rx)
                 maths.update_fir(loss,rx['optimiser'])
-    
+
+                
+                if rx['save_channel_batch']:
+                    # rx['h_est_batch'].append(rx['h_est'].detach().numpy())
+                    rx['h_est_batch'].append(rx['h_est'].tolist())
+                    # print(len(rx['h_est_batch']))
+                    
+
     
     # ---------------------------------------------------------------- to check
         if len(varargin) != 0 and "loss" in varargin:
@@ -749,7 +759,9 @@ def mimo(tx,rx,saving,*varargin):
             gen.plot_fir(rx, title =f"fir after mimo {rx['Frame']}")
     # ---------------------------------------------------------------- to check
     
-    rx["H_est_l"].append(rx["h_est"].tolist())
+    # louis, do not change, for now, .tolist() into .detach().numpy()
+    #  as it fails when processing with matlab
+    rx["h_est_frame"].append(rx["h_est"].tolist())
     
     return rx,loss
     

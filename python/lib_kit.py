@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.1.4
-#   Date            : 2024-07-05
+#   Version         : 1.1.5
+#   Date            : 2024-07-10
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -22,6 +22,8 @@
 #   1.1.3 (2024-06-21) - train_self -> train_vae
 #   1.1.4 (2024-07-05) - cma, twoXtwoFIR: changing sig_eq_real -> sig_mimo_real
 #                        along with rxdsp (1.6.2), processing (1.3.2)
+#   1.1.5 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
+#                        along with main (1.4.3)
 #
 # ----- MAIN IDEA -----
 #   Library for CMA equalizer in (optical) telecommunications
