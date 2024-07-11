@@ -4,8 +4,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-10
-%   Version         : 2.0.2
+%   Date            : 2024-07-11
+%   Version         : 2.0.3
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -22,6 +22,7 @@
 %                       [REMOVED] check_if_fibre_prop
 %   2024-07-09 (2.0.1)  phase estimation
 %   2024-07-10 (2.0.2)  flexibility and naming standardisation
+%   2024-07-11 (2.0.3)  cleaning caps structure 
 % 
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -52,18 +53,18 @@ Nfiles              = length(Dat);
 ErrMean             = zeros(Nfiles,1);
 ErrStd              = zeros(Nfiles,1);
 ErrRms              = zeros(Nfiles,1);
-what_carac          = 'dnu';  % {dnu, Slope, End,std}
+what_carac          = 'End';  % {dnu, Slope, End,std}
 Carac               = get_value_from_filename_in(caps.PathSave,what_carac,caps.Fn);
 cd(caps.myInitPath)
 
 
-caps.flags.fir          = 1;
-caps.flags.poincare     = 0;
-caps.flags.SOP          = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
-caps.flags.plot.phi     = 0;
-caps.method.thetas      = 'eig';
+caps.plot.fir           = 1;
+caps.plot.poincare      = 0;
+caps.plot.phi           = 1;
+caps.plot.SOP_xlabel    = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
+caps.plot.phi_xlabel    = 'comparison per batch';
+caps.method.thetas      = 'mat';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
-caps.method.norm.phi     = 0;
 
 
 for tap = 7:7
@@ -76,7 +77,7 @@ for tap = 7:7
         [thetas,phis, H_est]    = channel_estimation(Dat,caps);
         [thetas, phis]          = extract_ground_truth(Dat,caps,thetas,phis);
         
-        if caps.flags.plot.phi
+        if caps.plot.phi
             metrics             = get_metrics(caps,thetas,phis);
             plot_results(caps,H_est, thetas,metrics,phis);
         else
@@ -93,7 +94,7 @@ Mthetas             = [Carac,metrics.thetas.ErrMean,metrics.thetas.ErrStd,metric
 Mthetas(end+1,:)    = [0,median(metrics.thetas.ErrMean),median(metrics.thetas.ErrStd),median(metrics.thetas.ErrRms)];
 writematrix(Mthetas,strcat('<Err Theta>-',caps.filename,'.csv'))
 
-if caps.flags.plot.phi
+if caps.plot.phi
     Mphis             = [Carac,metrics.phis.ErrMean,metrics.phis.ErrStd,metrics.phis.ErrRms];
     Mphis(end+1,:)    = [0,median(metrics.phis.ErrMean),median(metrics.phis.ErrStd),median(metrics.phis.ErrRms)];
     writematrix(Mphis,strcat('<Err Phi>-',caps.filename,'.csv'))
@@ -209,9 +210,6 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     caps.Fn         = allFilenames;
     caps.PathSave   = allPathnames;
 end
-
-
-
 %-----------------------------------------------------
 
 function out = get_value_from_filename_in(folderPath,quantity,varargin)
