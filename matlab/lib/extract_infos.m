@@ -3,18 +3,18 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Arxivs          :
-%   Date            : 2024-07-10
-%   Version         : 1.0.2
+%   Date            : 2024-07-11
+%   Version         : 1.0.3
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
 %
 % ----- CHANGE LOG -----
-%   2024-07-06 (1.0.0) creation
-%   2024-07-09 (1.0.1) caps: closing figures + number of Frames
-%   2024-07-10 (1.0.2) caps: sorting the struct
+%   2024-07-06  (1.0.0) creation
+%   2024-07-09  (1.0.1) caps: closing figures + number of Frames
+%   2024-07-10  (1.0.2) caps: sorting the struct
+%   2024-07-11  (1.0.3) phase noise management
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -42,18 +42,16 @@
 
 function caps = extract_infos(caps,Dat,kdata)
 
-
 data                = Dat{kdata};
 data                = sort_struct_alphabet(data);
 filename            = char(caps.Fn{kdata});
 caps.filename       = ['matlab',filename(1:end-4)];
 
-
-
-caps.NFrames        = double(data.NFrames);
 caps.FrameChannel   = double(data.FrameChannel);
 caps.NFramesTraining= double(data.NFramesTraining);
-caps.Frames         = linspace(1,caps.NFramesTraining,caps.NFramesTraining);
+caps.NFrames        = double(data.NFrames);
+caps.NFramesChannel = caps.NFrames-caps.NFramesTraining;
+caps.Frames         = linspace(1,caps.NFramesChannel,caps.NFramesChannel);
 caps.NBatchFrame    = double(data.NBatchFrame);
 caps.NBatchesChannel= double(data.NBatchesChannel);
 caps.FIRlength      = double(data.NspTaps);
@@ -62,9 +60,15 @@ caps.kdata          = kdata;
 caps.NFramesChannel = caps.NFrames-caps.FrameChannel;
 
 if length(caps.Fn) > 1
-    caps.flags.close = 1;
+    caps.plot.close = 1;
 else
-    caps.flags.close = 0;
+    caps.plot.close = 0;
+end
+
+if isfield(data,"h_est_batch")
+    caps.est_phi            = 1;
+    caps.NBatchesTraining   = caps.NFramesTraining*caps.NBatchFrame;
+    caps.Batches            = linspace(1,caps.NBatchesChannel,caps.NBatchesChannel);
 end
 
 caps = sort_struct_alphabet(caps);

@@ -55,18 +55,18 @@
 function metrics = get_metrics(caps,thetas,varargin)
 
 
-Err.thetas                              = (thetas.est-thetas.gnd)'; % [deg]
+Err.thetas                              = thetas.est-thetas.gnd; % [deg]
 metrics.thetas.ErrMean(caps.kdata,1)    = mean(Err.thetas);
 metrics.thetas.ErrStd(caps.kdata,1)     = std(Err.thetas);
 metrics.thetas.ErrRms(caps.kdata,1)     = metrics.thetas.ErrStd(caps.kdata)/metrics.thetas.ErrMean(caps.kdata);
-metrics.Err.thetas                      = [zeros(1,caps.NFramesTraining),Err.thetas];
+metrics.thetas.Err                      = [zeros(caps.NFramesTraining,1);Err.thetas];
 
 
 params.method       = "mirror";
 params.period       = 5;
 
-metrics.thetas.Err_mov_avg = moving_stat_in(metrics.Err.thetas,params,"average");
-metrics.thetas.Err_mov_std = moving_stat_in(metrics.Err.thetas,params,"std");
+metrics.thetas.Err_mov_avg = (moving_stat_in(metrics.thetas.Err,params,"average")).';
+metrics.thetas.Err_mov_std = (moving_stat_in(metrics.thetas.Err,params,"std")).';
 
 
 if ~isempty(varargin)
@@ -75,10 +75,10 @@ if ~isempty(varargin)
     metrics.phis.ErrMean(caps.kdata,1)      = mean(Err.phis);
     metrics.phis.ErrStd(caps.kdata,1)       = std(Err.phis);
     metrics.phis.ErrRms(caps.kdata,1)       = metrics.phis.ErrStd(caps.kdata)/metrics.phis.ErrMean(caps.kdata);
+    metrics.phis.Err                        = [zeros(caps.NBatchesTraining,1);Err.phis];
 
-
-    metrics.phis.Err_mov_avg = moving_average_in(metrics.thetas.Err,params,"average");
-    metrics.phis.Err_mov_std = moving_std_in(metrics.phis.Err,params,"std");
+    metrics.phis.Err_mov_avg = (moving_stat_in(metrics.thetas.Err,params,"average")).';
+    metrics.phis.Err_mov_std = (moving_stat_in(metrics.phis.Err,params,"std")).';
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -4,19 +4,19 @@
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
 %   Arxivs          :
-%   Date            : 2024-07-10
-%   Version         : 1.0.1
+%   Date            : 2024-07-11
+%   Version         : 1.0.2
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
 %
 % ----- CHANGE LOG -----
-%   2023-07-06 (1.0.0)
-%   2024-07-10 (1.0.1)  extract_ground_truth: now already exported from python
-%                       phis_gnd reshaped
-%                       FIRgnd unused so removed
+%   2023-07-06  (1.0.0)
+%   2024-07-10  (1.0.1) extract_ground_truth: now already exported from python
+%                       phis_gnd reshaped, FIRgnd unused so removed
 %                       flexibility and naming normalisation
+%   2024-07-11  (1.0.2) phase noise management
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -48,7 +48,7 @@ function [thetas, phis] = extract_ground_truth(Dat,caps,thetas,phis)
     
     thetas.gnd  = Dat{1}.thetas(caps.FrameChannel+1:end,2)*180/pi;              % [deg]
 
-    if caps.flags.plot.phi
+    if caps.plot.phi
         phis.gnd    = Dat{caps.kdata}.Phis_gnd(caps.FrameChannel+1:end,:)*180/pi;   % [deg]
         tmp_phi     = zeros(numel(phis.gnd),1);
         for k = 1:caps.NFramesChannel
@@ -60,8 +60,7 @@ function [thetas, phis] = extract_ground_truth(Dat,caps,thetas,phis)
         phis = NaN;
     end
 
-
-    if caps.flags.poincare
+    if caps.plot.poincare
         params = {"marker"  ,'square'   ,...
               "size"    , 100        ,...
               "fill"    , ''};

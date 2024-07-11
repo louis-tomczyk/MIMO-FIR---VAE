@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-10
-%   Version         : 1.1.1
+%   Date            : 2024-07-11
+%   Version         : 1.1.2
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -15,7 +15,8 @@
 %   2024-07-09 (1.1.0)  [NEW] plot_SOP, plot_FIR, plot_phi
 %                       plot_results: encapsulation + plot phase estimation
 %   2024-07-10 (1.1.1)  flexibility and naming standardisation
-%
+%   2024-07-11 (1.1.2)  plot for phase estimation per batch (1.1.0 == per frame)
+% 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
 % ----- OUTPUTS -----
@@ -50,13 +51,13 @@ end
 
 H_ests_norm = prepare_plots(H_est);
 
-if caps.flags.fir
+if caps.plot.fir
 
     plot_fir(caps,H_ests_norm);
     f = plot_SOP(caps,thetas,metrics);
 
     if ~isempty(varargin)
-        f = plot_phi(caps,phis);
+        f = plot_phi(caps,phis,metrics);
     end
 
     cd ../figs/fir
@@ -64,17 +65,17 @@ if caps.flags.fir
     cd(caps.myInitPath)
     pause(0.25)
 
-    if caps.flags.close
+    if caps.plot.close
         close all
     end
     
 end
 
 cd ../err
-writematrix(metrics.Err.thetas,strcat('Err Theta-',caps.filename,'.csv'))
+writematrix(metrics.thetas.Err,strcat('Err Theta-',caps.filename,'.csv'))
 
 if ~isempty(varargin)
-    writematrix(metrics.Err.phis,strcat('Err Phi-',caps.filename,'.csv'))
+    writematrix(metrics.phis.Err,strcat('Err Phi-',caps.filename,'.csv'))
 end
 
 cd(caps.myInitPath)
@@ -92,6 +93,12 @@ cd(caps.myInitPath)
 
 
 function H_ests_norm = prepare_plots(H_est)
+
+if isfield(H_est,'frame')
+    H_est   = H_est.frame;
+else
+    H_est   = H_est.batch;
+end
 
 H_est_11    = squeeze(H_est(1,1,:));
 H_est_12    = squeeze(H_est(1,2,:));
@@ -129,24 +136,24 @@ f = figure(1);
 function f = plot_SOP(caps,thetas,metrics)
 
 f = figure(1);
-if caps.flags.plot.phi
+if caps.plot.phi
     subplot(2,2,3)
 else
     subplot(2,2,[3,4])
 end
 
 hold on
-if strcmpi(caps.flags.SOP,'error per frame')
+if strcmpi(caps.plot.SOP_xlabel,'error per frame')
     scatter(caps.Frames,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("frame")
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
-elseif strcmpi(caps.flags.SOP,'error per theta')
+elseif strcmpi(caps.plot.SOP_xlabel,'error per theta')
     scatter(thetas.gnd,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("$\theta$ [deg]")
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
-elseif strcmpi(caps.flags.SOP,'comparison per frame')
+elseif strcmpi(caps.plot.SOP_xlabel,'comparison per frame')
     plot(caps.Frames,thetas.gnd,'color',[1,1,1]*0.83, LineWidth=5)
     scatter(caps.Frames,thetas.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     legend("ground truth","estimation",Location="northwest")
@@ -162,18 +169,34 @@ title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
 
 
 
-function f = plot_phi(caps,phis)
+function f = plot_phi(caps,phis,metrics)
 
 f = figure(1);
-if caps.flags.plot.phi
+if caps.plot.phi
     subplot(2,2,4)
 
     hold on
-    plot(caps.Frames,phis.gnd,'--',color = ones(1,3)*0.83,LineWidth=2)
-    scatter(caps.Frames,phis.est(caps.FrameChannel+1:end),100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
-    xlabel("frame")
-    ylabel("$\hat{\phi}$ [deg]")
+    if strcmpi(caps.plot.phi,'error per batch')
+        scatter(caps.Batches,phis.est-phis.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+        xlabel("batch")
+        ylabel("$\hat{\phi}-\phi$ [deg]")
     
+    elseif strcmpi(caps.plot.phi,'error per phi')
+        scatter(phis.gnd,phis.est-phis.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+        xlabel("$\phi$ [deg]")
+        ylabel("$\hat{\phi}-\phi$ [deg]")
+    
+    elseif strcmpi(caps.plot.phi,'comparison per batch')
+        plot(caps.Batches,phis.gnd,'color',[1,1,1]*0.83, LineWidth=5)
+        scatter(caps.Batches,phis.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+        legend("ground truth","estimation",Location="northwest")
+        xlabel("batch")
+        ylabel("$\hat{\phi},\phi$ [deg]")
+    end
 
+title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
+      caps.method.phis, caps.tap, ...
+      metrics.phis.ErrMean(caps.kdata),metrics.phis.ErrStd(caps.kdata)))
 end
+
 % ---------------------------------------------
