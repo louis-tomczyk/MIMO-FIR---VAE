@@ -35,6 +35,8 @@
 #   1.2.4 (2024-07-05)  - transmitter: not normalising output if vae
 #   1.2.5 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
 #                        along with main (1.4.3)
+# ---------------------
+#   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -80,7 +82,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 import lib_misc as misc
-import lib_general as gen
+import lib_plot as plot
 import lib_txhw as txhw
 import lib_matlab as mb
 import lib_maths as maths
@@ -131,7 +133,7 @@ def transmitter(tx,rx,*varargin):
 
     
     if len(varargin)!= 0 and "plot" in varargin:
-        gen.plot_constellations(sig1 = tx['sig_real'],title ='tx')
+        plot.constellations(sig1 = tx['sig_real'],title ='tx')
         
 
     if tx['norm_power'] == 1:
@@ -753,7 +755,7 @@ def pilot_generation(tx,rx,what_pilots_k,*varargin):
 
         plt.suptitle("pilot_generation, frame = {}".format(rx['Frame']))
         plt.show()
-        # gen.plot_constellations(tx['{}_cplx_up'.format(pilots_function)],polar='both',sps=2)
+        # plot.constellations(tx['{}_cplx_up'.format(pilots_function)],polar='both',sps=2)
             
     return tx
 
@@ -821,7 +823,7 @@ def pilot_insertion(tx,rx,what_pilots_k,*varargin):
                 
         tx['Symb_{}_cplx'.format(pilots_function)] =\
             tx['pilots_{}_cplx_up'.format(pilots_function)][:,:,::tx['Nsps']]
-        # gen.plot_constellations(tx['Symb_{}_cplx'.format(pilots_function)])
+        # plot.constellations(tx['Symb_{}_cplx'.format(pilots_function)])
 
         if ('once' in pilots_function) or ('same' in pilots_changes):
             tx['{}_flag_all_same'.format(pilots_function)] = 1
@@ -1105,7 +1107,7 @@ def shaping_filter(tx):
     tx['hmatrix'][0]    = h
     tx['hmatrix'][3]    = h
 
-    # gen.plot_fir(tx,tx['hmatrix'])
+    # plot.fir(tx,tx['hmatrix'])
 
     tx      = misc.sort_dict_by_keys(tx)
 

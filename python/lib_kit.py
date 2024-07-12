@@ -73,7 +73,7 @@ import matplotlib.pyplot as plt
 
 import lib_misc as misc
 import lib_rxdsp as rxdsp
-import lib_general as gen
+import lib_plot as plot
 
 
 pi = np.pi

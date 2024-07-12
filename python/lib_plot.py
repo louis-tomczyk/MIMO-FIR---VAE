@@ -35,9 +35,9 @@
 # ---------------------
 # 
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
-#                      --------------------------------------------------------
-#                      ---------------     LIBRARY OBSOLETE     ---------------
-#                      --------------------------------------------------------
+#                      - [REMOVED] real2complex_fir, moved to lib_maths.
+#                      - [REMOVED] fir_3Dto2D, fir_2Dto2D, moved to lib_maths
+#                      - def plot_<my_function> -> def <my_function>
 # 
 # ----- MAIN IDEA -----
 #   Library for plotting functions in (optical) telecommunications
@@ -120,51 +120,12 @@ plt.rcParams["axes.titleweight"]= "bold"
 # --- FUNCTIONS
 # =============================================================================
 
-#%% 
-def fir_2Dto3D(rx):
-    
-    if type(rx) == dict:
-        fir = rx['h_est']
-    else:
-        fir = rx
-    
-    # if len(fir.shape)
-    NsampTaps       = len(fir.transpose())
-    tmp         = np.zeros((2,2,NsampTaps),dtype = complex)
-    
-    tmp[0,0,:]    = fir[0,:] # HH
-    tmp[0,1,:]    = fir[1,:] # VH
-    tmp[1,0,:]    = fir[2,:] # VH
-    tmp[1,1,:]    = fir[3,:] # VV
-    
-    return tmp
 
-#%% 
-def fir_3Dto2D(rx):
-    
-    if type(rx) == dict:
-        fir = rx['h_est']
-    else:
-        fir = rx
-        
-    if type(fir) == torch.Tensor:
-        fir         = fir.detach().numpy()
-    
-    fir_shape   = fir.shape
-    NsampTaps       = fir_shape[-1]
-    tmp         = np.zeros(4,NsampTaps)
-    
-    tmp[0,:]    = fir[0,0,:]
-    tmp[1,:]    = fir[0,1,:]
-    tmp[2,:]    = fir[1,0,:]
-    tmp[3,:]    = fir[1,1,:]
-    
-    return tmp
 
 
 
 #%%
-def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', title='', axislim=[-2, 2]):
+def constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', title='', axislim=[-2, 2]):
     def process_signal(sig):
         if type(sig) == torch.Tensor:
             sig = sig.detach().numpy()
@@ -285,7 +246,7 @@ def plot_constellations(sig1, sig2=None, labels=None, norm=0, sps=2, polar='H', 
     plt.show()
 
 #%%
-def plot_decisions(t,r,Nplots,frame, NSymb = 100, title = ''):
+def decisions(t,r,Nplots,frame, NSymb = 100, title = ''):
     
    if type(t) == list:
         tmp1    = t[0][0].reshape((1,-1))
@@ -343,7 +304,7 @@ def plot_decisions(t,r,Nplots,frame, NSymb = 100, title = ''):
 
 
 #%%
-def plot_fir(rx,*varargin):
+def fir(rx,*varargin):
 
     if type(rx) == dict:
         NsampTaps = max(rx['h_est'].shape)
@@ -392,7 +353,7 @@ def plot_fir(rx,*varargin):
 
 #%%
 
-def plot_loss_batch(rx,flags,saving,keyword,what):
+def loss_batch(rx,flags,saving,keyword,what):
     
     # a tensor with GRAD on cannot be plotted, it requires first to put it in a normal array
     # that's the purpose of DETACH
@@ -451,7 +412,7 @@ def plot_loss_batch(rx,flags,saving,keyword,what):
             
 #%%
 
-def plot_loss_cma(rx,saving,keyword,what):
+def loss_cma(rx,saving,keyword,what):
     
     # a tensor with GRAD on cannot be plotted, it requires first to put it in a normal array
     # that's the purpose of DETACH
@@ -523,7 +484,7 @@ def plot_loss_cma(rx,saving,keyword,what):
 
 
 #%%
-def plot_losses(Losses,OSNRdBs,title):
+def losses(Losses,OSNRdBs,title):
     
         # Création de la grille de sous-graphiques avec une résolution DPI élevée
         fig, axes = plt.subplots(1, 2, figsize=(10, 5), dpi=400)
@@ -552,7 +513,7 @@ def plot_losses(Losses,OSNRdBs,title):
 
 
 #%%
-def plot_PSD(signal,fs,*order):
+def PSD(signal,fs,*order):
     
     signal = signal/np.sqrt(np.mean(np.abs(signal)**2))
     N       = signal.size
@@ -587,7 +548,7 @@ def plot_PSD(signal,fs,*order):
     
 #%%
 
-def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title = '',ref=0,zoom=0):
+def xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title = '',ref=0,zoom=0):
 
     assert sig_11.shape == sig_12.shape == sig_21.shape == sig_22.shape
     
@@ -639,7 +600,7 @@ def plot_xcorr_2x2(sig_11,sig_12,sig_21, sig_22,title = '',ref=0,zoom=0):
 
 #%%
 
-def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
+def y1_axes(saving,xaxis,yaxis,extensions,*varargin):
     
 
     directory_path = saving["root_path"]
@@ -713,7 +674,7 @@ def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
 #%%
 
 
-def plot_2y_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
+def y2_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
 
     directory_path = saving["root_path"]
 
@@ -798,7 +759,7 @@ def plot_2y_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
         
 #%%
 
-def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
+def y3_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
     
     directory_path = saving["root_path"]
 

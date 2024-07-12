@@ -106,7 +106,7 @@ import lib_prop as prop
 import lib_txdsp as txdsp
 import lib_txhw as txhw
 import lib_rxdsp as rxdsp
-import lib_general as gen
+import lib_plot as plot
 import lib_matlab as mat
 from lib_matlab import clc
 import timeit

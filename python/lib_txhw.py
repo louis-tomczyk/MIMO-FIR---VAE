@@ -60,7 +60,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import lib_misc as misc
 from lib_misc import KEYS as keys
-import lib_general as gen
+import lib_plot as plot
 import torch
 
 from lib_matlab import clc
@@ -223,7 +223,7 @@ def load_ase(tx,rx):
     tx['sig_real'][2]   = torch.tensor(np.real(tx_sig_cplx[1]))
     tx['sig_real'][3]   = torch.tensor(np.imag(tx_sig_cplx[1]))
     
-    # gen.plot_constellation(tx["sig_cplx"][0],title = "TX ase loading)
+    # plot.constellation(tx["sig_cplx"][0],title = "TX ase loading)
 
     return tx
 
@@ -258,7 +258,7 @@ def load_phase_noise(tx,rx,*varargin):
             plt.show()
             
     if len(varargin) != 0 and 'pn const' in varargin:
-        gen.plot_constellations(tx["sig_cplx"],title = 'phase noise laoding')
+        plot.constellations(tx["sig_cplx"],title = 'phase noise laoding')
 
     tx              = misc.sort_dict_by_keys(tx)
 

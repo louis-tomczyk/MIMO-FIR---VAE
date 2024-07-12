@@ -22,6 +22,8 @@
 #   1.0.4 (2024-06-27) - propagation: varargin to check synchro of pilots
 #   1.0.5 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
 #                        along with main (1.4.3)
+# ---------------------
+#   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
 #
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
@@ -57,7 +59,7 @@ import lib_misc as misc
 from lib_misc import KEYS as keys
 import lib_rxhw as rxhw
 import lib_prop as prop
-import lib_general as gen
+import lib_plot as plot
 
 pi = np.pi
 
@@ -124,7 +126,7 @@ def propagation(tx,fibre,rx,*varargin):
     
 
     # if rx['Frame'] >= rx['FrameChannel']:
-    #     gen.plot_const_2pol(rx['sig_real'], "prop  f-{}".format(rx['Frame']-rx['FrameChannel']),tx)
+    #     plot.constellations(rx['sig_real'], "prop  f-{}".format(rx['Frame']-rx['FrameChannel']),tx)
         
     rx      = misc.sort_dict_by_keys(rx)
     

@@ -42,6 +42,8 @@
 #                       organise_files: managing xml files
 #                       save2mat: exporting phase noise esitmation with cpr
 #                       find_string -> find_substring
+# ---------------------
+#   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
 # 
 # ----- MAIN IDEA -----
 #   Miscellaneous functions for logistics and plots
@@ -89,7 +91,7 @@ from dateutil.parser import parse
 from tkinter import filedialog
 import re
 
-import lib_general as gen
+import lib_plot as plot
 import lib_matlab as mb
 pi = np.pi
 
@@ -260,33 +262,33 @@ def convert_byte(num, suffix="B"):
 def create_xml_file(tx,fibre,rx,saving,*varargin):
     
     sections    = ["TX","CHANNEL","RX"]
-    
+
+
+# =============================================================================
+# default values in the filenames
+# =============================================================================
     if tx['nu'] != 0:
         TX      = ["mod","nu","Nsps", "Rs","NsampTaps",'SNRdB','law']
     else:
         TX      = ["mod", "Nsps", "Rs","NsampTaps",'SNRdB','law']
-
-
-    if rx['mode'].lower() == 'pilots':
-        TX.append("Nplts")
-
 
     CHANNEL     = ["tauPMD", "tauCD", "law"]
     RX          = ["mimo",'lr',"NFrames", "NSymbBatch", "FrameChannel", "NSymbFrame","SNR_dB"]
     fields_list = [TX, CHANNEL, RX]
     
     if tx['nu'] != 0:
-        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu','SNRdB',"CD","PMD",'law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu','SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
     else:
-        saving_list = ["mimo",'lr','Rs','mod','dnu','SNRdB',"CD","PMD",'law',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        saving_list = ["mimo",'lr','Rs','mod','dnu','SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
         
-        
-    if rx['mode'].lower() == 'pilots':
-        saving_list.insert(5, "Nplts")
 
     CHANNELpar  = [np.round(fibre["tauPMD"]*1e12,0),           # [ps]
                    np.round(np.sqrt(fibre["tauCD"])*1e12,0),   # [ps]
                    fibre["ThetasLaw"]["law"]]
+    
+# =============================================================================
+# additional values in the filenames
+# =============================================================================
     
     if fibre["ThetasLaw"]["kind"] == "Rwalk":
         
@@ -301,11 +303,11 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
             CHANNELpar.append(fibre["ThetasLaw"]['high']*180/pi)
         
         if fibre["ThetasLaw"]["law"] == "gauss":
-            saving_list.insert(6,'theta_in')
-            saving_list.insert(7,'theta_std')
+            saving_list.insert(6,'Th_in')
+            saving_list.insert(7,'Th_std')
             
-            CHANNEL.append('theta_in')
-            CHANNEL.append('theta_std')
+            CHANNEL.append('Th_in')
+            CHANNEL.append('Th_std')
             
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_in']*180/np.pi,0))
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_std']*180/np.pi,0))
@@ -326,10 +328,10 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
             
     elif fibre["ThetasLaw"]["kind"] == "func":
         if fibre["ThetasLaw"]["law"] == "lin":
-            saving_list.insert(11,'End')
+            saving_list.insert(11,'ThEnd')
             saving_list.insert(12,'Sth')
 
-            CHANNEL.append('End')
+            CHANNEL.append('ThEnd')
             CHANNEL.append('Sth')
             
             Sth = (fibre["ThetasLaw"]['End']-fibre["ThetasLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
@@ -347,14 +349,16 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
                        else tx['PhiLaw']["law"]
                    ]
     
+    if tx["nu"] != 0:
+        TXpar.insert(1, round(tx['nu'],3))
 
     if tx['flag_phase_noise'] == 1:
         if tx["PhiLaw"]["kind"] == "func":
             if tx["PhiLaw"]["law"] == "lin":
-                saving_list.insert(6,'End')
+                saving_list.insert(6,'PhEnd')
                 saving_list.insert(7,'Sph')
     
-                TX.append('End')
+                TX.append('PhEnd')
                 TX.append('Sph')
                 
                 Sph = (tx["PhiLaw"]['End']-tx["PhiLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
@@ -362,19 +366,14 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
                 TXpar.append(np.round(Sph*180/pi,2))
     
     
-    if tx["flag_phase_noise"] == 1:
-        TXpar.insert(len(TXpar), tx['pilots_info'][0][-1])
-        
-    if tx["nu"] != 0:
-        TXpar.insert(1, round(tx['nu'],3))
-        
     if rx['mode'].lower() == 'pilots':
-        TXpar.insert(len(TX), tx['pilots_info'][0][-1])
-    
+        saving_list.insert(len(TX), "Nplts")
+        TX.append("Nplts")
+        TXpar.insert(len(TXpar), tx['pilots_info'][0][-1])
 
     
     RXpar       = [rx['mimo'],
-                   rx['lr']*1000,
+                   round(rx['lr']*1000,4),
                    rx["NFrames"],
                    rx["NSymbBatch"],
                    rx["FrameChannel"],
@@ -567,8 +566,8 @@ def import_data(Nsps = 2, scale = 1):
     data["tx_real"] = my_tensor(np.array([[XHI,XHQ],[XVI,XVQ]]))
     data["rx_real"] = my_tensor(np.array([[YHI,YHQ],[YVI,YVQ]]))
             
-    gen.plot_const_2pol(data['tx_real'],"tx")
-    gen.plot_const_2pol(data['rx_real'],"rx")
+    plot.constellations(data['tx_real'],"tx")
+    plot.constellations(data['rx_real'],"rx")
 
     return data
         
@@ -833,261 +832,6 @@ def organise_files(directory):
             else:
                 print(f'Unrecognized file type: {filename}')
 
-#%%
-
-def plot_1y_axes(saving,xaxis,yaxis,extensions,*varargin):
-    
-
-    directory_path = saving["root_path"]
-
-    if not os.path.exists(directory_path):
-        raise FileNotFoundError(\
-                            f"The folder '{directory_path}' does not exists.")
-
-    csv_files = [file for file in os.listdir(directory_path)\
-                 if file.endswith(".csv")]
-
-    for csv_file in csv_files:
-        csv_path = os.path.join(directory_path, csv_file)
-
-        values, keywords = extract_values_from_filename(csv_file)
-
-        df = pd.read_csv(csv_path)
-        x  = df[xaxis]
-        y  = df[yaxis]
-        
-        if len(varargin) == 1:
-            x       = x[varargin[0]:]
-            y       = y[varargin[0]:]
-
-        fig, ax1 = plt.subplots(figsize=(10, 6.1423))
-
-        ax1.plot(x, y, color='tab:blue',linestyle='dashed',linewidth = 2)
-        ax1.set_xlabel(xaxis)
-        ax1.set_ylabel(yaxis, color='tab:blue')
-        ax1.tick_params(axis='y', labelcolor='tab:blue')
-        
-        mytext  = ''.join([f"{key}:{values[key]} - "\
-                           for key in keywords if key in values])
-        
-        text_lim = 45
-        
-        if len(mytext)>text_lim:
-
-            mytext2 = mytext[text_lim:]
-            mytext  = mytext[:text_lim]
- 
-            if len(mytext2)>text_lim:
-    
-                mytext3 = mytext2[text_lim+11:]
-                mytext2 = mytext2[:text_lim+11]
-            
-            pos_mytext  = 0.25#len(mytext)/50
-            pos_mytext2 = 0.25#len(mytext2)/50            
-            pos_mytext3 = 0.25#len(mytext3)/50
-            
-        plt.text(0.5-pos_mytext,    1,      mytext,  fontsize=14,\
-                 transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext2,   0.95,   mytext2, fontsize=14,\
-                 transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext3,   0.9,    mytext3, fontsize=14,\
-                 transform=plt.gcf().transFigure)
-            
-        # tmp     = len(mytext)/200
-        # plt.text(0.5-tmp, 0.95, mytext, fontsize=14, \
-        #   transform=plt.gcf().transFigure)
-        
-        if type(extensions) == list:
-            for extension in extensions:
-                output_file = os.path.splitext(csv_file)[0] + '.'+ extension
-                plt.savefig(output_file, bbox_inches='tight')
-        else:
-            output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
-            plt.savefig(output_file, bbox_inches='tight')
-            
-
-#%%
-
-
-def plot_2y_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
-
-    directory_path = saving["root_path"]
-
-    if not os.path.exists(directory_path):
-        raise FileNotFoundError(\
-                            f"The folder '{directory_path}' does not exists.")
-
-    csv_files = [file for file in os.listdir(directory_path)\
-                 if file.endswith(".csv")]
-
-    for csv_file in csv_files:
-        csv_path = os.path.join(directory_path, csv_file)
-
-        values, keywords = extract_values_from_filename(csv_file)
-
-        df = pd.read_csv(csv_path)
-        x  = df[xaxis]
-        y1 = df[yaxis_left]
-        y2 = df[yaxis_right]
-        
-        if len(varargin) == 1:
-            x  = x[varargin[0]:]
-            y1        = y1[varargin[0]:]
-            y2         = y2[varargin[0]:]
-
-        fig, ax1 = plt.subplots(figsize=(10, 6.1423))
-
-        ax1.plot(x, y1, color='tab:blue',linestyle='dashed',linewidth = 2)
-        ax1.set_xlabel(xaxis)
-        ax1.set_ylabel(yaxis_left   , color='tab:blue')
-        # ax1.set_ylim(-1200, 700)
-        ax1.tick_params(axis='y', labelcolor='tab:blue')
-        
-        # create right Y axis
-        ax2 = ax1.twinx()
-
-        ax2.plot(x, y2, color='tab:red')
-        # ax2.set_ylabel(yaxis_right, color='tab:red')
-        ax2.set_ylabel(yaxis_right, color='tab:red')
-        # ax2.set_ylim(0, 40)
-        ax2.tick_params(axis='y', labelcolor='tab:red')
-        
-        mytext  = ''.join([f"{key}:{values[key]} - "\
-                           for key in keywords if key in values])
-        
-        text_lim = 50
-        
-        if len(mytext)>text_lim:
-
-            mytext2 = mytext[text_lim:]
-            mytext  = mytext[:text_lim]
- 
-            if len(mytext2)>text_lim:
-    
-                mytext3 = mytext2[text_lim+11:]
-                mytext2 = mytext2[:text_lim+11]
-            
-            pos_mytext  = 0.375#len(mytext)/50
-            pos_mytext2 = 0.375#len(mytext2)/50            
-            pos_mytext3 = 0.375#len(mytext3)/50
-
-        plt.text(0.5-pos_mytext,    1,      mytext,  fontsize=14,\
-                 transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext2,   0.95,   mytext2, fontsize=14,\
-                 transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext3,   0.9,    mytext3, fontsize=14,\
-                 transform=plt.gcf().transFigure)
-            
-        # tmp     = len(mytext)/200
-        # plt.text(0.5-tmp, 0.95, mytext,\
-        #   fontsize=14, transform=plt.gcf().transFigure)
-        
-        # Sauvegarder la figure en format image
-        if type(extensions) == list:
-            for extension in extensions:
-                output_file = os.path.splitext(csv_file)[0] + '.'+ extension
-                plt.savefig(output_file, bbox_inches='tight')
-        else:
-            output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
-            plt.savefig(output_file, bbox_inches='tight')
-            
-        
-#%%
-
-def plot_3y_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
-    
-    directory_path = saving["root_path"]
-
-    if not os.path.exists(directory_path):
-        raise FileNotFoundError(\
-                            f"The folder '{directory_path}' does not exists.")
-
-    csv_files = [file for file in os.listdir(directory_path)\
-                 if file.endswith(".csv")]
-
-    for csv_file in csv_files:
-        csv_path    = os.path.join(directory_path, csv_file)
-        df          = pd.read_csv(csv_path)
-
-        values,keys = extract_values_from_filename(csv_file)
-
-        x           = df[xaxis]
-        y1          = df[yaxis_left]
-        y2          = df[yaxis_right]
-        y3          = df[yaxis_right_2]
-
-        fig, ax1    = plt.subplots(figsize=(10, 6.1423))
-
-        if yaxis_left.lower() == "ser":
-            ax1.semilogy(x, y1, color='tab:blue')
-        else:
-            ax1.plot(x, y1, color='tab:blue',linestyle='dashed',linewidth = 2)
-
-        ax1.set_xlabel(xaxis)
-        ax1.set_ylabel(yaxis_left, color='tab:blue')
-        locs, labels = plt.xticks()  # Get the current locations and labels.
-        plt.xticks(np.arange(0, len(y3)+1, step=5))  # Set label locations.
-        ax1.tick_params(axis='y', labelcolor='tab:blue')
-        
-        ax2 = ax1.twinx()
-        if yaxis_right.lower() == "ser":
-            ax2.semilogy(x, y2, color='tab:red')
-        else:
-            ax2.plot(x, y2, color='tab:red')
-            
-        ax2.set_ylabel(yaxis_right, color='tab:red')
-        ax2.tick_params(axis='y', labelcolor='tab:red')
-        
-        ax3 = ax1.twinx()
-        ax3.spines['right'].set_position(('outward', 60))  # adjust axis pos
-        ax3.set_ylabel(yaxis_right_2, color='tab:green')
-        
-        if yaxis_right_2.lower() == "ser":
-            ax3.semilogy(x, y3, color='tab:green',linestyle='dotted',linewidth = 3)
-        else:
-            ax3.plot(x, y3, color='tab:green',linestyle='dotted',linewidth = 3)
-            
-        ax3.tick_params(axis='y', labelcolor='tab:green')
-
-        
-        mytext  = ''.join([f"{key}:{values[key]} - "\
-                           for key in keys if key in values])
-        text_lim    = 50
-        
-        if len(mytext)>text_lim:
-
-            mytext2 = mytext[text_lim:]
-            mytext  = mytext[:text_lim]
- 
-            if len(mytext2)>text_lim:
-    
-                mytext3 = mytext2[text_lim+11:]
-                mytext2 = mytext2[:text_lim+11]
-            
-            pos_mytext  = 0.375#len(mytext)/50
-            pos_mytext2 = 0.375#len(mytext2)/50            
-            pos_mytext3 = 0.375#len(mytext3)/50
-            
-        plt.text(0.5-pos_mytext,    1,      mytext,  fontsize=14,\
-                 transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext2,   0.95,   mytext2, fontsize=14,\
-                 transform=plt.gcf().transFigure)
-        plt.text(0.5-pos_mytext3,   0.9,    mytext3, fontsize=14,\
-                 transform=plt.gcf().transFigure)
-        
-
-        # Sauvegarder la figure en format image
-        if type(extensions) == list:
-            for extension in extensions:
-                output_file = os.path.splitext(csv_file)[0] + '.'+ extension
-                plt.savefig(output_file, bbox_inches='tight')
-        else:
-            output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
-            plt.savefig(output_file, bbox_inches='tight')
-            
-        # plt.close('all')
-
-
 
 #%%
         
@@ -1178,7 +922,9 @@ def save2mat(tx,fibre,rx,saving):
                 'SER_valid'         : rx["SER_valid"],
                 'Var_est'           : rx["Pnoise_est"],
                 'PhaseNoise_est_cpr': rx['PhaseNoise_pilots'] if rx['mode'].lower() == "pilots"\
-                                            else np.nan
+                                            else np.nan,
+                'ThLaw'             : fibre["ThetasLaw"]['law'],
+                'PhLaw'             : tx['PhiLaw']["law"],
                 }
     
     

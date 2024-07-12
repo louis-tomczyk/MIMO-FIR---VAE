@@ -28,7 +28,9 @@
 #   1.4.3 (2024-07-10) - naming normalisation (*frame*-> *Frame*)
 #   1.4.4 (2024-07-11) - file naming managed in 'create_xml_file', along with
 #                           misc (1.4.0)
-#
+# ---------------------
+#   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
+# 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
 #
@@ -63,6 +65,7 @@
 import gc
 import numpy            as np
 import lib_misc         as misc
+import lib_plot         as plot
 
 from processing         import processing
 from lib_txdsp          import set_Nsymbols
@@ -176,12 +179,12 @@ rx['NSymbBatch']        = int(160)
 # tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",5,0]]         #ok
 tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]         #ok
 
-tx['PhiLaw']["kind"]  = 'Rwalk'
-tx['PhiLaw']["law"]   = 'linewidth'
-# tx['PhiLaw']["kind"]    = 'func'
-# tx['PhiLaw']["law"]     = 'lin'
-# tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
-# tx["PhiLaw"]['End']     = 5*pi/180                                            # [rad]
+# tx['PhiLaw']["kind"]  = 'Rwalk'
+# tx['PhiLaw']["law"]   = 'linewidth'
+tx['PhiLaw']["kind"]    = 'func'
+tx['PhiLaw']["law"]     = 'lin'
+tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
+tx["PhiLaw"]['End']     = 10*pi/180                                            # [rad]
 
 win_width               = 10
 tx['pn_filt_par']       = {
@@ -213,7 +216,7 @@ rx['SNRdB']             = 25                                                   #
 
 
 if tx['Rs'] == 64e9:
-    rx["FrameChannel"]  = 5
+    rx["FrameChannel"]  = 10
     rx["SymbScale"]     = 100
 else:
     rx["FrameChannel"]  = 40
@@ -228,7 +231,7 @@ else:
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NFramesChannel]]
 
-paramPOL                        = np.array([[0],[10],[1]])
+paramPOL                        = np.array([[0],[5],[0.25]])
 # paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
 # paramPOL                        = np.array([[0],[25]])
 
@@ -305,9 +308,9 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
     misc.save2mat(tx,fibre,rx,saving)
 
     if tx['flag_phase_noise'] == 0:
-        misc.plot_2y_axes(saving,"iteration",'Thetas','SER',['svg'])
+        plot.y2_axes(saving,"iteration",'Thetas','SER',['svg'])
     else:
-        misc.plot_3y_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
+        plot.y3_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
 
 
     # close("all")

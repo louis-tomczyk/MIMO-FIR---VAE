@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.2
-#   Date            : 2024-07-02
+#   Version         : 2.0.0
+#   Date            : 2024-07-12
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -24,6 +24,9 @@
 #   1.3.0 (2024-06-27) - [NEW] my_low_pass_filter
 #   1.3.1 (2024-06-30) - [NEW] mae
 #   1.3.2 (2024-07-02) - [NEW] mse, rmse
+# ---------------------
+#   2.0.0 (2024-07-12) - [NEW] real2complex_fir, imported from lib_plot.
+#                      - [NEW] fir_3Dto2D, fir_2Dto2D, imported from lib_plot
 #
 # ----- MAIN IDEA -----
 #   Advanced mathematical operations
@@ -73,6 +76,46 @@ import lib_matlab as mb
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt
 
+#%% 
+def fir_2Dto3D(rx):
+    
+    if type(rx) == dict:
+        fir = rx['h_est']
+    else:
+        fir = rx
+    
+    # if len(fir.shape)
+    NsampTaps       = len(fir.transpose())
+    tmp         = np.zeros((2,2,NsampTaps),dtype = complex)
+    
+    tmp[0,0,:]    = fir[0,:] # HH
+    tmp[0,1,:]    = fir[1,:] # VH
+    tmp[1,0,:]    = fir[2,:] # VH
+    tmp[1,1,:]    = fir[3,:] # VV
+    
+    return tmp
+
+#%% 
+def fir_3Dto2D(rx):
+    
+    if type(rx) == dict:
+        fir = rx['h_est']
+    else:
+        fir = rx
+        
+    if type(fir) == torch.Tensor:
+        fir         = fir.detach().numpy()
+    
+    fir_shape   = fir.shape
+    NsampTaps       = fir_shape[-1]
+    tmp         = np.zeros(4,NsampTaps)
+    
+    tmp[0,:]    = fir[0,0,:]
+    tmp[1,:]    = fir[0,1,:]
+    tmp[2,:]    = fir[1,0,:]
+    tmp[3,:]    = fir[1,1,:]
+    
+    return tmp
 #%%
 def fft_matrix(matrix):
     
@@ -181,41 +224,54 @@ def normalise_power(x,real_or_complex = 'real'):
 
 
 
-
 #%%
-def plot_PSD(signal,fs,*order):
+def real2complex_fir(rx):
     
-    signal = signal/np.sqrt(np.mean(np.abs(signal)**2))
-    N       = signal.size
-    freq    = np.fft.fftfreq(N,1/fs)
-    sig_fft = np.fft.fft(signal/N)
+    if type(rx) == dict:
+        rx_h_est = rx['h_est']
+        
+    if type(rx_h_est) == torch.Tensor:
+        rx_h_est = rx_h_est.detach().numpy()
+        
+    if type(rx) == dict:
+        
+        h_11_I  = rx_h_est[0,0,0,:]
+        h_12_I  = rx_h_est[0,1,0,:]
+        h_21_I  = rx_h_est[1,0,0,:]
+        h_22_I  = rx_h_est[1,1,0,:]
     
-    freq1   = np.log10(freq[freq>0])
-    indexes = freq>=0
+        h_11_Q  = rx_h_est[0,0,1,:]
+        h_12_Q  = rx_h_est[0,1,1,:]
+        h_21_Q  = rx_h_est[1,0,1,:]
+        h_22_Q  = rx_h_est[1,1,1,:]
+    else:
+        h_11_I  = rx[0,0,0,:]
+        h_12_I  = rx[0,1,0,:]
+        h_21_I  = rx[1,0,0,:]
+        h_22_I  = rx[1,1,0,:]
     
-    sig_fft = sig_fft[indexes]
-    sig_fft = sig_fft[sig_fft != 0]
-    sig_fft = sig_fft[1:]
+        h_11_Q  = rx[0,0,1,:]
+        h_12_Q  = rx[0,1,1,:]
+        h_21_Q  = rx[1,0,1,:]
+        h_22_Q  = rx[1,1,1,:]        
     
-    plt.figure()
-    plt.semilogx(10*np.log10(np.abs(sig_fft)**2))
+    h_11    = h_11_I+1j*h_11_Q
+    h_12    = h_12_I+1j*h_12_Q
+    h_21    = h_21_I+1j*h_21_Q
+    h_22    = h_22_I+1j*h_22_Q
+    
+    NsampTaps               = max(rx['h_est'].shape)
+    rx['h_est_cplx']        = np.zeros((4,NsampTaps)).astype(dtype=complex)
+    
+    rx['h_est_cplx'][0,:]   = h_11
+    rx['h_est_cplx'][1,:]   = h_12
+    rx['h_est_cplx'][2,:]   = h_21
+    rx['h_est_cplx'][3,:]   = h_22
+    
+    rx              = misc.sort_dict_by_keys(rx)
+    
+    return rx
 
-    if len(order) != 0:
-        f1  = 100
-        f2  = 10*f1
-        a   = -50
-        b   = 20*order
-        plt.semilogx([f1,f1],[-150,-20],color = 'black')
-        plt.semilogx([f2,f2],[-150,-20],color = 'black')
-        plt.semilogx([f1/10,f2],[a,a],color = 'black')
-        plt.semilogx([f1/10,f2],[a-b,a-b],color = 'black')
-    
-    
-    plt.xlabel('frequency [Hz]')
-    plt.ylabel('PSD [dB/Hz]')
-    plt.show()
-    
-    
     
 #%%
 def rmse(x,ref):
