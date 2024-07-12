@@ -24,6 +24,7 @@
 %   2024-07-10  (2.0.2) flexibility and naming standardisation
 %   2024-07-11  (2.0.3) cleaning caps structure 
 %   2024-07-12  (2.0.4) phase noise management --- for rx['mode'] = 'pilots'
+%                       import_data: caps structuring
 %
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -45,32 +46,29 @@
 %% MAINTENANCE
 rst
 
-cd(strcat('../python/data-',Date,"/mat"))
-caps.myInitPath         = pwd();
-[Dat,caps]              = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
-cd(caps.myInitPath)
-caps.Nfiles             = length(Dat);
-caps.rx_mode            = 'pilots';                 % {blind, pilots}
+cd(strcat('../python/data-',caps.log.Date,"/mat"))
+caps.log.myInitPath     = pwd();
+[allData,caps]          = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
+cd(caps.log.myInitPath)
 caps.plot.fir           = 1;
 caps.plot.poincare      = 0;
 caps.plot.phi           = 1;
 caps.plot.SOP_xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
 caps.plot.phi_xlabel    = 'comparison per batch';
-caps.method.thetas      = 'mat';                    % {fft, mat, svd}
+caps.method.thetas      = 'fft';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
 
 
 for tap = 7:7
 
-    caps.tap = tap;
+    caps.FIR.tap = tap;
 
-    for kdata = 1:length(Dat)
+    for kdata = 1:length(allData)
     
-        data                    = Dat{kdata};
+        data                    = allData{kdata};
+        caps.kdata              = kdata;
         caps                    = extract_infos(caps,data);
-%         [thetas,phis, H_est]    = channel_estimation(Dat,caps);
         [thetas,phis, H_est]    = channel_estimation(data,caps);
-%         [thetas, phis]          = extract_ground_truth(Dat,caps,thetas,phis);
         [thetas, phis]          = extract_ground_truth(data,caps,thetas,phis);
         
         if caps.plot.phi
@@ -86,16 +84,34 @@ for tap = 7:7
 end
 
 cd ../err
-Mthetas             = [Carac,metrics.thetas.ErrMean,metrics.thetas.ErrStd,metrics.thetas.ErrRms];
-Mthetas(end+1,:)    = [0,median(metrics.thetas.ErrMean),median(metrics.thetas.ErrStd),median(metrics.thetas.ErrRms)];
-writematrix(Mthetas,strcat('<Err Theta>-',caps.filename,'.csv'))
+tmp                 = zeros(size(caps.carac.values));
+Mthetas             = [caps.carac.values,...
+                       metrics.thetas.ErrMean,...
+                       metrics.thetas.ErrStd,...
+                       metrics.thetas.ErrRms];
+Mthetas(end+1,:)    = [tmp,...
+                       median(metrics.thetas.ErrMean),...
+                       median(metrics.thetas.ErrStd),...
+                       median(metrics.thetas.ErrRms)];
 
+writematrix(Mthetas,strcat('<Err Theta>-',caps.log.filename,'.csv'))
+
+% (end), for rx_mode = pilots
 if caps.plot.phi
-    Mphis             = [Carac,metrics.phis.ErrMean,metrics.phis.ErrStd,metrics.phis.ErrRms];
-    Mphis(end+1,:)    = [0,median(metrics.phis.ErrMean),median(metrics.phis.ErrStd),median(metrics.phis.ErrRms)];
-    writematrix(Mphis,strcat('<Err Phi>-',caps.filename,'.csv'))
+    Mphis           = [caps.carac.values,...
+                       metrics.phis.ErrMean(end),...
+                       metrics.phis.ErrStd(end),...
+                       metrics.phis.ErrRms(end)];
+
+    Mphis(end+1,:)  = [tmp,...
+                       median(metrics.phis.ErrMean(end)),...
+                       median(metrics.phis.ErrStd(end)),...
+                       median(metrics.phis.ErrRms(end))];
+
+    writematrix(Mphis,strcat('<Err Phi>-',caps.log.filename,'.csv'))
 end
-cd(myRootPath)
+
+cd(caps.log.myRootPath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS
@@ -203,68 +219,8 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
         allPathnames{i} = pathname;
     end
 
-    caps.Fn         = allFilenames;
-    caps.PathSave   = allPathnames;
-end
-%-----------------------------------------------------
-% 
-% function out = get_value_from_filename_in(folderPath,quantity,varargin)
-% 
-%     cd(folderPath{1})
-%   
-%     if nargin == 2
-%         nfiles          = length(dir(pwd))-2;
-%         folder_struct   = dir(pwd);
-%         out             = zeros(nfiles,1);
-% 
-%         for k=1:nfiles
-%             filename    = folder_struct(k+2).name;
-%             out(k)      = get_number_from_string_in(filename,quantity);
-%         end
-% 
-%     else
-%         nfiles          = length(varargin{1});
-%         out             = zeros(nfiles,1);
-%         for k=1:nfiles
-%             out(k)      = get_number_from_string_in(varargin{1}{k},quantity);
-%         end
-%     end
-% 
-%     out = sort(out);
-%     
-% end
-% %-----------------------------------------------------
-
-function out = get_number_from_string_in(stringIn,what,varargin)
-
-    stringIn    = char(stringIn);
-    iwhat       = strfind(stringIn,what);
-
-    if nargin == 2
-        iendwhat    = iwhat+length(what);
-        idashes     = strfind(stringIn,'-');
-        [~,itmp]    = max(idashes-iendwhat>0);
-        idashNext   = idashes(itmp);
-        strTmp      = stringIn(iendwhat+1:idashNext-1);
-    else
-        if nargin > 2
-            if iwhat-varargin{1}<1
-                istart = 1;
-            else
-                istart = iwhat-varargin{1};
-            end
-            if nargin == 4
-                if iwhat+varargin{2}>length(stringIn)
-                    iend = length(stringIn);
-                else
-                    iend = iwhat+varargin{2};
-                end
-            end
-            strTmp  = stringIn(istart:iend);
-        end
-    end
-
-    indexes = regexp(strTmp,'[0123456789.]');
-    out     = str2double(strTmp(indexes));
+    caps.log.Fn         = allFilenames;
+    caps.log.PathSave   = allPathnames;
+    caps.log.Nfiles     = length(allData);
 end
 %-----------------------------------------------------
