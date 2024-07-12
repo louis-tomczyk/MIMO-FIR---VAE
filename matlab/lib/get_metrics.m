@@ -70,13 +70,23 @@ metrics.thetas.Err_mov_std = (moving_stat_in(metrics.thetas.Err,params,"std")).'
 
 
 if ~isempty(varargin)
-    phis = varargin{1};
+    phis                                    = varargin{1};
     Err.phis                                = phis.est-phis.gnd;        % [deg]
+    if ~strcmpi(caps.rx_mode,'pilots')
+        metrics.phis.ErrMean            = zeros(caps.Nfiles,1);
+    else
+        metrics.phis.ErrMean            = zeros(caps.Nfiles,3);
+    end
     metrics.phis.ErrMean(caps.kdata,1)      = mean(Err.phis);
     metrics.phis.ErrStd(caps.kdata,1)       = std(Err.phis);
-    metrics.phis.ErrRms(caps.kdata,1)       = metrics.phis.ErrStd(caps.kdata)/metrics.phis.ErrMean(caps.kdata);
-    metrics.phis.Err                        = [zeros(caps.NBatchesTraining,1);Err.phis];
+    metrics.phis.ErrRms(caps.kdata,1)       = metrics.phis.ErrStd(caps.kdata)./metrics.phis.ErrMean(caps.kdata);
 
+    if ~strcmpi(caps.rx_mode,'pilots')
+        metrics.phis.Err                    = [zeros(caps.NBatchesTraining,1);Err.phis];
+    else
+        metrics.phis.Err                    = Err.phis;
+    end
+    
     metrics.phis.Err_mov_avg = (moving_stat_in(metrics.thetas.Err,params,"average")).';
     metrics.phis.Err_mov_std = (moving_stat_in(metrics.phis.Err,params,"std")).';
 end

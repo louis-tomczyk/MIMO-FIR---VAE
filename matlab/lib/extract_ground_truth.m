@@ -4,8 +4,8 @@
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
 %   Arxivs          :
-%   Date            : 2024-07-11
-%   Version         : 1.0.2
+%   Date            : 2024-07-12
+%   Version         : 1.0.3
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -17,6 +17,7 @@
 %                       phis_gnd reshaped, FIRgnd unused so removed
 %                       flexibility and naming normalisation
 %   2024-07-11  (1.0.2) phase noise management
+%   2024-07-12  (1.0.3) phase noise management --- for rx['mode'] = 'pilots'
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -42,20 +43,31 @@
 % ---------------------------------------------
 %%
 
-function [thetas, phis] = extract_ground_truth(Dat,caps,thetas,phis)
+% function [thetas, phis] = extract_ground_truth(Dat,caps,thetas,phis)
+function [thetas, phis] = extract_ground_truth(data,caps,thetas,phis)
 
-    data        = Dat{caps.kdata};
+%     data        = Dat{caps.kdata};
     
-    thetas.gnd  = Dat{1}.thetas(caps.FrameChannel+1:end,2)*180/pi;              % [deg]
+    thetas.gnd  = data.thetas(caps.FrameChannel+1:end,2)*180/pi;              % [deg]
 
     if caps.plot.phi
-        phis.gnd    = Dat{caps.kdata}.Phis_gnd(caps.FrameChannel+1:end,:)*180/pi;   % [deg]
-        tmp_phi     = zeros(numel(phis.gnd),1);
-        for k = 1:caps.NFramesChannel
-            tmp_phi(1+(k-1)*caps.NBatchFrame:k*caps.NBatchFrame) = phis.gnd(k,:);
-        end
-        phis.gnd    = tmp_phi;
+        if ~strcmpi(caps.rx_mode,'pilots')
+            phis.gnd    = Dat{caps.kdata}.Phis_gnd(caps.FrameChannel+1:end,:)*180/pi;   % [deg]
+            tmp_phi     = zeros(numel(phis.gnd),1);
+            for k = 1:caps.NFramesChannel
+                tmp_phi(1+(k-1)*caps.NBatchFrame:k*caps.NBatchFrame) = phis.gnd(k,:);
+            end
+            phis.gnd    = tmp_phi;
 
+        else
+            % 1:end-1 as we removed first and last batch in python processing
+            tmp_phi     = Dat{caps.kdata}.Phis_gnd(:,2:end-1)*180/pi;   % [deg]
+            phis.gnd    = zeros(numel(tmp_phi),1);
+            for k = 1:caps.NFrames
+                phis.gnd(1+(k-1)*caps.NBatchFrameCut:k*caps.NBatchFrameCut) = tmp_phi(k,:);
+            end
+            phis.gnd    = repmat(phis.gnd,[1,3]);
+        end
     else
         phis = NaN;
     end

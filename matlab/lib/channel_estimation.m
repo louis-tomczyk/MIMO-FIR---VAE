@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-11
-%   Version         : 1.1.1
+%   Date            : 2024-07-12
+%   Version         : 1.1.2
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -15,7 +15,8 @@
 %   2024-07-09 (1.1.0)  [NEW] check_fir, check_orthogonality
 %                       extract_thetas_est: fftshift for natural FIR checking
 %                       extract_phis_est: checking orthogonality + working phase estimation
-%   2024-07-11 (1.1.1)  managing phase noises
+%   2024-07-11 (1.1.1)  phase noise management
+%   2024-07-12 (1.1.2)  phase noise management --- for rx['mode'] = 'pilots'
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -41,15 +42,20 @@
 % ---------------------------------------------
 %%
 
-function [thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(Dat,caps)
+% function [thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(Dat,caps)
+function [thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(data,caps)
 
-data            = Dat{caps.kdata};
+% data            = Dat{caps.kdata};
 H_est           = zeros(2,2,caps.FIRlength);
 thetas.est      = zeros(caps.NFramesChannel-1,1);
 H_est_f         = zeros([caps.NFramesChannel,size(H_est)]);
 
-if caps.est_phi == 1
+if caps.est_phi == 1 && ~strcmpi(caps.rx_mode,'pilots')
     phis.est    = zeros(caps.NBatchFrame,caps.NFramesChannel);
+
+elseif caps.est_phi == 1 && strcmpi(caps.rx_mode,'pilots')
+    % 3 = polH, polV, mean(polH,polV)
+    phis.est    = zeros(caps.NBatchFrameCut*caps.NFrames,3);
 else
     phis        = NaN;
 end
@@ -59,7 +65,7 @@ for k = 1:caps.NFramesChannel
     H_est                   = extract_Hest(data,caps);
     [thetas.est(k),H_est_f] = extract_thetas_est(H_est,k,H_est_f,caps); % [deg]
 
-    if caps.est_phi
+    if ~strcmpi(caps.rx_mode,'pilots') &&  caps.est_phi
         for j = 1:caps.NBatchFrame
             caps.batch      = (caps.Frame-1)*caps.NBatchFrame+j;
             H_est           = extract_Hest(data,caps,H_est);
@@ -68,12 +74,23 @@ for k = 1:caps.NFramesChannel
     end
 end
 
-tmp = phis.est;
-phis.est = zeros(caps.NFramesChannel*caps.NBatchFrame,1);
-for k = 1:caps.NFramesChannel
-    phis.est(1+(k-1)*caps.NBatchFrame:k*caps.NBatchFrame,1) = tmp(:,k);
-end
+if ~strcmpi(caps.rx_mode, 'pilots')
+    tmp         = phis.est;
+    phis.est    = zeros(caps.NFramesChannel*caps.NBatchFrame,1);
+    for k = 1:caps.NFramesChannel
+        phis.est(1+(k-1)*caps.NBatchFrame:k*caps.NBatchFrame,1) = tmp(:,k);
+    end
+else
+    polH = squeeze(Dat{caps.kdata}.PhaseNoise_est_cpr(:,1,:));
+    polV = squeeze(Dat{caps.kdata}.PhaseNoise_est_cpr(:,2,:));
 
+    for k = 1:caps.NFrames
+        phis.est(1+(k-1)*caps.NBatchFrameCut:k*caps.NBatchFrameCut,1) = polH(k,:)';
+        phis.est(1+(k-1)*caps.NBatchFrameCut:k*caps.NBatchFrameCut,2) = polV(k,:)';
+    end
+
+    phis.est(:,3) = mean(phis.est(:,1:2)');
+end
 % to show the FIR filter of the last step
 
 FIRest.HH = squeeze(H_est_f(data.FrameChannel+1:end,1,1,:));

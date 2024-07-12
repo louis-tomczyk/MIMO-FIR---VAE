@@ -41,35 +41,13 @@
 % ---------------------------------------------
 %%
 
-function caps = extract_infos(caps,data)
+function caps = extract_infos(caps,Dat,kdata)
 
-what_carac         = string({''});
-
-if strcmpi(data.ThLaw,'lin')
-    what_carac    = [what_carac,string({'ThEnd','Sth'})];
-elseif strcmpi(data.ThLaw,'gauss')
-    disp("Warning: all possible models implemented in Python's simulator" + ...
-        "are not taken into account. If not LINEAR model, Rwalk-Gauss by" + ...
-        "default is considered. Future versions may need to take it into" + ...
-        "account")
-    what_carac    = [what_carac,string({'Thstd'})];  % {dnu, Sth, Sph, ThEnd, PhEnd,Thstd, Phstd}
-end
-
-if isfield(data,"h_est_batch")
-    caps.est_phi            = 1;
-    caps.NBatchesTraining   = caps.NFramesTraining*caps.NBatchFrame;
-    caps.Batches            = linspace(1,caps.NBatchesChannel,caps.NBatchesChannel);
-end
-
-if caps.est_phi && strcmpi(data.PhLaw,'lin')
-    what_carac    = [what_carac,string({'PhEnd','Sph'})];
-elseif strcmp(data.PhLaw,'Linewidth')
-    what_carac    = [what_carac,string({'dnu'})];
-end
+caps.Nfiles             = length(Dat);
+caps.what_carac         = string({'ThEnd','Sth', 'PhEnd', 'Sph'});  % {dnu, Sth, Sph, ThEnd, PhEnd,Thstd, Phstd}
 
 
-
-caps.what_carac     = what_carac;
+data                = Dat{kdata};
 data                = sort_struct_alphabet(data);
 filename            = char(caps.Fn{kdata});
 caps.filename       = ['matlab',filename(1:end-4)];
@@ -96,7 +74,11 @@ else
     caps.plot.close = 0;
 end
 
-
+if isfield(data,"h_est_batch")
+    caps.est_phi            = 1;
+    caps.NBatchesTraining   = caps.NFramesTraining*caps.NBatchFrame;
+    caps.Batches            = linspace(1,caps.NBatchesChannel,caps.NBatchesChannel);
+end
 
 if strcmpi(caps.rx_mode,'pilots')
     caps.NBatchFrameCut     = caps.NBatchFrame-2;
