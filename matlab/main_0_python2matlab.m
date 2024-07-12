@@ -18,7 +18,8 @@
 %   2024-04-18  (1.1.3) import_data
 %   2024-04-19  (1.1.4) <Err Theta>
 %   ------------------
-%   2024-07-06  (2.0.0) encapsulation into modules
+%   2024-07-06  
+% (2.0.0) encapsulation into modules
 %                       [REMOVED] check_if_fibre_prop
 %   2024-07-09  (2.0.1) phase estimation
 %   2024-07-10  (2.0.2) flexibility and naming standardisation
@@ -52,9 +53,9 @@ caps.log.myInitPath     = pwd();
 cd(caps.log.myInitPath)
 caps.plot.fir           = 1;
 caps.plot.poincare      = 0;
-caps.plot.phi           = 1;
-caps.plot.SOP_xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
-caps.plot.phi_xlabel    = 'comparison per batch';
+caps.plot.phis.do       = 1;
+caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
+caps.plot.phis.xlabel   = 'comparison per batch';
 caps.method.thetas      = 'fft';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
 
@@ -65,20 +66,19 @@ for tap = 7:7
 
     for kdata = 1:length(allData)
     
-        data                    = allData{kdata};
-        caps.kdata              = kdata;
-        caps                    = extract_infos(caps,data);
-        [thetas,phis, H_est]    = channel_estimation(data,caps);
-        [thetas, phis]          = extract_ground_truth(data,caps,thetas,phis);
+        data                        = allData{kdata};
+        caps.kdata                  = kdata;
+        caps                        = extract_infos(caps,data);
+        [caps,thetas,phis, H_est]   = channel_estimation(data,caps);
+        [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
         
-        if caps.plot.phi
+        if caps.plot.phis.do
             metrics             = get_metrics(caps,thetas,phis);
             plot_results(caps,H_est, thetas,metrics,phis);
         else
             metrics             = get_metrics(caps,thetas);
             plot_results(caps,H_est, thetas,metrics);
         end
-
 
     end
 end
@@ -97,7 +97,7 @@ Mthetas(end+1,:)    = [tmp,...
 writematrix(Mthetas,strcat('<Err Theta>-',caps.log.filename,'.csv'))
 
 % (end), for rx_mode = pilots
-if caps.plot.phi
+if caps.plot.phis.do
     Mphis           = [caps.carac.values,...
                        metrics.phis.ErrMean(end),...
                        metrics.phis.ErrStd(end),...
