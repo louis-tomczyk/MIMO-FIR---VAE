@@ -4,26 +4,27 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-11
-%   Version         : 2.0.3
+%   Date            : 2024-07-12
+%   Version         : 2.0.4
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
 %
 % ----- CHANGE LOG -----
-%   2023-10-09 (1.0.0)
-%   2024-03-04 (1.1.0) [NEW] plot poincare sphere
-%   2024-03-29 (1.1.1) data.FrameChannel -> data.FrameChannel
-%   2024-04-18 (1.1.3) import_data
-%   2024-04-19 (1.1.4) <Err Theta>
+%   2023-10-09  (1.0.0)
+%   2024-03-04  (1.1.0) [NEW] plot poincare sphere
+%   2024-03-29  (1.1.1) data.FrameChannel -> data.FrameChannel
+%   2024-04-18  (1.1.3) import_data
+%   2024-04-19  (1.1.4) <Err Theta>
 %   ------------------
-%   2024-07-06 (2.0.0)  encapsulation into modules
+%   2024-07-06  (2.0.0) encapsulation into modules
 %                       [REMOVED] check_if_fibre_prop
-%   2024-07-09 (2.0.1)  phase estimation
-%   2024-07-10 (2.0.2)  flexibility and naming standardisation
-%   2024-07-11 (2.0.3)  cleaning caps structure 
-% 
+%   2024-07-09  (2.0.1) phase estimation
+%   2024-07-10  (2.0.2) flexibility and naming standardisation
+%   2024-07-11  (2.0.3) cleaning caps structure 
+%   2024-07-12  (2.0.4) phase noise management --- for rx['mode'] = 'pilots'
+%
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
 %   of a beam propagating into an optical fibre.
@@ -45,23 +46,15 @@
 rst
 
 cd(strcat('../python/data-',Date,"/mat"))
-caps.myInitPath     = pwd();
-
-[Dat,caps]          = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
-
-Nfiles              = length(Dat);
-ErrMean             = zeros(Nfiles,1);
-ErrStd              = zeros(Nfiles,1);
-ErrRms              = zeros(Nfiles,1);
-what_carac          = 'End';  % {dnu, Slope, End,std}
-Carac               = get_value_from_filename_in(caps.PathSave,what_carac,caps.Fn);
+caps.myInitPath         = pwd();
+[Dat,caps]              = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
 cd(caps.myInitPath)
-
-
+caps.Nfiles             = length(Dat);
+caps.rx_mode            = 'pilots';                 % {blind, pilots}
 caps.plot.fir           = 1;
 caps.plot.poincare      = 0;
 caps.plot.phi           = 1;
-caps.plot.SOP_xlabel    = 'comparison per frame';   %{'error per frame','error per theta''comparison per frame'}
+caps.plot.SOP_xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
 caps.plot.phi_xlabel    = 'comparison per batch';
 caps.method.thetas      = 'mat';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
@@ -73,9 +66,12 @@ for tap = 7:7
 
     for kdata = 1:length(Dat)
     
-        caps                    = extract_infos(caps,Dat,kdata);
-        [thetas,phis, H_est]    = channel_estimation(Dat,caps);
-        [thetas, phis]          = extract_ground_truth(Dat,caps,thetas,phis);
+        data                    = Dat{kdata};
+        caps                    = extract_infos(caps,data);
+%         [thetas,phis, H_est]    = channel_estimation(Dat,caps);
+        [thetas,phis, H_est]    = channel_estimation(data,caps);
+%         [thetas, phis]          = extract_ground_truth(Dat,caps,thetas,phis);
+        [thetas, phis]          = extract_ground_truth(data,caps,thetas,phis);
         
         if caps.plot.phi
             metrics             = get_metrics(caps,thetas,phis);
@@ -211,33 +207,33 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     caps.PathSave   = allPathnames;
 end
 %-----------------------------------------------------
-
-function out = get_value_from_filename_in(folderPath,quantity,varargin)
-
-    cd(folderPath{1})
-  
-    if nargin == 2
-        nfiles          = length(dir(pwd))-2;
-        folder_struct   = dir(pwd);
-        out             = zeros(nfiles,1);
-
-        for k=1:nfiles
-            filename    = folder_struct(k+2).name;
-            out(k)      = get_number_from_string_in(filename,quantity);
-        end
-
-    else
-        nfiles          = length(varargin{1});
-        out             = zeros(nfiles,1);
-        for k=1:nfiles
-            out(k)      = get_number_from_string_in(varargin{1}{k},quantity);
-        end
-    end
-
-    out = sort(out);
-    
-end
-%-----------------------------------------------------
+% 
+% function out = get_value_from_filename_in(folderPath,quantity,varargin)
+% 
+%     cd(folderPath{1})
+%   
+%     if nargin == 2
+%         nfiles          = length(dir(pwd))-2;
+%         folder_struct   = dir(pwd);
+%         out             = zeros(nfiles,1);
+% 
+%         for k=1:nfiles
+%             filename    = folder_struct(k+2).name;
+%             out(k)      = get_number_from_string_in(filename,quantity);
+%         end
+% 
+%     else
+%         nfiles          = length(varargin{1});
+%         out             = zeros(nfiles,1);
+%         for k=1:nfiles
+%             out(k)      = get_number_from_string_in(varargin{1}{k},quantity);
+%         end
+%     end
+% 
+%     out = sort(out);
+%     
+% end
+% %-----------------------------------------------------
 
 function out = get_number_from_string_in(stringIn,what,varargin)
 
