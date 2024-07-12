@@ -152,14 +152,14 @@ pi = np.pi
 def receiver(tx,rx,saving):
             
     rx              = front_end(rx)
-    rx, loss        = mimo(tx, rx, saving,'b4','after')
-    rx              = remove_symbols(rx,'data','data removal')
-    rx              = CPR_pilots(tx, rx, 'demod','corr')#,'trace loss')#,'demod','corr')     # {align,demod,time trace pn, time trace pn loss, trace loss}
+    rx, loss        = mimo(tx, rx, saving)#,'b4','after')
+    rx              = remove_symbols(rx,'data')#,'data removal')
+    rx              = CPR_pilots(tx, rx)#, 'demod','corr')#,'trace loss')#,'demod','corr')     # {align,demod,time trace pn, time trace pn loss, trace loss}
     rx              = SNR_estimation(tx, rx)
-    rx              = decision(tx,rx,"const norm",'time decision')         # {time decision, const decision, const norm}
-    tx,rx           = find_shift(tx, rx,'corr', 'err dec')                              # {corr, err dec}
+    rx              = decision(tx,rx)#,"const norm",'time decision')         # {time decision, const decision, const norm}
+    tx,rx           = find_shift(tx, rx)#,'corr', 'err dec')                              # {corr, err dec}
     tx,rx           = compensate_and_truncate(tx,rx)#, 'err dec','corr')     # {corr, err dec}
-    rx              = SER_estimation(tx, rx, 'err dec')                      # {err dec}
+    rx              = SER_estimation(tx, rx)#, 'err dec')                      # {err dec}
 
     return rx, loss
 

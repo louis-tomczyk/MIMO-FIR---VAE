@@ -914,7 +914,7 @@ def save2mat(tx,fibre,rx,saving):
                 'NFrames'           : rx["NFrames"],
                 'NFramesTraining'   : rx["NFramesTraining"],
                 'FrameChannel'      : rx["FrameChannel"],
-                'NBatchFrame'       : rx['NBatchFrame'],
+                'NBatchesFrame'     : rx['NBatchFrame'],
                 'NBatchesChannel'   : rx['NBatchesChannel'],
                 'Phis_gnd'          : tx["PhaseNoise_unique"],
                 'SNRdBs'            : rx["SNRdBs"],
