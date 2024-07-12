@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-11
-%   Version         : 1.1.2
+%   Date            : 2024-07-12
+%   Version         : 1.1.3
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -16,6 +16,7 @@
 %                       plot_results: encapsulation + plot phase estimation
 %   2024-07-10 (1.1.1)  flexibility and naming standardisation
 %   2024-07-11 (1.1.2)  plot for phase estimation per batch (1.1.0 == per frame)
+%   2024-07-12 (1.1.3)  phase noise management --- for rx['mode'] = 'pilots'
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -136,24 +137,24 @@ f = figure(1);
 function f = plot_SOP(caps,thetas,metrics)
 
 f = figure(1);
-if caps.plot.phi
+if caps.plot.phis.do
     subplot(2,2,3)
 else
     subplot(2,2,[3,4])
 end
 
 hold on
-if strcmpi(caps.plot.SOP_xlabel,'error per frame')
+if strcmpi(caps.plot.SOP.xlabel,'error per frame')
     scatter(caps.Frames.array,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("frame")
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
-elseif strcmpi(caps.plot.SOP_xlabel,'error per theta')
+elseif strcmpi(caps.plot.SOP.xlabel,'error per theta')
     scatter(thetas.gnd,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("$\theta$ [deg]")
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
-elseif strcmpi(caps.plot.SOP_xlabel,'comparison per frame')
+elseif strcmpi(caps.plot.SOP.xlabel,'comparison per frame')
     plot(caps.Frames.array,thetas.gnd,'color',[1,1,1]*0.83, LineWidth=5)
     scatter(caps.Frames.array,thetas.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     legend("ground truth","estimation",Location="northwest")
@@ -172,23 +173,30 @@ title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
 function f = plot_phi(caps,phis,metrics)
 
 f = figure(1);
-if caps.plot.phi
+if caps.plot.phis.do
     subplot(2,2,4)
-
+    
     hold on
-    if strcmpi(caps.plot.phi,'error per batch')
-        scatter(caps.Batches.array,phis.est-phis.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    if strcmpi(caps.plot.phis.xlabel,'error per batch')
+        scatter(caps.Batches.array,...
+                phis.est.channel(:,caps.plot.phis.pol)-phis.gnd.channel(:,caps.plot.phis.pol),...
+                100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         xlabel("batch")
         ylabel("$\hat{\phi}-\phi$ [deg]")
     
-    elseif strcmpi(caps.plot.phi,'error per phi')
-        scatter(phis.gnd,phis.est-phis.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    elseif strcmpi(caps.plot.phis.xlabel,'error per phi')
+        scatter(phis.gnd(:,caps.plot.phis.pol), ...
+                phis.est.channel(:,caps.plot.phis.pol)-phis.gnd.channel(:,caps.plot.phis.pol), ...
+                100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         xlabel("$\phi$ [deg]")
         ylabel("$\hat{\phi}-\phi$ [deg]")
     
-    elseif strcmpi(caps.plot.phi,'comparison per batch')
-        plot(caps.Batches.array,phis.gnd,'color',[1,1,1]*0.83, LineWidth=5)
-        scatter(caps.Batches.array,phis.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    elseif strcmpi(caps.plot.phis.xlabel,'comparison per batch')
+        plot(caps.Batches.array, ...
+             phis.gnd.channel(:,caps.plot.phis.pol), ...
+             'color',[1,1,1]*0.83, LineWidth=5)
+        scatter(caps.Batches.array,phis.est.channel(:,caps.plot.phis.pol),...
+                100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         legend("ground truth","estimation",Location="northwest")
         xlabel("batch")
         ylabel("$\hat{\phi},\phi$ [deg]")

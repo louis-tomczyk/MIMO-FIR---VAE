@@ -72,8 +72,21 @@ caps.Frames.array       = linspace(1,caps.NFrames.Channel,caps.NFrames.Channel);
 caps.NBatches.Frame     = double(data.NBatchesFrame);
 caps.NBatches.Channel   = double(data.NBatchesChannel);
 
-if strcmpi(caps.rx_mode,'pilots')
-    caps.NBatches.FrameCut     = caps.NBatches.Frame-2;
+
+
+if isfield(data,"h_est_batch") && ~isempty(data.h_est_batch)
+    caps.est_phi            = 1;
+    if strcmpi(caps.rx_mode,'pilots')
+        caps.NBatches.FrameCut  = caps.NBatches.Frame-2;
+        caps.NBatches.Channel   = caps.NBatches.FrameCut*caps.NFrames.Channel;
+        caps.NBatches.Training  = caps.NBatches.FrameCut*caps.NFrames.Training;
+    else
+        caps.NBatches.Training  = caps.NFrames.Training*caps.NBatches.Frame;
+    end
+    caps.Batches.array          = linspace(1,caps.NBatches.Channel,caps.NBatches.Channel);
+else
+    caps.est_phi            = 0;
+    caps.plot.phis.do       = 0;
 end
 
 % fir
@@ -94,11 +107,6 @@ elseif strcmpi(data.ThLaw,'gauss')
     what_carac    = [what_carac,string({'Thstd'})];  % {dnu, Sth, Sph, ThEnd, PhEnd,Thstd, Phstd}
 end
 
-if isfield(data,"h_est_batch")
-    caps.est_phi            = 1;
-    caps.NBatches.Training  = caps.NFrames.Training*caps.NBatches.Frame;
-    caps.Batches.array      = linspace(1,caps.NBatches.Channel,caps.NBatches.Channel);
-end
 
 if caps.est_phi && strcmpi(data.PhLaw,'lin')
     what_carac    = [what_carac,string({'PhEnd','Sph'})];
@@ -111,7 +119,6 @@ caps.carac.what     = what_carac(2:end);
 for k = 1:length(caps.carac.what)
     caps.carac.values(k)   = get_value_from_filename_in(caps.log.PathSave,caps.carac.what{k},caps.log.Fn);
 end
-
 
 caps = sort_struct_alphabet(caps);
 

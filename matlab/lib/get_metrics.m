@@ -70,7 +70,7 @@ metrics.thetas.Err_mov_std = (moving_stat_in(metrics.thetas.Err,params,"std")).'
 
 if ~isempty(varargin)
     phis                                = varargin{1};
-    Err.phis                            = phis.est-phis.gnd;        % [deg]
+    Err.phis                            = phis.est.all-phis.gnd.all;        % [deg]
     if ~strcmpi(caps.rx_mode,'pilots')
         metrics.phis.ErrMean            = zeros(caps.log.Nfiles,1);
     else

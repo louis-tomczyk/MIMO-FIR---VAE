@@ -45,36 +45,41 @@
 
 function [thetas, phis] = extract_ground_truth(data,caps,thetas,phis)
     
-    thetas.gnd  = data.thetas(caps.Frames.Channel+1:end,2)*180/pi;              % [deg]
+thetas.gnd  = data.thetas(caps.Frames.Channel+1:end,2)*180/pi;              % [deg]
 
-    if caps.plot.phi
-        if ~strcmpi(caps.rx_mode,'pilots')
-            phis.gnd    = data.Phis_gnd(caps.Frames.Channel+1:end,:)*180/pi;   % [deg]
-            tmp_phi     = zeros(numel(phis.gnd),1);
-            for k = 1:caps.NFrames.Channel
-                tmp_phi(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame) = phis.gnd(k,:);
-            end
-            phis.gnd    = tmp_phi;
-
-        else
-            % 1:end-1 as we removed first and last batch in python processing
-            tmp_phi     = data.Phis_gnd(:,2:end-1)*180/pi;   % [deg]
-            phis.gnd    = zeros(numel(tmp_phi),1);
-            for k = 1:caps.NFrames.all
-                phis.gnd(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut) = tmp_phi(k,:);
-            end
-            phis.gnd    = repmat(phis.gnd,[1,3]);
+if caps.plot.phis.do
+    if ~strcmpi(caps.rx_mode,'pilots')
+        phis.gnd.all    = data.Phis_gnd(caps.Frames.Channel+1:end,:)*180/pi;   % [deg]
+        tmp_phi         = zeros(numel(phis.gnd.all),1);
+        for k = 1:caps.NFrames.Channel
+            tmp_phi(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame) = phis.gnd.all(k,:);
         end
-    else
-        phis = NaN;
-    end
+        phis.gnd    = tmp_phi;
 
-    if caps.plot.poincare
-        params = {"marker"  ,'square'   ,...
-              "size"    , 100        ,...
-              "fill"    , ''};
-        FIR2Stockes(FIRgnd,params);
+    else
+        % 1:end-1 as we removed first and last batch in python processing
+        tmp_phi         = data.Phis_gnd(:,2:end-1)*180/pi;   % [deg]
+        phis.gnd.all    = zeros(numel(tmp_phi),1);
+        for k = 1:caps.NFrames.all
+            phis.gnd.all(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut) = tmp_phi(k,:);
+        end
+        phis.gnd.all    = repmat(phis.gnd.all,[1,3]);
     end
+else
+    phis = NaN;
+end
+
+if caps.est_phi
+    phis.gnd.channel = phis.gnd.all(caps.NBatches.Training+1:end,:);
+end
+
+
+if caps.plot.poincare
+    params = {"marker"  ,'square'   ,...
+          "size"    , 100        ,...
+          "fill"    , ''};
+    FIR2Stockes(FIRgnd,params);
+end
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS

@@ -43,18 +43,18 @@
 % ---------------------------------------------
 %%
 
-function [thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(data,caps)
+function [caps,thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(data,caps)
 
 H_est           = zeros([2,2,caps.FIR.length]);
 thetas.est      = zeros([caps.NFrames.Channel-1,1]);
 H_est_f         = zeros([caps.NFrames.Channel,size(H_est)]);
 
 if caps.est_phi == 1 && ~strcmpi(caps.rx_mode,'pilots')
-    phis.est    = zeros([caps.NBatches.Frame,caps.NFrames.Channel]);
+    phis.est.all    = zeros([caps.NBatches.Frame,caps.NFrames.Channel]);
 
 elseif caps.est_phi == 1 && strcmpi(caps.rx_mode,'pilots')
     % 3 = polH, polV, mean(polH,polV)
-    phis.est    = zeros([caps.NBatches.FrameCut*caps.NFrames.all,3]);
+    phis.est.all    = zeros([caps.NBatches.FrameCut*caps.NFrames.all,3]);
 else
     phis        = NaN;
 end
@@ -66,30 +66,47 @@ for k = 1:caps.NFrames.Channel
 
     if ~strcmpi(caps.rx_mode,'pilots') &&  caps.est_phi
         for j = 1:caps.NBatches.Frame
-            caps.batch      = (caps.Frame-1)*caps.NBatches.Frame+j;
-            H_est           = extract_Hest(data,caps,H_est);
-            phis.est(j,k)   = extract_phis_est(H_est,caps);             % [deg]
+            caps.batch          = (caps.Frame-1)*caps.NBatches.Frame+j;
+            H_est               = extract_Hest(data,caps,H_est);
+            phis.est.all(j,k)   = extract_phis_est(H_est,caps);             % [deg]
         end
     end
 end
 
-if ~strcmpi(caps.rx_mode, 'pilots')
-    tmp         = phis.est;
-    phis.est    = zeros(caps.NFrames.Channel*caps.NBatches.Frame,1);
+if ~strcmpi(caps.rx_mode, 'pilots') && ~isnan(phis)
+    tmp             = phis.est.all;
+    phis.est.all    = zeros(caps.NFrames.Channel*caps.NBatches.Frame,1);
     for k = 1:caps.NFrames.Channel
-        phis.est(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame,1) = tmp(:,k);
+        phis.est.all(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame,1) = tmp(:,k);
     end
-else
+elseif strcmpi(caps.rx_mode, 'pilots')
     polH = squeeze(data.PhaseNoise_est_cpr(:,1,:));
     polV = squeeze(data.PhaseNoise_est_cpr(:,2,:));
 
     for k = 1:caps.NFrames.all
-        phis.est(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,1) = polH(k,:)';
-        phis.est(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,2) = polV(k,:)';
+        phis.est.all(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,1) = polH(k,:)';
+        phis.est.all(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,2) = polV(k,:)';
     end
 
-    phis.est(:,3) = mean(phis.est(:,1:2), 2);
+    phis.est.all(:,3) = mean(phis.est.all(:,1:2), 2);
+else
 end
+
+
+
+if caps.est_phi
+    phis.est.channel = phis.est.all(caps.NBatches.Training+1:end,:);
+    
+    if ~isfield(caps.plot.phis, 'pol')
+        caps.plot.phis.pol = 3;          % 1 = polH, 2 = polV, 3 = mean
+    end
+
+end
+
+
+
+
+
 % to show the FIR filter of the last step
 
 FIRest.HH = squeeze(H_est_f(data.FrameChannel+1:end,1,1,:));
