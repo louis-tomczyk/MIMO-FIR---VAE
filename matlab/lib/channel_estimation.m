@@ -17,6 +17,7 @@
 %                       extract_phis_est: checking orthogonality + working phase estimation
 %   2024-07-11 (1.1.1)  phase noise management
 %   2024-07-12 (1.1.2)  phase noise management --- for rx['mode'] = 'pilots'
+%                       [REMOVED] check_fir
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -42,32 +43,30 @@
 % ---------------------------------------------
 %%
 
-% function [thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(Dat,caps)
 function [thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(data,caps)
 
-% data            = Dat{caps.kdata};
-H_est           = zeros(2,2,caps.FIRlength);
-thetas.est      = zeros(caps.NFramesChannel-1,1);
-H_est_f         = zeros([caps.NFramesChannel,size(H_est)]);
+H_est           = zeros([2,2,caps.FIR.length]);
+thetas.est      = zeros([caps.NFrames.Channel-1,1]);
+H_est_f         = zeros([caps.NFrames.Channel,size(H_est)]);
 
 if caps.est_phi == 1 && ~strcmpi(caps.rx_mode,'pilots')
-    phis.est    = zeros(caps.NBatchFrame,caps.NFramesChannel);
+    phis.est    = zeros([caps.NBatches.Frame,caps.NFrames.Channel]);
 
 elseif caps.est_phi == 1 && strcmpi(caps.rx_mode,'pilots')
     % 3 = polH, polV, mean(polH,polV)
-    phis.est    = zeros(caps.NBatchFrameCut*caps.NFrames,3);
+    phis.est    = zeros([caps.NBatches.FrameCut*caps.NFrames.all,3]);
 else
     phis        = NaN;
 end
 
-for k = 1:caps.NFramesChannel
-    caps.Frame              = caps.FrameChannel+k;
+for k = 1:caps.NFrames.Channel
+    caps.Frame              = caps.Frames.Channel+k;
     H_est                   = extract_Hest(data,caps);
     [thetas.est(k),H_est_f] = extract_thetas_est(H_est,k,H_est_f,caps); % [deg]
 
     if ~strcmpi(caps.rx_mode,'pilots') &&  caps.est_phi
-        for j = 1:caps.NBatchFrame
-            caps.batch      = (caps.Frame-1)*caps.NBatchFrame+j;
+        for j = 1:caps.NBatches.Frame
+            caps.batch      = (caps.Frame-1)*caps.NBatches.Frame+j;
             H_est           = extract_Hest(data,caps,H_est);
             phis.est(j,k)   = extract_phis_est(H_est,caps);             % [deg]
         end
@@ -76,20 +75,20 @@ end
 
 if ~strcmpi(caps.rx_mode, 'pilots')
     tmp         = phis.est;
-    phis.est    = zeros(caps.NFramesChannel*caps.NBatchFrame,1);
-    for k = 1:caps.NFramesChannel
-        phis.est(1+(k-1)*caps.NBatchFrame:k*caps.NBatchFrame,1) = tmp(:,k);
+    phis.est    = zeros(caps.NFrames.Channel*caps.NBatches.Frame,1);
+    for k = 1:caps.NFrames.Channel
+        phis.est(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame,1) = tmp(:,k);
     end
 else
-    polH = squeeze(Dat{caps.kdata}.PhaseNoise_est_cpr(:,1,:));
-    polV = squeeze(Dat{caps.kdata}.PhaseNoise_est_cpr(:,2,:));
+    polH = squeeze(data.PhaseNoise_est_cpr(:,1,:));
+    polV = squeeze(data.PhaseNoise_est_cpr(:,2,:));
 
-    for k = 1:caps.NFrames
-        phis.est(1+(k-1)*caps.NBatchFrameCut:k*caps.NBatchFrameCut,1) = polH(k,:)';
-        phis.est(1+(k-1)*caps.NBatchFrameCut:k*caps.NBatchFrameCut,2) = polV(k,:)';
+    for k = 1:caps.NFrames.all
+        phis.est(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,1) = polH(k,:)';
+        phis.est(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,2) = polV(k,:)';
     end
 
-    phis.est(:,3) = mean(phis.est(:,1:2)');
+    phis.est(:,3) = mean(phis.est(:,1:2), 2);
 end
 % to show the FIR filter of the last step
 
@@ -115,63 +114,11 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----
-%   check_fir                       (1.1.0)
 %   check_orthogonality             (1.1.0)
 %   extract_Hest
 %   extract_phis_est
 %   extract_thetas_est
 % ---------------------------------------------
-
-
-
-function check_fir(H_est,caps)
-
-if caps.plot.fir
-    H11     = reshape(H_est(1,1,:),1,[]);
-    H12     = reshape(H_est(1,2,:),1,[]);
-    H21     = reshape(H_est(2,1,:),1,[]);
-    H22     = reshape(H_est(2,2,:),1,[]);
-    Mreal   = max(abs([real(H11),real(H12),real(H21),real(H22)]));
-    Mimag   = max(abs([imag(H11),imag(H12),imag(H21),imag(H22)]));
-
-    t   = linspace(1,caps.FIRlength,caps.FIRlength)-ceil(caps.FIRlength/2);
-    figure
-    subplot(2,2,1)
-        hold on
-        plot([-1,1]*caps.FIRlength/2,[0,0],LineWidth= 3, Color='k')
-        plot(t,real(H11))
-        plot(t,fliplr(real(H22)))
-        title('real part')
-        ylim([-1,1]*Mreal)
-        legend("-","11","22")
-    subplot(2,2,2)
-        hold on
-        plot([-1,1]*caps.FIRlength/2,[0,0],LineWidth= 3, Color='k')
-        plot(t,imag(H11))
-        plot(t,fliplr(imag(H22)))
-        title('imag part')
-        ylim([-1,1]*Mimag)
-        legend("-","11","22")
-
-    subplot(2,2,3)
-        hold on
-        plot([-1,1]*caps.FIRlength/2,[0,0],LineWidth= 3, Color='k')
-        plot(t,real(H12))
-        plot(t,fliplr(real(H21)))
-        title('real part')
-        ylim([-1,1]*Mreal)
-        legend("-","12","21")
-    subplot(2,2,4)
-        hold on
-        plot([-1,1]*caps.FIRlength/2,[0,0],LineWidth= 3, Color='k')
-        plot(t,imag(H12))
-        plot(t,fliplr(imag(H21)))
-        title('imag part')
-        ylim([-1,1]*Mimag)
-        legend("-","12","21")
-end
-% ---------------------------------------------
-
 
 
 function check_orthogonality(Hest,caps)
@@ -181,12 +128,12 @@ if ~isfield(caps,'check')
 end
 
 if caps.check.fir_orth
-    H           = Hest(:,:,caps.tap);
+    H           = Hest(:,:,caps.FIR.tap);
     tmp         = sum(sum(H'*H - H*H' < 1e-2*ones(2)))/4;
-    M           = H*H';
+%     M           = H*H';
 %     diagMeanR   = trace(real(M))/2;
 %     diagMeanR   = trace(imag(M))/2;
-%     fprintf("%i,%d,%d,%.2f,%.2f\n", k,caps.tap,tmp == 1, diagMeanR, diagMeanI)
+%     fprintf("%i,%d,%d,%.2f,%.2f\n", k,caps.FIR.tap,tmp == 1, diagMeanR, diagMeanI)
     assert(tmp == 1,"Hest Hest^dagger not unitary")
 end
 % ---------------------------------------------
@@ -200,15 +147,15 @@ else
 end
 
 if strcmpi(what,'frame')
-    h_est_11_I_j        = reshape(data.h_est_frame(caps.Frame,1,1,1,:),[1,caps.FIRlength]);
-    h_est_12_I_j        = reshape(data.h_est_frame(caps.Frame,1,2,1,:),[1,caps.FIRlength]);
-    h_est_21_I_j        = reshape(data.h_est_frame(caps.Frame,2,1,1,:),[1,caps.FIRlength]);
-    h_est_22_I_j        = reshape(data.h_est_frame(caps.Frame,2,2,1,:),[1,caps.FIRlength]);
+    h_est_11_I_j        = reshape(data.h_est_frame(caps.Frame,1,1,1,:),[1,caps.FIR.length]);
+    h_est_12_I_j        = reshape(data.h_est_frame(caps.Frame,1,2,1,:),[1,caps.FIR.length]);
+    h_est_21_I_j        = reshape(data.h_est_frame(caps.Frame,2,1,1,:),[1,caps.FIR.length]);
+    h_est_22_I_j        = reshape(data.h_est_frame(caps.Frame,2,2,1,:),[1,caps.FIR.length]);
     
-    h_est_11_Q_j        = reshape(data.h_est_frame(caps.Frame,1,1,2,:),[1,caps.FIRlength]);
-    h_est_12_Q_j        = reshape(data.h_est_frame(caps.Frame,1,2,2,:),[1,caps.FIRlength]);
-    h_est_21_Q_j        = reshape(data.h_est_frame(caps.Frame,2,1,2,:),[1,caps.FIRlength]);
-    h_est_22_Q_j        = reshape(data.h_est_frame(caps.Frame,2,2,2,:),[1,caps.FIRlength]);
+    h_est_11_Q_j        = reshape(data.h_est_frame(caps.Frame,1,1,2,:),[1,caps.FIR.length]);
+    h_est_12_Q_j        = reshape(data.h_est_frame(caps.Frame,1,2,2,:),[1,caps.FIR.length]);
+    h_est_21_Q_j        = reshape(data.h_est_frame(caps.Frame,2,1,2,:),[1,caps.FIR.length]);
+    h_est_22_Q_j        = reshape(data.h_est_frame(caps.Frame,2,2,2,:),[1,caps.FIR.length]);
 
     H_est.frame(1,1,:)  = complex(h_est_11_I_j, h_est_11_Q_j);
     H_est.frame(1,2,:)  = complex(h_est_12_I_j, h_est_12_Q_j);
@@ -218,15 +165,15 @@ if strcmpi(what,'frame')
     check_orthogonality(H_est.frame,caps)
 else
 
-    h_est_11_I_j        = reshape(data.h_est_batch(caps.batch,1,1,1,:),[1,caps.FIRlength]);
-    h_est_12_I_j        = reshape(data.h_est_batch(caps.batch,1,2,1,:),[1,caps.FIRlength]);
-    h_est_21_I_j        = reshape(data.h_est_batch(caps.batch,2,1,1,:),[1,caps.FIRlength]);
-    h_est_22_I_j        = reshape(data.h_est_batch(caps.batch,2,2,1,:),[1,caps.FIRlength]);
+    h_est_11_I_j        = reshape(data.h_est_batch(caps.batch,1,1,1,:),[1,caps.FIR.length]);
+    h_est_12_I_j        = reshape(data.h_est_batch(caps.batch,1,2,1,:),[1,caps.FIR.length]);
+    h_est_21_I_j        = reshape(data.h_est_batch(caps.batch,2,1,1,:),[1,caps.FIR.length]);
+    h_est_22_I_j        = reshape(data.h_est_batch(caps.batch,2,2,1,:),[1,caps.FIR.length]);
     
-    h_est_11_Q_j        = reshape(data.h_est_batch(caps.batch,1,1,2,:),[1,caps.FIRlength]);
-    h_est_12_Q_j        = reshape(data.h_est_batch(caps.batch,1,2,2,:),[1,caps.FIRlength]);
-    h_est_21_Q_j        = reshape(data.h_est_batch(caps.batch,2,1,2,:),[1,caps.FIRlength]);
-    h_est_22_Q_j        = reshape(data.h_est_batch(caps.batch,2,2,2,:),[1,caps.FIRlength]);
+    h_est_11_Q_j        = reshape(data.h_est_batch(caps.batch,1,1,2,:),[1,caps.FIR.length]);
+    h_est_12_Q_j        = reshape(data.h_est_batch(caps.batch,1,2,2,:),[1,caps.FIR.length]);
+    h_est_21_Q_j        = reshape(data.h_est_batch(caps.batch,2,1,2,:),[1,caps.FIR.length]);
+    h_est_22_Q_j        = reshape(data.h_est_batch(caps.batch,2,2,2,:),[1,caps.FIR.length]);
 
     H_est.batch(1,1,:)  = complex(h_est_11_I_j, h_est_11_Q_j);
     H_est.batch(1,2,:)  = complex(h_est_12_I_j, h_est_12_Q_j);
@@ -241,8 +188,8 @@ end
 
 function [phis_est, g0] = extract_phis_est(H_est,caps)
 
-if caps.Frame > caps.FrameChannel
-    Hest        = H_est.batch(:,:,caps.tap);
+if caps.Frame > caps.Frames.Channel
+    Hest        = H_est.batch(:,:,caps.FIR.tap);
     M           = Hest'*Hest;
     g0          = mean(trace(M));
     phis_est    = 0.5*angle(det(Hest))*180/pi;
@@ -261,23 +208,23 @@ Hest_f(k,1,2,:) = fftshift(fft(H_est.frame(1,2,:)));
 Hest_f(k,2,1,:) = fftshift(fft(H_est.frame(2,1,:)));
 Hest_f(k,2,2,:) = fftshift(fft(H_est.frame(2,2,:)));
 
-Hest            = H_est.frame(:,:,caps.tap);
+Hest            = H_est.frame(:,:,caps.FIR.tap);
 
 if strcmpi(caps.method.thetas,'fft')
-    H_f0        = squeeze(Hest_f(k,:,:,caps.tap));
+    H_f0        = squeeze(Hest_f(k,:,:,caps.FIR.tap));
     thetas_est  = atan(abs(H_f0(1,2)./H_f0(1,1)))*180/pi;   % [deg]
 
 elseif strcmpi(caps.method.thetas,'svd')
     [U,~,~]     = svd(Hest);
     Cos11       = -U(1,1);
-    Cos22       = U(2,2);
-    Sin12       = U(1,2);
-    Sin21       = U(2,1);
+%     Cos22       = U(2,2);
+%     Sin12       = U(1,2);
+%     Sin21       = U(2,1);
     
     Tcos11      = acos(Cos11)*180/pi;
-    Tcos22      = acos(Cos22)*180/pi;
-    Tsin12      = asin(Sin12)*180/pi;
-    Tsin21      = asin(Sin21)*180/pi;
+%     Tcos22      = acos(Cos22)*180/pi;
+%     Tsin12      = asin(Sin12)*180/pi;
+%     Tsin21      = asin(Sin21)*180/pi;
     thetas_est  = real(Tcos11);
 
 elseif strcmpi(caps.method.thetas,'mat')

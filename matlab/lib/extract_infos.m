@@ -43,6 +43,45 @@
 
 function caps = extract_infos(caps,data)
 
+% logistics
+data                = sort_struct_alphabet(data);
+filename            = char(caps.log.Fn{caps.kdata});
+caps.log.filename   = ['matlab',filename(1:end-4)];
+
+if length(caps.log.Fn) > 1
+    caps.plot.close = 1;
+else
+    caps.plot.close = 0;
+end
+
+if ~isnan(data.PhaseNoise_est_cpr)
+    caps.rx_mode = "pilots";
+else
+    caps.rx_mode = "blind";
+end
+
+% frames
+caps.Frames.Channel     = double(data.FrameChannel);
+caps.NFrames.Training   = double(data.NFramesTraining);
+caps.NFrames.all        = double(data.NFrames);
+caps.NFrames.Channel    = caps.NFrames.all-caps.NFrames.Training;
+caps.NFrames.Channel    = caps.NFrames.all-caps.Frames.Channel;
+caps.Frames.array       = linspace(1,caps.NFrames.Channel,caps.NFrames.Channel);
+
+% batches
+caps.NBatches.Frame     = double(data.NBatchesFrame);
+caps.NBatches.Channel   = double(data.NBatchesChannel);
+
+if strcmpi(caps.rx_mode,'pilots')
+    caps.NBatches.FrameCut     = caps.NBatches.Frame-2;
+end
+
+% fir
+caps.FIR.length         = double(data.NspTaps);
+caps.FIR.taps           = linspace(1,caps.FIR.length,caps.FIR.length)-ceil(caps.FIR.length/2);
+
+
+% caracs
 what_carac         = string({''});
 
 if strcmpi(data.ThLaw,'lin')
@@ -57,8 +96,8 @@ end
 
 if isfield(data,"h_est_batch")
     caps.est_phi            = 1;
-    caps.NBatchesTraining   = caps.NFramesTraining*caps.NBatchFrame;
-    caps.Batches            = linspace(1,caps.NBatchesChannel,caps.NBatchesChannel);
+    caps.NBatches.Training  = caps.NFrames.Training*caps.NBatches.Frame;
+    caps.Batches.array      = linspace(1,caps.NBatches.Channel,caps.NBatches.Channel);
 end
 
 if caps.est_phi && strcmpi(data.PhLaw,'lin')
@@ -67,40 +106,12 @@ elseif strcmp(data.PhLaw,'Linewidth')
     what_carac    = [what_carac,string({'dnu'})];
 end
 
+caps.carac.what     = what_carac(2:end);
 
-
-caps.what_carac     = what_carac;
-data                = sort_struct_alphabet(data);
-filename            = char(caps.Fn{kdata});
-caps.filename       = ['matlab',filename(1:end-4)];
-
-for k = 1:length(caps.what_carac)
-    caps.Carac(k)   = get_value_from_filename_in(caps.PathSave,caps.what_carac{k},caps.Fn);
+for k = 1:length(caps.carac.what)
+    caps.carac.values(k)   = get_value_from_filename_in(caps.log.PathSave,caps.carac.what{k},caps.log.Fn);
 end
 
-caps.FrameChannel   = double(data.FrameChannel);
-caps.NFramesTraining= double(data.NFramesTraining);
-caps.NFrames        = double(data.NFrames);
-caps.NFramesChannel = caps.NFrames-caps.NFramesTraining;
-caps.Frames         = linspace(1,caps.NFramesChannel,caps.NFramesChannel);
-caps.NBatchFrame    = double(data.NBatchFrame);
-caps.NBatchesChannel= double(data.NBatchesChannel);
-caps.FIRlength      = double(data.NspTaps);
-caps.FIRtaps        = linspace(1,caps.FIRlength,caps.FIRlength)-ceil(caps.FIRlength/2);
-caps.kdata          = kdata;
-caps.NFramesChannel = caps.NFrames-caps.FrameChannel;
-
-if length(caps.Fn) > 1
-    caps.plot.close = 1;
-else
-    caps.plot.close = 0;
-end
-
-
-
-if strcmpi(caps.rx_mode,'pilots')
-    caps.NBatchFrameCut     = caps.NBatchFrame-2;
-end
 
 caps = sort_struct_alphabet(caps);
 

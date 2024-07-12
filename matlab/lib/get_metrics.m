@@ -54,12 +54,11 @@
 
 function metrics = get_metrics(caps,thetas,varargin)
 
-
 Err.thetas                              = thetas.est-thetas.gnd; % [deg]
 metrics.thetas.ErrMean(caps.kdata,1)    = mean(Err.thetas);
 metrics.thetas.ErrStd(caps.kdata,1)     = std(Err.thetas);
 metrics.thetas.ErrRms(caps.kdata,1)     = metrics.thetas.ErrStd(caps.kdata)/metrics.thetas.ErrMean(caps.kdata);
-metrics.thetas.Err                      = [zeros(caps.NFramesTraining,1);Err.thetas];
+metrics.thetas.Err                      = [zeros(caps.NFrames.Training,1);Err.thetas];
 
 
 params.method       = "mirror";
@@ -70,21 +69,22 @@ metrics.thetas.Err_mov_std = (moving_stat_in(metrics.thetas.Err,params,"std")).'
 
 
 if ~isempty(varargin)
-    phis                                    = varargin{1};
-    Err.phis                                = phis.est-phis.gnd;        % [deg]
+    phis                                = varargin{1};
+    Err.phis                            = phis.est-phis.gnd;        % [deg]
     if ~strcmpi(caps.rx_mode,'pilots')
-        metrics.phis.ErrMean            = zeros(caps.Nfiles,1);
+        metrics.phis.ErrMean            = zeros(caps.log.Nfiles,1);
     else
-        metrics.phis.ErrMean            = zeros(caps.Nfiles,3);
+        metrics.phis.ErrMean            = zeros(caps.log.Nfiles,3);
     end
-    metrics.phis.ErrMean(caps.kdata,1)      = mean(Err.phis);
-    metrics.phis.ErrStd(caps.kdata,1)       = std(Err.phis);
-    metrics.phis.ErrRms(caps.kdata,1)       = metrics.phis.ErrStd(caps.kdata)./metrics.phis.ErrMean(caps.kdata);
+    
+    metrics.phis.ErrMean(caps.kdata,:)  = mean(Err.phis);
+    metrics.phis.ErrStd(caps.kdata,:)   = std(Err.phis);
+    metrics.phis.ErrRms(caps.kdata,:)   = metrics.phis.ErrStd(caps.kdata,:)./metrics.phis.ErrMean(caps.kdata,:);
 
     if ~strcmpi(caps.rx_mode,'pilots')
-        metrics.phis.Err                    = [zeros(caps.NBatchesTraining,1);Err.phis];
+        metrics.phis.Err                = [zeros(caps.NBatches.Training,1);Err.phis];
     else
-        metrics.phis.Err                    = Err.phis;
+        metrics.phis.Err                = Err.phis;
     end
     
     metrics.phis.Err_mov_avg = (moving_stat_in(metrics.thetas.Err,params,"average")).';

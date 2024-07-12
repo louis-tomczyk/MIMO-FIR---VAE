@@ -61,8 +61,8 @@ if caps.plot.fir
     end
 
     cd ../figs/fir
-    exportgraphics(f,sprintf("%s.png",caps.filename))
-    cd(caps.myInitPath)
+    exportgraphics(f,sprintf("%s.png",caps.log.filename))
+    cd(caps.log.myInitPath)
     pause(0.25)
 
     if caps.plot.close
@@ -72,13 +72,13 @@ if caps.plot.fir
 end
 
 cd ../err
-writematrix(metrics.thetas.Err,strcat('Err Theta-',caps.filename,'.csv'))
+writematrix(metrics.thetas.Err,strcat('Err Theta-',caps.log.filename,'.csv'))
 
 if ~isempty(varargin)
-    writematrix(metrics.phis.Err,strcat('Err Phi-',caps.filename,'.csv'))
+    writematrix(metrics.phis.Err,strcat('Err Phi-',caps.log.filename,'.csv'))
 end
 
-cd(caps.myInitPath)
+cd(caps.log.myInitPath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS
@@ -115,20 +115,20 @@ function f = plot_fir(caps,H_ests_norm)
 f = figure(1);
     subplot(2,2,1);
         hold on
-        plot(caps.FIRtaps,abs(H_ests_norm(:,1)),LineWidth=5,Color='k')
-        plot(caps.FIRtaps,abs(H_ests_norm(:,4)),'--',color = ones(1,3)*0.83,LineWidth=2)
+        plot(caps.FIR.taps,abs(H_ests_norm(:,1)),LineWidth=5,Color='k')
+        plot(caps.FIR.taps,abs(H_ests_norm(:,4)),'--',color = ones(1,3)*0.83,LineWidth=2)
         xlabel("filter taps")
         ylabel("amplitude")
         legend("$h_{11}$","$h_{22}$")
-        axis([-10,10,0,1])
+        axis([-caps.FIR.length/2-1,caps.FIR.length/2+1,0,1])
 
     subplot(2,2,2);
     hold on
-        plot(caps.FIRtaps,abs(H_ests_norm(:,2)),LineWidth=5,color = 'k')
-        plot(caps.FIRtaps,abs(H_ests_norm(:,3)),'--',color = ones(1,3)*0.83,LineWidth=2)
+        plot(caps.FIR.taps,abs(H_ests_norm(:,2)),LineWidth=5,color = 'k')
+        plot(caps.FIR.taps,abs(H_ests_norm(:,3)),'--',color = ones(1,3)*0.83,LineWidth=2)
         xlabel("filter taps")
         legend("$h_{12}$","$h_{21}$")
-        axis([-10,10,0,1])
+        axis([-caps.FIR.length/2-1,caps.FIR.length/2+1,0,1])
 % ---------------------------------------------
 
 
@@ -144,7 +144,7 @@ end
 
 hold on
 if strcmpi(caps.plot.SOP_xlabel,'error per frame')
-    scatter(caps.Frames,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    scatter(caps.Frames.array,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("frame")
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
@@ -154,15 +154,15 @@ elseif strcmpi(caps.plot.SOP_xlabel,'error per theta')
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
 elseif strcmpi(caps.plot.SOP_xlabel,'comparison per frame')
-    plot(caps.Frames,thetas.gnd,'color',[1,1,1]*0.83, LineWidth=5)
-    scatter(caps.Frames,thetas.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    plot(caps.Frames.array,thetas.gnd,'color',[1,1,1]*0.83, LineWidth=5)
+    scatter(caps.Frames.array,thetas.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
     legend("ground truth","estimation",Location="northwest")
     xlabel("frame")
     ylabel("$\hat{\theta},\theta$ [deg]")
 end
 
 title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
-      caps.method.thetas, caps.tap, ...
+      caps.method.thetas, caps.FIR.tap, ...
       metrics.thetas.ErrMean(caps.kdata),metrics.thetas.ErrStd(caps.kdata)))
 % ---------------------------------------------
 
@@ -177,7 +177,7 @@ if caps.plot.phi
 
     hold on
     if strcmpi(caps.plot.phi,'error per batch')
-        scatter(caps.Batches,phis.est-phis.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+        scatter(caps.Batches.array,phis.est-phis.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         xlabel("batch")
         ylabel("$\hat{\phi}-\phi$ [deg]")
     
@@ -187,15 +187,15 @@ if caps.plot.phi
         ylabel("$\hat{\phi}-\phi$ [deg]")
     
     elseif strcmpi(caps.plot.phi,'comparison per batch')
-        plot(caps.Batches,phis.gnd,'color',[1,1,1]*0.83, LineWidth=5)
-        scatter(caps.Batches,phis.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+        plot(caps.Batches.array,phis.gnd,'color',[1,1,1]*0.83, LineWidth=5)
+        scatter(caps.Batches.array,phis.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         legend("ground truth","estimation",Location="northwest")
         xlabel("batch")
         ylabel("$\hat{\phi},\phi$ [deg]")
     end
 
 title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
-      caps.method.phis, caps.tap, ...
+      caps.method.phis, caps.FIR.tap, ...
       metrics.phis.ErrMean(caps.kdata),metrics.phis.ErrStd(caps.kdata)))
 end
 
