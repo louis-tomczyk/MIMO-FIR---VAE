@@ -205,7 +205,7 @@ tx['pn_filt_par']       = {
 ###############################################################################
 
 rx['mode']              = 'blind'                                             # {blind, pilots}
-rx["mimo"]              = "vae"                                                # {cma,vae}
+rx["mimo"]              = "cma"                                                # {cma,vae}
 
 rx['SNRdB']             = 25                                                   # {>0}
 # rx["lr"]                = 1e-5                                                 # {>0,<1e-2} {cma ~ 1e-5, vae ~ 5e-4}
