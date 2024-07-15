@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-12
-%   Version         : 1.0.4
+%   Date            : 2024-07-15
+%   Version         : 1.0.5
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -16,6 +16,7 @@
 %   2024-07-10  (1.0.2) caps: sorting the struct
 %   2024-07-11  (1.0.3) phase noise management
 %   2024-07-12  (1.0.4) phase noise management --- for rx['mode'] = 'pilots'
+%   2024-07-15  (1.0.5) multiple files processing
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -44,21 +45,19 @@
 function caps = extract_infos(caps,data)
 
 % logistics
-data                = sort_struct_alphabet(data);
-filename            = char(caps.log.Fn{caps.kdata});
-caps.log.filename   = ['matlab',filename(1:end-4)];
+data                    = sort_struct_alphabet(data);
+filename                = char(caps.log.Fn{caps.kdata});
+caps.log.filename       = ['matlab',filename(1:end-4)];
 
 if length(caps.log.Fn) > 1
-    caps.plot.close = 1;
+    caps.plot.close     = 1;
 else
-    caps.plot.close = 0;
+    caps.plot.close     = 0;
 end
 
-if ~isnan(data.PhaseNoise_est_cpr)
-    caps.rx_mode = "pilots";
-else
-    caps.rx_mode = "blind";
-end
+
+caps.rx_mimo            = data.rx_mimo;
+caps.rx_mode            = data.rx_mode;
 
 % frames
 caps.Frames.Channel     = double(data.FrameChannel);
@@ -72,21 +71,34 @@ caps.Frames.array       = linspace(1,caps.NFrames.Channel,caps.NFrames.Channel);
 caps.NBatches.Frame     = double(data.NBatchesFrame);
 caps.NBatches.Channel   = double(data.NBatchesChannel);
 
-
-
-if isfield(data,"h_est_batch") && ~isempty(data.h_est_batch)
-    caps.est_phi            = 1;
-    if strcmpi(caps.rx_mode,'pilots')
-        caps.NBatches.FrameCut  = caps.NBatches.Frame-2;
-        caps.NBatches.Channel   = caps.NBatches.FrameCut*caps.NFrames.Channel;
-        caps.NBatches.Training  = caps.NBatches.FrameCut*caps.NFrames.Training;
+if isfield(data, 'Phis_gnd') && ~sum(sum(isnan(data.Phis_gnd)))
+    if ~(strcmpi(caps.rx_mimo ,'cma') && strcmpi(caps.rx_mode,'blind'))
+        caps.phis_est           = 1;
+        caps.Batches.array      = linspace(1,caps.NBatches.Channel,caps.NBatches.Channel);
     else
-        caps.NBatches.Training  = caps.NFrames.Training*caps.NBatches.Frame;
+        caps.phis_est           = 0;
+        caps.Batches.array      = NaN;
     end
-    caps.Batches.array          = linspace(1,caps.NBatches.Channel,caps.NBatches.Channel);
 else
-    caps.est_phi            = 0;
-    caps.plot.phis.do       = 0;
+    caps.phis_est           = 0;
+    caps.Batches.array      = NaN;
+end
+
+
+if ~strcmpi(caps.rx_mode,'pilots')
+    caps.NBatches.Training  = caps.NFrames.Training*caps.NBatches.Frame;
+    caps.NBatches.Channel   = caps.NBatches.Frame*caps.NFrames.Channel;
+
+else
+    caps.NBatches.FrameCut  = caps.NBatches.Frame-2;
+    caps.NBatches.Channel   = caps.NBatches.FrameCut*caps.NFrames.Channel;
+    caps.NBatches.Training  = caps.NBatches.FrameCut*caps.NFrames.Training;
+
+end
+
+
+if ~isfield(caps.plot.phis,'pol')
+    caps.plot.phis.pol = 1;
 end
 
 % fir
@@ -108,7 +120,7 @@ elseif strcmpi(data.ThLaw,'gauss')
 end
 
 
-if caps.est_phi && strcmpi(data.PhLaw,'lin')
+if caps.phis_est && strcmpi(data.PhLaw,'lin') && ~sum(sum(isnan(data.Phis_gnd)))
     what_carac    = [what_carac,string({'PhEnd','Sph'})];
 elseif strcmp(data.PhLaw,'Linewidth')
     what_carac    = [what_carac,string({'dnu'})];
@@ -116,13 +128,17 @@ end
 
 caps.carac.what     = what_carac(2:end);
 
+caps.carac.values   = zeros(length(caps.log.Fn),length(caps.carac.what));
 for k = 1:length(caps.carac.what)
-    caps.carac.values(k)   = get_value_from_filename_in(caps.log.PathSave,caps.carac.what{k},caps.log.Fn);
+    caps.carac.values(:,k)   = get_value_from_filename_in(caps.log.PathSave,caps.carac.what{k},caps.log.Fn);
 end
+
+caps.carac.Ncarac   = length(caps.carac.what);
 
 caps = sort_struct_alphabet(caps);
 
 end
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

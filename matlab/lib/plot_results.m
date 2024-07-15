@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-12
-%   Version         : 1.1.3
+%   Date            : 2024-07-15
+%   Version         : 1.1.4
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -17,6 +17,7 @@
 %   2024-07-10 (1.1.1)  flexibility and naming standardisation
 %   2024-07-11 (1.1.2)  plot for phase estimation per batch (1.1.0 == per frame)
 %   2024-07-12 (1.1.3)  phase noise management --- for rx['mode'] = 'pilots'
+%   2024-07-15 (1.1.4)  multiple files processing
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -137,7 +138,7 @@ f = figure(1);
 function f = plot_SOP(caps,thetas,metrics)
 
 f = figure(1);
-if caps.plot.phis.do
+if caps.phis_est
     subplot(2,2,3)
 else
     subplot(2,2,[3,4])
@@ -164,7 +165,7 @@ end
 
 title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
       caps.method.thetas, caps.FIR.tap, ...
-      metrics.thetas.ErrMean(caps.kdata),metrics.thetas.ErrStd(caps.kdata)))
+      metrics.thetas.ErrMean,metrics.thetas.ErrStd))
 % ---------------------------------------------
 
 
@@ -173,7 +174,7 @@ title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
 function f = plot_phi(caps,phis,metrics)
 
 f = figure(1);
-if caps.plot.phis.do
+if caps.phis_est
     subplot(2,2,4)
     
     hold on
@@ -185,7 +186,7 @@ if caps.plot.phis.do
         ylabel("$\hat{\phi}-\phi$ [deg]")
     
     elseif strcmpi(caps.plot.phis.xlabel,'error per phi')
-        scatter(phis.gnd(:,caps.plot.phis.pol), ...
+        scatter(phis.gnd.channel(:,caps.plot.phis.pol), ...
                 phis.est.channel(:,caps.plot.phis.pol)-phis.gnd.channel(:,caps.plot.phis.pol), ...
                 100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         xlabel("$\phi$ [deg]")
@@ -193,7 +194,7 @@ if caps.plot.phis.do
     
     elseif strcmpi(caps.plot.phis.xlabel,'comparison per batch')
         plot(caps.Batches.array, ...
-             phis.gnd.channel(:,caps.plot.phis.pol), ...
+             phis.gnd.channel, ...
              'color',[1,1,1]*0.83, LineWidth=5)
         scatter(caps.Batches.array,phis.est.channel(:,caps.plot.phis.pol),...
                 100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')

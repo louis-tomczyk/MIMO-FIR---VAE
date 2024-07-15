@@ -3,21 +3,22 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-12
-%   Version         : 1.1.2
+%   Date            : 2024-07-15
+%   Version         : 1.1.3
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
 % 
 % ----- CHANGE LOG -----
-%   2024-07-06 (1.0.0)  creation
-%   2024-07-09 (1.1.0)  [NEW] check_fir, check_orthogonality
+%   2024-07-06  (1.0.0) creation
+%   2024-07-09  (1.1.0) [NEW] check_fir, check_orthogonality
 %                       extract_thetas_est: fftshift for natural FIR checking
 %                       extract_phis_est: checking orthogonality + working phase estimation
-%   2024-07-11 (1.1.1)  phase noise management
-%   2024-07-12 (1.1.2)  phase noise management --- for rx['mode'] = 'pilots'
+%   2024-07-11  (1.1.1) phase noise management
+%   2024-07-12  (1.1.2) phase noise management --- for rx['mode'] = 'pilots'
 %                       [REMOVED] check_fir
+%   2024-07-15  (1.1.3) multiple files processing
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -49,10 +50,10 @@ H_est           = zeros([2,2,caps.FIR.length]);
 thetas.est      = zeros([caps.NFrames.Channel-1,1]);
 H_est_f         = zeros([caps.NFrames.Channel,size(H_est)]);
 
-if caps.est_phi == 1 && ~strcmpi(caps.rx_mode,'pilots')
+if caps.phis_est == 1 && ~strcmpi(caps.rx_mode,'pilots')
     phis.est.all    = zeros([caps.NBatches.Frame,caps.NFrames.Channel]);
 
-elseif caps.est_phi == 1 && strcmpi(caps.rx_mode,'pilots')
+elseif caps.phis_est == 1 && strcmpi(caps.rx_mode,'pilots')
     % 3 = polH, polV, mean(polH,polV)
     phis.est.all    = zeros([caps.NBatches.FrameCut*caps.NFrames.all,3]);
 else
@@ -64,7 +65,7 @@ for k = 1:caps.NFrames.Channel
     H_est                   = extract_Hest(data,caps);
     [thetas.est(k),H_est_f] = extract_thetas_est(H_est,k,H_est_f,caps); % [deg]
 
-    if ~strcmpi(caps.rx_mode,'pilots') &&  caps.est_phi
+    if ~strcmpi(caps.rx_mode,'pilots') &&  caps.phis_est
         for j = 1:caps.NBatches.Frame
             caps.batch          = (caps.Frame-1)*caps.NBatches.Frame+j;
             H_est               = extract_Hest(data,caps,H_est);
@@ -73,35 +74,40 @@ for k = 1:caps.NFrames.Channel
     end
 end
 
-if ~strcmpi(caps.rx_mode, 'pilots') && ~isnan(phis)
-    tmp             = phis.est.all;
-    phis.est.all    = zeros(caps.NFrames.Channel*caps.NBatches.Frame,1);
-    for k = 1:caps.NFrames.Channel
-        phis.est.all(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame,1) = tmp(:,k);
-    end
-elseif strcmpi(caps.rx_mode, 'pilots')
-    polH = squeeze(data.PhaseNoise_est_cpr(:,1,:));
-    polV = squeeze(data.PhaseNoise_est_cpr(:,2,:));
-
-    for k = 1:caps.NFrames.all
-        phis.est.all(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,1) = polH(k,:)';
-        phis.est.all(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,2) = polV(k,:)';
-    end
-
-    phis.est.all(:,3) = mean(phis.est.all(:,1:2), 2);
-else
-end
-
-
-
-if caps.est_phi
-    phis.est.channel = phis.est.all(caps.NBatches.Training+1:end,:);
+% handmade flattening
+if caps.phis_est
+    if ~strcmpi(caps.rx_mode, 'pilots') && ~isempty(phis.est) % if vae
+        tmp             = phis.est.all;
+        phis.est.all    = zeros(caps.NFrames.Channel*caps.NBatches.Frame,1);
+        for k = 1:caps.NFrames.Channel
+            phis.est.all(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame,1) = tmp(:,k);
+        end
+    elseif strcmpi(caps.rx_mode, 'pilots')
+        polH = squeeze(data.PhaseNoise_est_cpr(:,1,:));
+        polV = squeeze(data.PhaseNoise_est_cpr(:,2,:));
     
-    if ~isfield(caps.plot.phis, 'pol')
-        caps.plot.phis.pol = 3;          % 1 = polH, 2 = polV, 3 = mean
+        for k = 1:caps.NFrames.all
+            phis.est.all(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,1) = polH(k,:)';
+            phis.est.all(1+(k-1)*caps.NBatches.FrameCut:k*caps.NBatches.FrameCut,2) = polV(k,:)';
+        end
+    
+        phis.est.all(:,3) = mean(phis.est.all(:,1:2), 2);
+    else
     end
 
+    if caps.phis_est && strcmpi(caps.rx_mode, 'pilots')
+        phis.est.channel = phis.est.all(caps.NBatches.Training+1:end,:);
+        
+        if ~isfield(caps.plot.phis, 'pol')
+            caps.plot.phis.pol = 3;          % 1 = polH, 2 = polV, 3 = mean
+        end
+    else
+        phis.est.channel    = phis.est.all;
+        phis.est            = rmfield(phis.est,'all');
+    end
 end
+
+
 
 
 
@@ -122,8 +128,8 @@ if caps.plot.poincare
     [Sest,f]   = FIR2Stockes(FIRest,params);
 
     cd ../figs/poincare
-    saveas(f,sprintf("%s --- Poincare.png",caps.filename))
-    cd(caps.myInitPath)
+    saveas(f,sprintf("%s --- Poincare.png",caps.log.filename))
+    cd(caps.log.myInitPath)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -182,22 +188,24 @@ if strcmpi(what,'frame')
     check_orthogonality(H_est.frame,caps)
 else
 
-    h_est_11_I_j        = reshape(data.h_est_batch(caps.batch,1,1,1,:),[1,caps.FIR.length]);
-    h_est_12_I_j        = reshape(data.h_est_batch(caps.batch,1,2,1,:),[1,caps.FIR.length]);
-    h_est_21_I_j        = reshape(data.h_est_batch(caps.batch,2,1,1,:),[1,caps.FIR.length]);
-    h_est_22_I_j        = reshape(data.h_est_batch(caps.batch,2,2,1,:),[1,caps.FIR.length]);
+    if ~isempty(data.h_est_batch)
+        h_est_11_I_j        = reshape(data.h_est_batch(caps.batch,1,1,1,:),[1,caps.FIR.length]);
+        h_est_12_I_j        = reshape(data.h_est_batch(caps.batch,1,2,1,:),[1,caps.FIR.length]);
+        h_est_21_I_j        = reshape(data.h_est_batch(caps.batch,2,1,1,:),[1,caps.FIR.length]);
+        h_est_22_I_j        = reshape(data.h_est_batch(caps.batch,2,2,1,:),[1,caps.FIR.length]);
+        
+        h_est_11_Q_j        = reshape(data.h_est_batch(caps.batch,1,1,2,:),[1,caps.FIR.length]);
+        h_est_12_Q_j        = reshape(data.h_est_batch(caps.batch,1,2,2,:),[1,caps.FIR.length]);
+        h_est_21_Q_j        = reshape(data.h_est_batch(caps.batch,2,1,2,:),[1,caps.FIR.length]);
+        h_est_22_Q_j        = reshape(data.h_est_batch(caps.batch,2,2,2,:),[1,caps.FIR.length]);
     
-    h_est_11_Q_j        = reshape(data.h_est_batch(caps.batch,1,1,2,:),[1,caps.FIR.length]);
-    h_est_12_Q_j        = reshape(data.h_est_batch(caps.batch,1,2,2,:),[1,caps.FIR.length]);
-    h_est_21_Q_j        = reshape(data.h_est_batch(caps.batch,2,1,2,:),[1,caps.FIR.length]);
-    h_est_22_Q_j        = reshape(data.h_est_batch(caps.batch,2,2,2,:),[1,caps.FIR.length]);
-
-    H_est.batch(1,1,:)  = complex(h_est_11_I_j, h_est_11_Q_j);
-    H_est.batch(1,2,:)  = complex(h_est_12_I_j, h_est_12_Q_j);
-    H_est.batch(2,1,:)  = complex(h_est_21_I_j, h_est_21_Q_j);
-    H_est.batch(2,2,:)  = complex(h_est_22_I_j, h_est_22_Q_j);
-
-    check_orthogonality(H_est.batch,caps)
+        H_est.batch(1,1,:)  = complex(h_est_11_I_j, h_est_11_Q_j);
+        H_est.batch(1,2,:)  = complex(h_est_12_I_j, h_est_12_Q_j);
+        H_est.batch(2,1,:)  = complex(h_est_21_I_j, h_est_21_Q_j);
+        H_est.batch(2,2,:)  = complex(h_est_22_I_j, h_est_22_Q_j);
+    
+        check_orthogonality(H_est.batch,caps)
+    end
 end
 
 

@@ -4,8 +4,8 @@
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
 %   Arxivs          :
-%   Date            : 2024-07-12
-%   Version         : 1.0.3
+%   Date            : 2024-07-15
+%   Version         : 1.0.4
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -18,6 +18,7 @@
 %                       flexibility and naming normalisation
 %   2024-07-11  (1.0.2) phase noise management
 %   2024-07-12  (1.0.3) phase noise management --- for rx['mode'] = 'pilots'
+%   2024-07-15  (1.1.3) multiple files processing + poincare plotting without FIRgnd
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -47,14 +48,14 @@ function [thetas, phis] = extract_ground_truth(data,caps,thetas,phis)
     
 thetas.gnd  = data.thetas(caps.Frames.Channel+1:end,2)*180/pi;              % [deg]
 
-if caps.plot.phis.do
+if caps.phis_est
     if ~strcmpi(caps.rx_mode,'pilots')
         phis.gnd.all    = data.Phis_gnd(caps.Frames.Channel+1:end,:)*180/pi;   % [deg]
         tmp_phi         = zeros(numel(phis.gnd.all),1);
         for k = 1:caps.NFrames.Channel
             tmp_phi(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame) = phis.gnd.all(k,:);
         end
-        phis.gnd    = tmp_phi;
+        phis.gnd.all    = tmp_phi;
 
     else
         % 1:end-1 as we removed first and last batch in python processing
@@ -69,16 +70,28 @@ else
     phis = NaN;
 end
 
-if caps.est_phi
-    phis.gnd.channel = phis.gnd.all(caps.NBatches.Training+1:end,:);
+if caps.phis_est
+    if strcmpi(caps.rx_mode, 'pilots')
+        phis.gnd.channel    = phis.gnd.all(caps.NBatches.Training+1:end,1);
+    else
+        phis.gnd.channel    = phis.gnd.all;
+        phis.gnd            = rmfield(phis.gnd,'all');
+    end
 end
 
-
 if caps.plot.poincare
+
+    J = zeros(2,caps.NFrames.Channel);
+    for k = 1:caps.NFrames.Channel
+        m = k+caps.NFrames.Training;
+        THETA = data.thetas(m,2);
+        J(:,k) = [cos(THETA), sin(THETA)];
+    end
+    
     params = {"marker"  ,'square'   ,...
           "size"    , 100        ,...
           "fill"    , ''};
-    FIR2Stockes(FIRgnd,params);
+    Jones2Stockes(J,params);
 end
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -4,8 +4,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-10
-%   Version         : 1.1.0
+%   Date            : 2024-07-15
+%   Version         : 1.1.1
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -17,6 +17,7 @@
 %                       of 'moving_average/std' 
 %                       encapsulating in structures metrics
 %                       naming standardisation
+%   2024-07-15  (1.1.1) multiple files processing
 % 
 % ----- MAIN IDEA -----
 %   Evaluate estimation errors
@@ -54,23 +55,25 @@
 
 function metrics = get_metrics(caps,thetas,varargin)
 
-Err.thetas                              = thetas.est-thetas.gnd; % [deg]
-metrics.thetas.ErrMean(caps.kdata,1)    = mean(Err.thetas);
-metrics.thetas.ErrStd(caps.kdata,1)     = std(Err.thetas);
-metrics.thetas.ErrRms(caps.kdata,1)     = metrics.thetas.ErrStd(caps.kdata)/metrics.thetas.ErrMean(caps.kdata);
-metrics.thetas.Err                      = [zeros(caps.NFrames.Training,1);Err.thetas];
+Err.thetas                  = thetas.est-thetas.gnd; % [deg]
+
+metrics.thetas.ErrMean      = mean(Err.thetas);
+metrics.thetas.ErrStd       = std(Err.thetas);
+metrics.thetas.ErrRms       = metrics.thetas.ErrStd/metrics.thetas.ErrMean;
+
+metrics.thetas.Err          = [zeros(caps.NFrames.Training,1);Err.thetas];
 
 
-params.method       = "mirror";
-params.period       = 5;
+params.method               = "mirror";
+params.period               = 5;
 
-metrics.thetas.Err_mov_avg = (moving_stat_in(metrics.thetas.Err,params,"average")).';
-metrics.thetas.Err_mov_std = (moving_stat_in(metrics.thetas.Err,params,"std")).';
+metrics.thetas.Err_mov_avg  = (moving_stat_in(metrics.thetas.Err,params,"average")).';
+metrics.thetas.Err_mov_std  = (moving_stat_in(metrics.thetas.Err,params,"std")).';
 
 
 if ~isempty(varargin)
     phis                                = varargin{1};
-    Err.phis                            = phis.est.all-phis.gnd.all;        % [deg]
+    Err.phis                            = phis.est.channel-phis.gnd.channel;        % [deg]
     if ~strcmpi(caps.rx_mode,'pilots')
         metrics.phis.ErrMean            = zeros(caps.log.Nfiles,1);
     else
