@@ -4,8 +4,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-12
-%   Version         : 2.0.4
+%   Date            : 2024-07-15
+%   Version         : 2.0.5
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -18,14 +18,14 @@
 %   2024-04-18  (1.1.3) import_data
 %   2024-04-19  (1.1.4) <Err Theta>
 %   ------------------
-%   2024-07-06  
-% (2.0.0) encapsulation into modules
+%   2024-07-06  (2.0.0) encapsulation into modules
 %                       [REMOVED] check_if_fibre_prop
 %   2024-07-09  (2.0.1) phase estimation
 %   2024-07-10  (2.0.2) flexibility and naming standardisation
 %   2024-07-11  (2.0.3) cleaning caps structure 
 %   2024-07-12  (2.0.4) phase noise management --- for rx['mode'] = 'pilots'
 %                       import_data: caps structuring
+%   2024-07-15  (2.0.5  multiple files processing
 %
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -47,17 +47,20 @@
 %% MAINTENANCE
 rst
 
-cd(strcat('../python/data-',caps.log.Date,"/mat"))
+% cd(strcat('../python/data-',caps.log.Date,"/mat"))
+
+cd(strcat('../python/data-',caps.log.Date,"/mat_phi"))
 caps.log.myInitPath     = pwd();
 [allData,caps]          = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
 cd(caps.log.myInitPath)
+
 caps.plot.fir           = 1;
-caps.plot.poincare      = 0;
-caps.plot.phis.do       = 1;
+caps.plot.poincare      = 1;
 caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
-caps.plot.phis.xlabel   = 'comparison per batch';
+caps.plot.phis.xlabel   = 'error per phi';
 caps.method.thetas      = 'fft';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
+
 
 
 for tap = 7:7
@@ -72,7 +75,7 @@ for tap = 7:7
         [caps,thetas,phis, H_est]   = channel_estimation(data,caps);
         [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
         
-        if caps.plot.phis.do
+        if caps.phis_est
             metrics             = get_metrics(caps,thetas,phis);
             plot_results(caps,H_est, thetas,metrics,phis);
         else
@@ -80,36 +83,47 @@ for tap = 7:7
             plot_results(caps,H_est, thetas,metrics);
         end
 
+        cd ../err
+
+        if kdata == 1
+            Mthetas         =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
+            if caps.phis_est
+                Mthetas     =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
+            end
+        end
+        Mthetas(kdata,:)    = [caps.carac.values(kdata,:),...
+                               metrics.thetas.ErrMean,...
+                               metrics.thetas.ErrStd,...
+                               metrics.thetas.ErrRms];
+
+        if caps.phis_est
+            Mphis(kdata,:)  = [caps.carac.values(kdata,:),...
+                               metrics.phis.ErrMean(end),...
+                               metrics.phis.ErrStd(end),...
+                               metrics.phis.ErrRms(end)];
+
+        end
     end
+
 end
 
-cd ../err
-tmp                 = zeros(size(caps.carac.values));
-Mthetas             = [caps.carac.values,...
-                       metrics.thetas.ErrMean,...
-                       metrics.thetas.ErrStd,...
-                       metrics.thetas.ErrRms];
-Mthetas(end+1,:)    = [tmp,...
-                       median(metrics.thetas.ErrMean),...
-                       median(metrics.thetas.ErrStd),...
-                       median(metrics.thetas.ErrRms)];
 
+Mthetas(end,:)  = [caps.carac.values(kdata,:),...
+                   median(metrics.thetas.ErrMean),...
+                   median(metrics.thetas.ErrStd),...
+                   median(metrics.thetas.ErrRms)];
 writematrix(Mthetas,strcat('<Err Theta>-',caps.log.filename,'.csv'))
 
-% (end), for rx_mode = pilots
-if caps.plot.phis.do
-    Mphis           = [caps.carac.values,...
-                       metrics.phis.ErrMean(end),...
-                       metrics.phis.ErrStd(end),...
-                       metrics.phis.ErrRms(end)];
 
-    Mphis(end+1,:)  = [tmp,...
-                       median(metrics.phis.ErrMean(end)),...
-                       median(metrics.phis.ErrStd(end)),...
-                       median(metrics.phis.ErrRms(end))];
-
+if caps.phis_est
+    Mphis(end,:)= [caps.carac.values(kdata,:),...
+                   median(metrics.phis.ErrMean(end)),...
+                   median(metrics.phis.ErrStd(end)),...
+                   median(metrics.phis.ErrRms(end))];
     writematrix(Mphis,strcat('<Err Phi>-',caps.log.filename,'.csv'))
 end
+
+
 
 cd(caps.log.myRootPath)
 
