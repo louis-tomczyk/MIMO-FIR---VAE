@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.4.0
-#   Date            : 2024-07-11
+#   Version         : 2.0.2
+#   Date            : 2024-07-15
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -44,6 +44,8 @@
 #                       find_string -> find_substring
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
+#   2.0.1 (2024-07-13) - save2mat: adding 'flag_phase_noise' in output dict
+#   2.0.2 (2024-07-15)  save2mat: adding rx mode
 # 
 # ----- MAIN IDEA -----
 #   Miscellaneous functions for logistics and plots
@@ -916,15 +918,18 @@ def save2mat(tx,fibre,rx,saving):
                 'FrameChannel'      : rx["FrameChannel"],
                 'NBatchesFrame'     : rx['NBatchFrame'],
                 'NBatchesChannel'   : rx['NBatchesChannel'],
-                'Phis_gnd'          : tx["PhaseNoise_unique"],
+                'Phis_gnd'          : tx["PhaseNoise_unique"] if tx['flag_phase_noise'] else np.nan,
                 'SNRdBs'            : rx["SNRdBs"],
                 'SER_means'         : rx["SERs"],
                 'SER_valid'         : rx["SER_valid"],
                 'Var_est'           : rx["Pnoise_est"],
+                'flag_phase_noise'  : tx['flag_phase_noise'],
                 'PhaseNoise_est_cpr': rx['PhaseNoise_pilots'] if rx['mode'].lower() == "pilots"\
                                             else np.nan,
                 'ThLaw'             : fibre["ThetasLaw"]['law'],
                 'PhLaw'             : tx['PhiLaw']["law"],
+                'rx_mimo'           : rx['mimo'],
+                'rx_mode'           : rx['mode']
                 }
     
     

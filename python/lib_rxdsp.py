@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.7.3
-#   Date            : 2024-07-10
+#   Version         : 2.0.1
+#   Date            : 2024-07-16
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -75,6 +75,8 @@
 #                        along with main (1.4.3)
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL->LIB_PLOT + cleaning
+#   2.0.1 (2024-07-16) - CPR_pilots,remove_symbols, find_shift: managing offset
+#                           for pilots
 # 
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
@@ -156,7 +158,7 @@ def receiver(tx,rx,saving):
     rx              = remove_symbols(rx,'data')#,'data removal')
     rx              = CPR_pilots(tx, rx)#, 'demod','corr')#,'trace loss')#,'demod','corr')     # {align,demod,time trace pn, time trace pn loss, trace loss}
     rx              = SNR_estimation(tx, rx)
-    rx              = decision(tx,rx)#,"const norm",'time decision')         # {time decision, const decision, const norm}
+    rx              = decision(tx,rx)#,"const norm")#, 'pilots removal')#,"const norm",'time decision')         # {time decision, const decision, const norm, pilots removal}
     tx,rx           = find_shift(tx, rx)#,'corr', 'err dec')                              # {corr, err dec}
     tx,rx           = compensate_and_truncate(tx,rx)#, 'err dec','corr')     # {corr, err dec}
     rx              = SER_estimation(tx, rx)#, 'err dec')                      # {err dec}
@@ -296,17 +298,13 @@ def CPR_pilots(tx,rx,*varargin):
         rx_H_rs             = np.reshape(rx_H, (rx['NBatchFrame_pilots'],-1))
         rx_V_rs             = np.reshape(rx_V, (rx['NBatchFrame_pilots'],-1))
 
-        # shaping using convolution puts symboles at end of previous batch
-        # and at beginning of current batch. the number of the latter is named
-        # ``offset_conv"
-        offset_conv         = rx['NSymb_pilots_cpr'] - tx['NSymbTaps']
         for k in range(int(rx['NBatchFrame_pilots'])):
             
-            pilots_H_begin  = rx_H_rs[k, :offset_conv+1].reshape((1,-1))
-            pilots_V_begin  = rx_V_rs[k, :offset_conv+1].reshape((1,-1))
+            pilots_H_begin  = rx_H_rs[k, :['offset_conv_begin']].reshape((1,-1))
+            pilots_V_begin  = rx_V_rs[k, :['offset_conv_begin']].reshape((1,-1))
             
-            pilots_H_end    = rx_H_rs[k, -offset_conv+3:].reshape((1,-1))
-            pilots_V_end    = rx_V_rs[k, -offset_conv+3:].reshape((1,-1))
+            pilots_H_end    = rx_H_rs[k, -rx['offset_conv_end']:].reshape((1,-1))
+            pilots_V_end    = rx_V_rs[k, -rx['offset_conv_end']:].reshape((1,-1))
             
             rx_H_pilots[k] = np.concatenate((pilots_H_begin,pilots_H_end),axis = 1)
             rx_V_pilots[k] = np.concatenate((pilots_V_begin,pilots_V_end),axis = 1)
@@ -628,11 +626,10 @@ def find_shift(tx,rx,*varargin):
     ref     = tx['Symb_real'].numpy()
     
     if rx['mode'].lower() != 'blind':
-        
-        offset_conv = rx['NSymb_pilots_cpr'] - tx['NSymbTaps']        
+          
         tmp         = ref[:,:,rx['NSymbBatch']:-rx['NSymbBatch']]
         tmp         = np.reshape(tmp,(2,2,rx['NBatchFrame_pilots'],-1))
-        tmp         = tmp[:,:,:,offset_conv+1:-offset_conv+3]
+        tmp         = tmp[:,:,:,rx['offset_conv_begin']:-rx['offset_conv_end']]
         tmp         = np.reshape(tmp,(2,2,-1))
         del ref
         ref         = tmp
@@ -721,10 +718,7 @@ def mimo(tx,rx,saving,*varargin):
 
                 
                 if rx['save_channel_batch']:
-                    # rx['h_est_batch'].append(rx['h_est'].detach().numpy())
-                    rx['h_est_batch'].append(rx['h_est'].tolist())
-                    # print(len(rx['h_est_batch']))
-                    
+                    rx['h_est_batch'].append(rx['h_est'].tolist())                   
 
     
     # ---------------------------------------------------------------- to check
@@ -800,8 +794,7 @@ def remove_symbols(rx,what, *varargin):
         return rx
     
     if type(what) == dict:
-        offset_conv     = rx['NSymb_pilots_cpr'] - what['NSymbTaps']
-        
+
         ZHItmp  = np.round(np.reshape(rx["sig_eq_real"][0], (1, -1)).squeeze(), 4)
         ZHQtmp  = np.round(np.reshape(rx["sig_eq_real"][1], (1, -1)).squeeze(), 4)
         ZVItmp  = np.round(np.reshape(rx["sig_eq_real"][2], (1, -1)).squeeze(), 4)
@@ -812,10 +805,10 @@ def remove_symbols(rx,what, *varargin):
         ZVIrs   = np.reshape(ZVItmp,(rx['NBatchFrame_pilots'],-1))
         ZVQrs   = np.reshape(ZVQtmp,(rx['NBatchFrame_pilots'],-1))
         
-        ZHIcut  = ZHIrs[:,offset_conv+1:-offset_conv+3]
-        ZHQcut  = ZHQrs[:,offset_conv+1:-offset_conv+3]
-        ZVIcut  = ZVIrs[:,offset_conv+1:-offset_conv+3]
-        ZVQcut  = ZVQrs[:,offset_conv+1:-offset_conv+3]
+        ZHIcut  = ZHIrs[:,rx['offset_conv_begin']:-rx['offset_conv_end']]
+        ZHQcut  = ZHQrs[:,rx['offset_conv_begin']:-rx['offset_conv_end']]
+        ZVIcut  = ZVIrs[:,rx['offset_conv_begin']:-rx['offset_conv_end']]
+        ZVQcut  = ZVQrs[:,rx['offset_conv_begin']:-rx['offset_conv_end']]
 
         Zcut    = [ZHIcut,ZHQcut,ZVIcut,ZVQcut]
         

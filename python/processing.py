@@ -4,8 +4,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.4
-#   Date            : 2024-07-10
+#   Version         : 1.3.6
+#   Date            : 2024-07-16
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -50,6 +50,8 @@
 #                        along with main (1.4.3)
 #                      - init_processing: saving per frame/bacth?
 #   1.3.5 (2024-07-11) - save_data: managing phase noise
+#   1.3.6 (2024-07-16) - init_processing: managing offset for pilots removal
+#                           previously manually adjusted in rxdsp
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -273,7 +275,14 @@ def init_processing(tx, fibre, rx, saving, device):
             
         rx['NSymbEq']   = rx["NSymbFrame"]-2*rx['NSymbBatch']        
         rx['NSymbSER']  = rx['NSymbEq'] - rx['NBatchFrame_pilots']*(rx['NSymb_pilots_cpr'])
-            
+        
+        # shaping using convolution puts symboles at end of previous batch
+        # and at beginning of current batch. the number of the latter is named
+        # ``offset_conv"
+        
+        rx['offset_conv_begin'] = rx['NSymb_pilots_cpr'] - tx['NSymbTaps']+1
+        rx['offset_conv_end'] = rx['NSymb_pilots_cpr'] - rx['offset_conv_begin']
+
     else:
         if rx['mimo'].lower() == "vae":
             rx['NSymbSER'] = rx["NSymbFrame"]

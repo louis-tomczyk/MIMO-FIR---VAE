@@ -97,7 +97,7 @@ tx,fibre,rx,saving,flags        = misc.init_dict()
 tx["Rs"]                        = 64e9                                         # [Baud] Symbol rate
 tx['SNRdB']                     = 50
 
-tx['flag_phase_noise']          = 1
+tx['flag_phase_noise']          = 0
 paramPHI                        = [1e5]                                        # [Hz] laser linewidth
 
 # -----------------------------------------------------------------------------
@@ -204,7 +204,8 @@ tx['pn_filt_par']       = {
 ################################## RECEIVER ###################################
 ###############################################################################
 
-rx['mode']              = 'blind'                                             # {blind, pilots}
+
+rx['mode']              = 'pilots'                                             # {blind, pilots}
 rx["mimo"]              = "cma"                                                # {cma,vae}
 
 rx['SNRdB']             = 25                                                   # {>0}
@@ -242,7 +243,7 @@ if rx['mimo'].lower() == "cma":
 else:
     paramLR                         = np.array([500])*1e-6                     # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
 
-paramFIRlen                     = [7]
+paramFIRlen                     = [9]
 
 
 fibre['PMD']                    = 0.00                                         # [ps/sqrt(km)]
