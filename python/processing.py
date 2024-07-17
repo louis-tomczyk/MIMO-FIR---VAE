@@ -1,11 +1,10 @@
-# %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.6
-#   Date            : 2024-07-16
+#   Version         : 1.3.7
+#   Date            : 2024-07-17
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -52,6 +51,8 @@
 #   1.3.5 (2024-07-11) - save_data: managing phase noise
 #   1.3.6 (2024-07-16) - init_processing: managing offset for pilots removal
 #                           previously manually adjusted in rxdsp
+#   1.3.7 (2024-07-17) - init_processing, print_results, save_data: managing
+#                           elapsed time
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -335,6 +336,11 @@ def init_processing(tx, fibre, rx, saving, device):
                                         rx['NFrames']),dtype = np.float32)
 
 
+    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+        tx['get_exec_time'].append(np.zeros((1,rx['NFrames'])))
+        tx['get_exec_time'][1] = time.time()
+        
+        
     tx      = misc.sort_dict_by_keys(tx)
     fibre   = misc.sort_dict_by_keys(fibre)
     rx      = misc.sort_dict_by_keys(rx)
@@ -376,6 +382,12 @@ def init_train(tx, rx, frame):
 # %%
 def print_results(loss, frame, tx, fibre, rx, saving):
 
+    
+    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+        dt = time.time()-tx['get_exec_time'][1]
+        tx['get_exec_time'][1] = time.time()
+        tx['get_exec_time'][2][0,rx['Frame']] = dt
+        
     SER_valid   = rx["SER_valid"]
     SERs        = rx["SERs"]
     Losses      = rx["Losses"]
@@ -434,6 +446,9 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                   '--- Theta    = %.2f'     % (thetak*180/np.pi),
                   '--- std(Phi) = %.1f'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
                   '--- <SER>    = %.2e'     % SERmeank,
+                  '--- dt       = %.2e'     % dt \
+                      if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      else None
                   )
         else:
             print("frame %d" % frame,
@@ -441,6 +456,9 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                   '--- SNRdB    = %.2f'     % SNRdBk,
                   '--- Theta    = %.2f'     % (thetak*180/np.pi),
                   '--- <SER>    = %.2e'     % SERmeank,
+                  '--- dt       = %.2e'     % dt \
+                      if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      else None
                   )
             
     else:
@@ -450,14 +468,25 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                   '--- Theta    = %.2f'     % (thetak*180/np.pi),
                   '--- std(Phi) = %.1f'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
                   '--- <SER>    = %.2e'     % SERmeank,
+                  '--- dt       = %.2e'     % dt \
+                      if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      else None
                   )
         else:
             print("frame %d" % frame,
                   '--- loss     = %.3e'     % lossk,
                   '--- Theta    = %.2f'     % (thetak*180/np.pi),
                   '--- <SER>    = %.2e'     % SERmeank,
+                  '--- dt       = %.2e'     % dt \
+                      if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      else None
                   )
     #'''
+    
+    
+    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+        dt      = np.array(tx['get_exec_time'][2][0,:rx['Frame']+1]).reshape((-1,1))
+        array   = np.concatenate((array,dt),axis = 1)
 
     return array
 
@@ -477,22 +506,23 @@ def save_data(tx, fibre, rx, saving, array):
         Phis            = tx['PhaseNoise_unique'][:,rx['NBatchFrame']-1].reshape((-1,1))*180/pi
         array2          = np.concatenate((array, Thetas, Phis), axis=1)
 
+
     if rx["mimo"].lower() == "vae":
         if tx['flag_phase_noise'] == 0:
-            misc.array2csv(array2, saving["filename"],\
-                           ["iteration","loss", "SNR", "SER", "Thetas"])
+            save_tmp = ["iteration","loss", "SNR", "SER", "Thetas"]
         else:
-            misc.array2csv(array2, saving["filename"],\
-                           ["iteration","loss", "SNR", "SER", "Thetas",'Phis'])
-                
+            save_tmp = ["iteration","loss", "SNR", "SER", "Thetas","Phis"]
+            
     else:
         if tx['flag_phase_noise'] == 0:
-            misc.array2csv(array2, saving["filename"],\
-                           ["iteration", "loss", "SER", "Thetas"])
-
+            save_tmp = ["iteration","loss", "SER", "Thetas"]
         else:
-            misc.array2csv(array2, saving["filename"],\
-                           ["iteration","loss", "SER", "Thetas",'Phis'])
+            save_tmp = ["iteration","loss", "SER", "Thetas","Phis"]
+
+    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+            save_tmp.append("dt")
+    
+    misc.array2csv(array2,saving["filename"],save_tmp)
 
     tx      = misc.sort_dict_by_keys(tx)
     fibre   = misc.sort_dict_by_keys(fibre)

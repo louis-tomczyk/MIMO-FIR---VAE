@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.4.4
-#   Date            : 2024-07-11
+#   Version         : 2.0.0
+#   Date            : 2024-07-12
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -30,6 +30,7 @@
 #                           misc (1.4.0)
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
+#   2.0.1 (2024-07-17) - saving elapsed time
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -97,7 +98,7 @@ tx,fibre,rx,saving,flags        = misc.init_dict()
 tx["Rs"]                        = 64e9                                         # [Baud] Symbol rate
 tx['SNRdB']                     = 50
 
-tx['flag_phase_noise']          = 0
+
 paramPHI                        = [1e5]                                        # [Hz] laser linewidth
 
 # -----------------------------------------------------------------------------
@@ -122,11 +123,11 @@ paramPHI                        = [1e5]                                        #
 # -------------------------------------------------------
 
 
-# tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
-# tx["nu"]                        = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
+tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
+tx["nu"]                        = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
 
-tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
-tx["nu"]                        = 0.1089375                                       # for PCS: exp(-nu*|x|^2)/...
+# tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
+# tx["nu"]                        = 0.1089375                                       # for PCS: exp(-nu*|x|^2)/...
 
 # -----------------------------------------------------------------------------
 # Pilots management
@@ -172,7 +173,7 @@ tx["nu"]                        = 0.1089375                                     
 
 
 rx["NSymbFrame"]        = int(12800)
-rx['NSymbBatch']        = int(160)
+# rx['NSymbBatch']        = int(140)
 
 
 
@@ -184,7 +185,7 @@ tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]         #ok
 tx['PhiLaw']["kind"]    = 'func'
 tx['PhiLaw']["law"]     = 'lin'
 tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
-tx["PhiLaw"]['End']     = 10*pi/180                                            # [rad]
+tx["PhiLaw"]['End']     = 15*pi/180                                            # [rad]
 
 win_width               = 10
 tx['pn_filt_par']       = {
@@ -200,13 +201,18 @@ tx['pn_filt_par']       = {
 # if tx['flag_phase_noise'] == 0:
 #     tx['dnu'] = 0
 
+tx['get_exec_time']     = ['frame',[]]
 ###############################################################################
 ################################## RECEIVER ###################################
 ###############################################################################
 
+tx['flag_phase_noise']  = 1
+rx['mode']              = "blind"                                             # {blind, pilots}
+rx["mimo"]              = "vae"                                                # {cma,vae}
+paramFIRlen             = [7]
+paramNSbB               = [200]#list(np.linspace(50,250,1).astype(int))
 
-rx['mode']              = 'pilots'                                             # {blind, pilots}
-rx["mimo"]              = "cma"                                                # {cma,vae}
+
 
 rx['SNRdB']             = 25                                                   # {>0}
 # rx["lr"]                = 1e-5                                                 # {>0,<1e-2} {cma ~ 1e-5, vae ~ 5e-4}
@@ -232,7 +238,7 @@ else:
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NFramesChannel]]
 
-paramPOL                        = np.array([[0],[5],[0.25]])
+paramPOL                        = np.array([[0],[20],[1]])
 # paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
 # paramPOL                        = np.array([[0],[25]])
 
@@ -243,7 +249,7 @@ if rx['mimo'].lower() == "cma":
 else:
     paramLR                         = np.array([500])*1e-6                     # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
 
-paramFIRlen                     = [9]
+
 
 
 fibre['PMD']                    = 0.00                                         # [ps/sqrt(km)]
@@ -263,7 +269,7 @@ fibre['DistProp_SI']            = 1e4                                          #
 fibre['tauCD']                  = np.sqrt(2*pi*fibre['DistRes_SI']*abs(beta2)) # differential group delay [s]
 fibre['tauPMD']                 = fibre['PMD_SI']*np.sqrt(fibre['DistProp_SI'])# PMD induced delay [s]
 
-print(fibre['tauCD'])
+# print(fibre['tauCD'])
 
 
 if len(paramPOL) == 2:
@@ -314,7 +320,7 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
         plot.y3_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
 
 
-    # close("all")
+    close("all")
         
     return tx,fibre,rx
 
@@ -324,24 +330,28 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
 
 Nrea = 1
 
-for nphi in range(len(paramPHI)):
-    for npol in range(len(paramPOL[0])):
-        
-        Nlr     = paramLR.shape[0]
-        Nfir    = len(paramFIRlen)
+for nSbB in range(len(paramNSbB)):
+    rx['NSymbBatch']  = paramNSbB[nSbB]
     
-        for nfir in range(Nfir):
-            for nrea in range(Nrea):
-                for nlr in range(Nlr):
-                    
-                    rx["lr"]        = paramLR[nlr]
-                    tx["NSymbTaps"] = paramFIRlen[nfir]
+    print(f"rx['NSymbBatch'] = {rx['NSymbBatch']}")
+    for nphi in range(len(paramPHI)):
+        for npol in range(len(paramPOL[0])):
             
-                    print(f"rea={nrea}, lr={rx['lr']}, firlen={tx['NSymbTaps']}")
-                    tx,fibre,rx     = process_data(nrea,npol,nphi,tx,fibre,rx)
-                    
-                    if "thetadiffs" in fibre:
-                        del fibre['thetadiffs']
+            Nlr     = paramLR.shape[0]
+            Nfir    = len(paramFIRlen)
+        
+            for nfir in range(Nfir):
+                for nrea in range(Nrea):
+                    for nlr in range(Nlr):
+                        
+                        rx["lr"]        = paramLR[nlr]
+                        tx["NSymbTaps"] = paramFIRlen[nfir]
+                
+                        print(f"rea={nrea}, lr={rx['lr']}, firlen={tx['NSymbTaps']}")
+                        tx,fibre,rx     = process_data(nrea,npol,nphi,tx,fibre,rx)
+                        
+                        if "thetadiffs" in fibre:
+                            del fibre['thetadiffs']
                         
                         
 cuda.empty_cache()
