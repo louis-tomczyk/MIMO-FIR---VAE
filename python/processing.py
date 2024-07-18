@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.7
-#   Date            : 2024-07-17
+#   Version         : 1.3.8
+#   Date            : 2024-07-18
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -53,6 +53,8 @@
 #                           previously manually adjusted in rxdsp
 #   1.3.7 (2024-07-17) - init_processing, print_results, save_data: managing
 #                           elapsed time
+#   1.3.8 (2024-07-18) - save_data: array columns reodered correctly after
+#                           adding "dt"
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -520,7 +522,7 @@ def save_data(tx, fibre, rx, saving, array):
             save_tmp = ["iteration","loss", "SER", "Thetas","Phis"]
 
     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
-            save_tmp.append("dt")
+            save_tmp.insert(4,"dt")
     
     misc.array2csv(array2,saving["filename"],save_tmp)
 
