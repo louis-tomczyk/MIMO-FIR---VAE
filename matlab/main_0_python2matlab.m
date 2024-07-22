@@ -1,11 +1,10 @@
 % ---------------------------------------------
 % ----- INFORMATIONS -----
-%   Function name   : processing_0_python2matlab
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-15
 %   Version         : 2.0.5
+%   Date            : 2024-07-16
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -25,7 +24,8 @@
 %   2024-07-11  (2.0.3) cleaning caps structure 
 %   2024-07-12  (2.0.4) phase noise management --- for rx['mode'] = 'pilots'
 %                       import_data: caps structuring
-%   2024-07-15  (2.0.5  multiple files processing
+%   2024-07-16  (2.0.5) multiple files processing
+%   2024-07-19  (2.0.6) import_data: managing files not containing data
 %
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -47,67 +47,63 @@
 %% MAINTENANCE
 rst
 
-% cd(strcat('../python/data-',caps.log.Date,"/mat"))
-
-cd(strcat('../python/data-',caps.log.Date,"/mat_phi"))
+caps.log.Date = '24-07-19';
+cd(strcat('../python/data-',caps.log.Date,"/mat"))
 caps.log.myInitPath     = pwd();
 [allData,caps]          = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
 cd(caps.log.myInitPath)
 
 caps.plot.fir           = 1;
-caps.plot.poincare      = 1;
+caps.plot.poincare      = 0;
 caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
-caps.plot.phis.xlabel   = 'error per phi';
+caps.plot.phis.xlabel   = 'comparison per batch';
 caps.method.thetas      = 'fft';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
 
 
 
-for tap = 7:7
 
-    caps.FIR.tap = tap;
+for kdata = 1:length(allData)
 
-    for kdata = 1:length(allData)
+    data                        = allData{kdata};
+    caps.kdata                  = kdata;
+    caps                        = extract_infos(caps,data);
+    [caps,thetas,phis, H_est]   = channel_estimation(data,caps);
+    [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
     
-        data                        = allData{kdata};
-        caps.kdata                  = kdata;
-        caps                        = extract_infos(caps,data);
-        [caps,thetas,phis, H_est]   = channel_estimation(data,caps);
-        [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
-        
-        if caps.phis_est
-            metrics             = get_metrics(caps,thetas,phis);
-            plot_results(caps,H_est, thetas,metrics,phis);
-        else
-            metrics             = get_metrics(caps,thetas);
-            plot_results(caps,H_est, thetas,metrics);
-        end
-
-        cd ../err
-
-        if kdata == 1
-            Mthetas         =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
-            if caps.phis_est
-                Mthetas     =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
-            end
-        end
-        Mthetas(kdata,:)    = [caps.carac.values(kdata,:),...
-                               metrics.thetas.ErrMean,...
-                               metrics.thetas.ErrStd,...
-                               metrics.thetas.ErrRms];
-
-        if caps.phis_est
-            Mphis(kdata,:)  = [caps.carac.values(kdata,:),...
-                               metrics.phis.ErrMean(end),...
-                               metrics.phis.ErrStd(end),...
-                               metrics.phis.ErrRms(end)];
-
-        end
+    if caps.phis_est
+        metrics                 = get_metrics(caps,thetas,phis);
+        plot_results(caps,H_est, thetas,metrics,phis);
+    else
+        metrics                 = get_metrics(caps,thetas);
+        plot_results(caps,H_est, thetas,metrics);
     end
 
+    cd ../err/thetas
+
+    if kdata == 1
+        Mthetas         =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
+        if caps.phis_est
+            Mthetas     =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
+        end
+    end
+    Mthetas(kdata,:)    = [caps.carac.values(kdata,:),...
+                           metrics.thetas.ErrMean,...
+                           metrics.thetas.ErrStd,...
+                           metrics.thetas.ErrRms];
+
+    if caps.phis_est
+        cd ../phis
+        Mphis(kdata,:)  = [caps.carac.values(kdata,:),...
+                           metrics.phis.ErrMean(end),...
+                           metrics.phis.ErrStd(end),...
+                           metrics.phis.ErrRms(end)];
+
+    end
 end
 
 
+cd ../thetas
 Mthetas(end,:)  = [caps.carac.values(kdata,:),...
                    median(metrics.thetas.ErrMean),...
                    median(metrics.thetas.ErrStd),...
@@ -116,6 +112,7 @@ writematrix(Mthetas,strcat('<Err Theta>-',caps.log.filename,'.csv'))
 
 
 if caps.phis_est
+    cd ../phis
     Mphis(end,:)= [caps.carac.values(kdata,:),...
                    median(metrics.phis.ErrMean(end)),...
                    median(metrics.phis.ErrStd(end)),...
@@ -132,9 +129,7 @@ cd(caps.log.myRootPath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----             
-%   import_data
-%   get_value_from_filename_in
-%   get_number_from_string_in
+%   import_data (1.0.1)
 % ---------------------------------------------
 
 function [allData, caps] = import_data(acceptedFormats,caps,varargin)
@@ -205,6 +200,10 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
             allFilenames{i} = filenames{i};
             allPathnames{i} = pathname;
             continue;
+        else
+            allFilenames{i} = filenames{i};
+            allPathnames{i} = pathname;
+            allData{i}      = NaN;
         end
 
         % [4] file extension check
@@ -238,3 +237,4 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     caps.log.Nfiles     = length(allData);
 end
 %-----------------------------------------------------
+
