@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.0
-#   Date            : 2024-07-12
+#   Version         : 2.0.2
+#   Date            : 2024-07-25
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -31,6 +31,7 @@
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
 #   2.0.1 (2024-07-17) - saving elapsed time
+#   2.0.2 (2024-07-25) - server management
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -83,13 +84,14 @@ from datetime           import date
 pi = np.pi
 clc()
 np.set_printoptions(linewidth=160)
+server  = 1
 
 #%% ===========================================================================
 # --- PARAMETERS ---
 # =============================================================================
 
 date                            = date.today().strftime("%Y-%m-%d")
-tx,fibre,rx,saving,flags        = misc.init_dict()
+tx,fibre,rx,saving              = misc.init_dict(server)
 
 ###############################################################################
 ################################ TRANSMITTER ##################################
@@ -99,7 +101,6 @@ tx["Rs"]                        = 64e9                                         #
 tx['SNRdB']                     = 50
 
 
-paramPHI                        = [1e5]                                        # [Hz] laser linewidth
 
 # -----------------------------------------------------------------------------
 # Entropies table
@@ -180,12 +181,12 @@ rx["NSymbFrame"]        = int(12800)
 # tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",5,0]]         #ok
 tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]         #ok
 
-# tx['PhiLaw']["kind"]  = 'Rwalk'
-# tx['PhiLaw']["law"]   = 'linewidth'
-tx['PhiLaw']["kind"]    = 'func'
-tx['PhiLaw']["law"]     = 'lin'
-tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
-tx["PhiLaw"]['End']     = 15*pi/180                                            # [rad]
+tx['PhiLaw']["kind"]  = 'Rwalk'
+tx['PhiLaw']["law"]   = 'linewidth'
+# tx['PhiLaw']["kind"]    = 'func'
+# tx['PhiLaw']["law"]     = 'lin'
+# tx["PhiLaw"]['Start']   = 0*pi/180                                             # [rad]
+# tx["PhiLaw"]['End']     = 15*pi/180                                            # [rad]
 
 win_width               = 10
 tx['pn_filt_par']       = {
@@ -201,16 +202,17 @@ tx['pn_filt_par']       = {
 # if tx['flag_phase_noise'] == 0:
 #     tx['dnu'] = 0
 
-tx['get_exec_time']     = ['frame',[]]
+# tx['get_exec_time']     = ['frame',[]]
 ###############################################################################
 ################################## RECEIVER ###################################
 ###############################################################################
 
-tx['flag_phase_noise']  = 1
+tx['flag_phase_noise']  = 0
 rx['mode']              = "blind"                                             # {blind, pilots}
 rx["mimo"]              = "vae"                                                # {cma,vae}
 paramFIRlen             = [7]
-paramNSbB               = [200]#list(np.linspace(50,250,1).astype(int))
+paramNSbB               = list(np.linspace(250,50,1).astype(int))
+paramPHI                = [10e3]                                        # [Hz] laser linewidth
 
 
 
@@ -223,7 +225,7 @@ rx['SNRdB']             = 25                                                   #
 
 
 if tx['Rs'] == 64e9:
-    rx["FrameChannel"]  = 10
+    rx["FrameChannel"]  = 2
     rx["SymbScale"]     = 100
 else:
     rx["FrameChannel"]  = 40
@@ -238,16 +240,17 @@ else:
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NFramesChannel]]
 
-paramPOL                        = np.array([[0],[20],[1]])
-# paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[10]])
-# paramPOL                        = np.array([[0],[25]])
+# paramPOL                        = np.array([[0],[25],[1]])
+fibre['fpol']                   = 1e3
+paramPOL                        = np.array([[np.sqrt(2*pi*fibre['fpol']/tx['Rs'])],[2]])
+# paramPOL                        = np.array([[0],[20]])
 
 # paramLR                         = np.array([10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,200,300,400,500])*1e-6
 
 if rx['mimo'].lower() == "cma":
-    paramLR                         = np.array([10])*1e-6                      # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+    paramLR                     = np.array([10])*1e-6                      # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
 else:
-    paramLR                         = np.array([500])*1e-6                     # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+    paramLR                     = np.array([500])*1e-6                     # {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
 
 
 
@@ -275,7 +278,7 @@ fibre['tauPMD']                 = fibre['PMD_SI']*np.sqrt(fibre['DistProp_SI'])#
 if len(paramPOL) == 2:
     fibre['ThetasLaw']["kind"]      = 'Rwalk'
     fibre["ThetasLaw"]['law']       = 'gauss'
-    fibre["ThetasLaw"]['theta_in']  = 0
+    fibre["ThetasLaw"]['theta_in']  = 0*pi/180                                  # [rad]
 else:
     fibre['ThetasLaw']["kind"]      = 'func'
     fibre['ThetasLaw']["law"]       = 'lin'
@@ -293,24 +296,25 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
         RangeTheta                  = paramPOL[1,npol] - paramPOL[0,npol]
         Sth                         = paramPOL[2,npol]
         
-        deltaN_Channel              = np.floor(RangeTheta/Sth)-rx["FrameChannel"]
+        deltaN_Channel              = int(np.floor(RangeTheta/Sth))-rx["FrameChannel"]
         NFrames_Channel             = rx["FrameChannel"]+deltaN_Channel
         Sth                         = (paramPOL[1,npol]-paramPOL[0,npol])/NFrames_Channel
         fibre["ThetasLaw"]['Start'] = (paramPOL[0,npol])*pi/180
         fibre["ThetasLaw"]['End']   = (paramPOL[1,npol])*pi/180
         
     else:
-        NFrames_Channel                 = paramPOL[-1]
+        NFrames_Channel                 = int(paramPOL[-1])
         fibre["ThetasLaw"]['theta_std'] = paramPOL[npol][0]
         fibre['fpol']                   = paramPOL[npol][0]
 
-    rx["NFrames"]                       = int(rx["FrameChannel"] + NFrames_Channel)
+    rx["NFrames"]                       = rx["FrameChannel"] + NFrames_Channel
     tx["dnu"]                           = paramPHI[nphi]                       # [Hz]
-    
     tx,fibre, rx                        = set_Nsymbols(tx,fibre,rx)
-
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,nrea)
-    tx,fibre,rx                         = processing(tx,fibre,rx,saving,flags)
+    
+
+    
+    tx,fibre,rx                         = processing(tx,fibre,rx,saving)
         
     misc.save2mat(tx,fibre,rx,saving)
 
@@ -328,26 +332,28 @@ def process_data(nrea,npol,nphi,tx,fibre,rx):
 # --- LOGISTICS ---
 # =============================================================================
 
-Nrea = 1
+Nrea = 5
 
-for nSbB in range(len(paramNSbB)):
-    rx['NSymbBatch']  = paramNSbB[nSbB]
+for nrea in range(Nrea):
     
-    print(f"rx['NSymbBatch'] = {rx['NSymbBatch']}")
     for nphi in range(len(paramPHI)):
-        for npol in range(len(paramPOL[0])):
+        for nSbB in range(len(paramNSbB)):
+
+            rx['NSymbBatch']  = paramNSbB[nSbB]
+
+            for npol in range(len(paramPOL[0])):
+                
+                Nlr     = paramLR.shape[0]
+                Nfir    = len(paramFIRlen)
             
-            Nlr     = paramLR.shape[0]
-            Nfir    = len(paramFIRlen)
-        
-            for nfir in range(Nfir):
-                for nrea in range(Nrea):
+                for nfir in range(Nfir):
+    
                     for nlr in range(Nlr):
-                        
+
+                        print(f"rea={nrea}")                        
                         rx["lr"]        = paramLR[nlr]
                         tx["NSymbTaps"] = paramFIRlen[nfir]
-                
-                        print(f"rea={nrea}, lr={rx['lr']}, firlen={tx['NSymbTaps']}")
+                            
                         tx,fibre,rx     = process_data(nrea,npol,nphi,tx,fibre,rx)
                         
                         if "thetadiffs" in fibre:

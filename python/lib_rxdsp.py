@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.1
-#   Date            : 2024-07-16
+#   Version         : 2.0.2
+#   Date            : 2024-07-24
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -77,7 +77,8 @@
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL->LIB_PLOT + cleaning
 #   2.0.1 (2024-07-16) - CPR_pilots,remove_symbols, find_shift: managing offset
 #                           for pilots
-# 
+#   2.0.2 (2024-07-24) - server management
+#
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
 #
@@ -154,14 +155,14 @@ pi = np.pi
 def receiver(tx,rx,saving):
             
     rx              = front_end(rx)
-    rx, loss        = mimo(tx, rx, saving)#,'b4','after')
-    rx              = remove_symbols(rx,'data')#,'data removal')
-    rx              = CPR_pilots(tx, rx)#, 'demod','corr')#,'trace loss')#,'demod','corr')     # {align,demod,time trace pn, time trace pn loss, trace loss}
+    rx, loss        = mimo(tx, rx, saving,'b4','after')
+    rx              = remove_symbols(rx,'data','data removal')
+    rx              = CPR_pilots(tx, rx, 'demod','corr')#,'trace loss')#,'demod','corr')     # {align,demod,time trace pn, time trace pn loss, trace loss}
     rx              = SNR_estimation(tx, rx)
-    rx              = decision(tx,rx)#,"const norm")#, 'pilots removal')#,"const norm",'time decision')         # {time decision, const decision, const norm, pilots removal}
-    tx,rx           = find_shift(tx, rx)#,'corr', 'err dec')                              # {corr, err dec}
-    tx,rx           = compensate_and_truncate(tx,rx)#, 'err dec','corr')     # {corr, err dec}
-    rx              = SER_estimation(tx, rx)#, 'err dec')                      # {err dec}
+    rx              = decision(tx,rx,"const norm")#, 'pilots removal')#,"const norm",'time decision')         # {time decision, const decision, const norm, pilots removal}
+    tx,rx           = find_shift(tx, rx,'corr', 'err dec')                              # {corr, err dec}
+    tx,rx           = compensate_and_truncate(tx,rx, 'err dec','corr')     # {corr, err dec}
+    rx              = SER_estimation(tx, rx, 'err dec')                      # {err dec}
 
     return rx, loss
 
@@ -221,14 +222,14 @@ def compensate_and_truncate(tx,rx,*varargin):
 
 
     # ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and 'corr' in varargin:
+    if (len(varargin) != 0) and ('corr' in varargin) and (not rx['server']):
         if rx['Frame']> rx['FrameChannel']:
             plot.xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ,\
                        title =f"compensate_and_truncate - frame {rx['Frame']}",\
                        ref = 1, zoom = 1)
 
 
-    if len(varargin) != 0 and 'err dec' in varargin:
+    if (len(varargin) != 0) and ('err dec' in varargin) and (not rx['server']):
         if rx["Frame"] >= rx["NFrames"]-1:
             t = tx['Symb_SER_real'][:,rx['Frame']]
             r = rx['Symb_SER_real'][:,rx['Frame']]
@@ -300,8 +301,8 @@ def CPR_pilots(tx,rx,*varargin):
 
         for k in range(int(rx['NBatchFrame_pilots'])):
             
-            pilots_H_begin  = rx_H_rs[k, :['offset_conv_begin']].reshape((1,-1))
-            pilots_V_begin  = rx_V_rs[k, :['offset_conv_begin']].reshape((1,-1))
+            pilots_H_begin  = rx_H_rs[k, :rx['offset_conv_begin']].reshape((1,-1))
+            pilots_V_begin  = rx_V_rs[k, :rx['offset_conv_begin']].reshape((1,-1))
             
             pilots_H_end    = rx_H_rs[k, -rx['offset_conv_end']:].reshape((1,-1))
             pilots_V_end    = rx_V_rs[k, -rx['offset_conv_end']:].reshape((1,-1))
@@ -311,8 +312,8 @@ def CPR_pilots(tx,rx,*varargin):
         
         
     # ---------------------------------------------------------------- to check
-        if len(varargin) != 0 and 'align' in varargin\
-            and rx['Frame']> rx['FrameChannel']:
+        if (len(varargin) != 0) and ('align' in varargin)\
+            and (rx['Frame']> rx['FrameChannel']) and (not rx['server']):
             for k in range(int(rx['NBatchFrame_pilots']/7)):            
                 plt.figure()
                 # 
@@ -350,8 +351,8 @@ def CPR_pilots(tx,rx,*varargin):
         tmpV   = tmpV/np.sqrt(power(tmpV))
         
         # ------------------------------------------------------------ to check
-        if len(varargin) != 0 and 'demod' in varargin\
-            and rx['Frame']> rx['FrameChannel']:
+        if (len(varargin) != 0) and ('demod' in varargin)\
+            and (rx['Frame']> rx['FrameChannel']) and (not rx['server']):
             plot.constellations(sig1 = tmpH, sig2 = tmpV,\
                 labels= ['H','V'], title = f"cpr_pilots, frame {rx['Frame']}")
         # ------------------------------------------------------------ to check
@@ -399,9 +400,9 @@ def CPR_pilots(tx,rx,*varargin):
                 
                 rea += 1
                 
-        # ------------------------------------------------------------ to check           
-                if len(varargin) != 0 and "time trace pn loss" in varargin\
-                    and rx['Frame'] >= rx['FrameChannel']:
+        # ------------------------------------------------------------ to check
+                if (len(varargin) != 0) and ("time trace pn loss" in varargin)\
+                    and (rx['Frame'] >= rx['FrameChannel']) and (not rx['server']):
                         batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
                         
                         plt.figure()
@@ -416,8 +417,8 @@ def CPR_pilots(tx,rx,*varargin):
             # end-while
             
         # ------------------------------------------------------------ to check
-            if len(varargin) != 0 and "trace loss" in varargin\
-                and rx['Frame'] >= rx['FrameChannel']:
+            if (len(varargin) != 0) and ("trace loss" in varargin)\
+                and (rx['Frame'] >= rx['FrameChannel']) and (not rx['server']):
                     batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
                     
                     plt.figure()
@@ -434,8 +435,8 @@ def CPR_pilots(tx,rx,*varargin):
             pn_V_filter = maths.my_low_pass_filter(phis_V_mean, tx['pn_filt_par'])
             
         # ------------------------------------------------------------ to check
-        if len(varargin) != 0 and "time trace pn" in varargin\
-            and rx['Frame'] >= rx['FrameChannel']:
+        if (len(varargin) != 0) and ("time trace pn" in varargin)\
+            and (rx['Frame'] >= rx['FrameChannel']) and (not rx['server']):
             batches     = np.linspace(1,rx['NBatchFrame_pilots'],rx['NBatchFrame_pilots'])
             
             plt.figure()
@@ -465,8 +466,8 @@ def CPR_pilots(tx,rx,*varargin):
         rx_V_corrected  = rx_V*np.exp(-1j*pn_V_filter)
 
         # ------------------------------------------------------------ to check
-        if len(varargin) != 0 and 'corr' in varargin\
-            and rx['Frame']> rx['FrameChannel']:
+        if (len(varargin) != 0) and ('corr' in varargin)\
+            and (rx['Frame']> rx['FrameChannel']) and (not rx['server']):
                 rx_corrected    = np.concatenate((rx_H_corrected, rx_V_corrected),axis = 0)
                 plot.constellations(sig1 = rx_corrected,sig2 = tx["sig_real"],\
                                         polar = 'H', labels = ['cpr','tx'],
@@ -506,7 +507,7 @@ def decision(tx, rx, *varargin):
             Prx     = power(rx["sig_eq_real"],flag_real2cplx=1,flag_flatten=1)
     
     else:
-        if len(varargin) != 0 and "pilots removal" in varargin:
+        if (len(varargin) != 0) and "pilots removal" in varargin:
             Zcut    = remove_symbols(rx,tx, 'pilots removal')
         else:
             Zcut    = remove_symbols(rx,tx)
@@ -527,13 +528,11 @@ def decision(tx, rx, *varargin):
     ZVQnorm     = (ZVQ/np.sqrt(Prx[1])).reshape((1,-1))
     
 
-    # ---------------------------------------------------------------- to check
     # checking normalisation
     ZHnorm  = np.array([ZHInorm+1j*ZHQnorm,ZVInorm+1j*ZVQnorm])
     assert abs(sum(power(ZHnorm))-2) <= 1e-1,\
         f'power should be close to 1 per polar, got {power(ZHnorm)}'
     del ZHnorm
-    # ---------------------------------------------------------------- to check
 
     M           = int(tx['mod'][0:-3])                  # 'M' for M-QAM
     ZHI_ext     = np.tile(ZHInorm, [int(np.sqrt(M)), 1])
@@ -550,8 +549,8 @@ def decision(tx, rx, *varargin):
         Xref    = Xref/np.sqrt(np.mean(Ptx))
 
     # ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and "const norm" in varargin\
-        and rx['Frame']> rx['FrameChannel']:
+    if (len(varargin) != 0) and ("const norm" in varargin)\
+        and (rx['Frame']> rx['FrameChannel']) and (not rx['server']):
             ZXnorm      = np.array([ZHInorm+1j*ZHQnorm,ZVInorm+1j*ZVQnorm]).squeeze()
             Xref_check  = Xref.reshape((1,-1))
         
@@ -600,14 +599,14 @@ def decision(tx, rx, *varargin):
     rx['Symb_real_dec'][3, rx['Frame']] = ZVQ_dec
 
     # ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and "time decision" in varargin:
+    if (len(varargin) != 0) and ("time decision" in varargin) and (not rx['server']):
         if rx["Frame"] >= rx["FrameChannel"]:
             t = [ZHInorm,ZHQnorm,ZVInorm,ZVQnorm]
             r = [ZHI_dec,ZHQ_dec,ZVI_dec,ZVQ_dec]
             plot.decisions(t, r, 5, rx['Frame'], NSymb = rx['NSymbBatch'],
                                title = f"rxdsp.decision - frame {rx['Frame']}")
 
-    if len(varargin) != 0 and "const decision" in varargin:
+    if (len(varargin) != 0) and ("const decision" in varargin)  and (not rx['server']):
         if rx["Frame"] >= rx["FrameChannel"]:
             ZXnorm = np.array([ZHInorm+1j*ZHQnorm,ZVInorm+1j*ZVQnorm]).squeeze()
             # TXclean = np.reshape(tx["Symb_real"],(4,-1))
@@ -666,14 +665,14 @@ def find_shift(tx,rx,*varargin):
     shiftVQ = np.argmax(xcorrVQ)-rx["NSymbSER"]/2
 
     # ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and 'corr' in varargin\
-        and rx['Frame'] >= rx['FrameChannel']:
+    if (len(varargin) != 0) and ('corr' in varargin)\
+        and (rx['Frame'] >= rx['FrameChannel']) and (not rx['server']):
         plot.xcorr_2x2(xcorrHI, xcorrHQ, xcorrVI, xcorrVQ,\
               title = f"rxdsp.find_shift - frame {rx['Frame']}", ref=1, zoom=1)
 
 
-    if len(varargin) != 0 and 'err dec' in varargin\
-        and rx['Frame'] >= rx['FrameChannel']:
+    if (len(varargin) != 0) and ('err dec' in varargin)\
+        and (rx['Frame'] >= rx['FrameChannel']) and (not rx['server']):
         Tx  = np.concatenate((THI, THQ, TVI, TVQ),axis = 0)
         Dec = np.concatenate((RHI, RHQ, RVI, RVQ),axis = 0)
         plot.decisions(Tx,Dec,5, rx['Frame'], rx['NSymbBatch'],\
@@ -701,7 +700,7 @@ def front_end(rx):
 def mimo(tx,rx,saving,*varargin):
 
     # ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and 'b4' in varargin:
+    if (len(varargin) != 0) and ('b4' in varargin) and (not rx['server']):
         if rx['Frame']> rx['FrameChannel']:
             plot.constellations(sig1 = rx['sig_real'],title =
                                               f"rx b4 mimo {rx['Frame']}")
@@ -722,7 +721,7 @@ def mimo(tx,rx,saving,*varargin):
 
     
     # ---------------------------------------------------------------- to check
-        if len(varargin) != 0 and "loss" in varargin:
+        if (len(varargin) != 0) and ("loss" in varargin) and (not rx['server']):
             plot.loss_batch(rx,saving,['kind','law',"std",'linewidth'],"Llikelihood")
             plot.loss_batch(rx,saving,['kind','law',"std",'linewidth'],"DKL")
             plot.loss_batch(rx,saving,['kind','law',"std",'linewidth'],"losses")
@@ -734,7 +733,7 @@ def mimo(tx,rx,saving,*varargin):
 
 
     # ---------------------------------------------------------------- to check
-        if len(varargin) != 0 and "loss" in varargin:
+        if (len(varargin) != 0) and ("loss" in varargin) and (not rx['server']):
             plot.loss_cma(rx,saving,['kind','law',"std",'linewidth'],"x")
     # ---------------------------------------------------------------- to check
                 
@@ -744,7 +743,7 @@ def mimo(tx,rx,saving,*varargin):
         
 
     # ---------------------------------------------------------------- to check        
-    if len(varargin) != 0 and "after" in varargin:
+    if (len(varargin) != 0) and ("after" in varargin) and (not rx['server']):
         if rx['Frame']> rx['FrameChannel']:
             if rx['mimo'].lower() == "cma" :
                 plot.constellations(rx["sig_mimo_real"],\
@@ -753,13 +752,11 @@ def mimo(tx,rx,saving,*varargin):
                 plot.constellations(rx["sig_mimo_real"][:,rx['Frame']],\
                                     title =f"rx after mimo {rx['Frame']}")            
 
-    if len(varargin) != 0 and "fir" in varargin:
+    if (len(varargin) != 0) and ("fir" in varargin) and (not rx['server']):
         if rx['Frame']> rx['FrameChannel']:
             plot.fir(rx, title =f"fir after mimo {rx['Frame']}")
     # ---------------------------------------------------------------- to check
     
-    # louis, do not change, for now, .tolist() into .detach().numpy()
-    #  as it fails when processing with matlab
     rx["h_est_frame"].append(rx["h_est"].tolist())
     
     return rx,loss
@@ -786,7 +783,7 @@ def remove_symbols(rx,what, *varargin):
             rx["sig_mimo_cut_real"] = rx["sig_mimo_real"]
 
         # ---------------------------------------------------------------- to check
-        if len(varargin) != 0 and 'data removal' in varargin:
+        if (len(varargin) != 0) and ('data removal' in varargin) and (not rx['server']):
             if rx['Frame']> rx['FrameChannel']:
                 plot.constellations(rx["sig_mimo_cut_real"],
                                         title = f"remove data - f {rx['Frame']}")
@@ -815,7 +812,7 @@ def remove_symbols(rx,what, *varargin):
         del ZHItmp,ZHQtmp,ZVItmp,ZVQtmp
         
     # ---------------------------------------------------------------- to check
-        if len(varargin) != 0 and 'pilots removal' in varargin:
+        if (len(varargin) != 0) and ('pilots removal' in varargin) and (not rx['server']):
             if rx['Frame']> rx['FrameChannel']:            
                 plt.figure()
                 #
@@ -857,7 +854,7 @@ def SER_estimation(tx,rx,*varargin):
     rx["SER_valid"][1,rx['Frame']]  = sum(RV!=TV)/rx['NSymbSER']
 
     # ---------------------------------------------------------------- to check
-    if len(varargin) != 0 and 'err dec' in varargin:
+    if (len(varargin) != 0) and ('err dec' in varargin) and (not rx['server']):
         if rx['Frame']> rx['FrameChannel']:
             tmpErrH = tx['Symb_SER_real'][0,rx['Frame']] != rx['Symb_SER_real'][0,rx['Frame']]
             tmpErrV = tx['Symb_SER_real'][1,rx['Frame']] != rx['Symb_SER_real'][1,rx['Frame']]

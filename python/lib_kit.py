@@ -1,4 +1,3 @@
-# %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
 #   Author          : louis tomczyk
@@ -648,8 +647,7 @@ def SER_estimation(tx,rx):
         else:
             # indexMax        = np.shape(rx['out_cpe'][str(rx['Frame']-rx['FrameChannel'])])[-1]
             # sig_eq          = rx['out_cpe'][str(rx['Frame']-rx['FrameChannel'])]
-            # shift,r         = find_shift(tx,rx)
-            shift,r             = rxdsp.find_shift_louis(tx,rx)
+            shift,r         = find_shift(tx,rx)
             
             
     rx['NSymbSER']      = rx['NSymbBatch'] - shift[0] - rx["NSymbCut"]
@@ -882,12 +880,6 @@ class twoXtwoFIR(nn.Module):
         rx["sig_mimo_real"][1,rx['Frame'],rx['BatchNo'],:] = ZHQ.detach().numpy()
         rx["sig_mimo_real"][2,rx['Frame'],rx['BatchNo'],:] = ZVI.detach().numpy()
         rx["sig_mimo_real"][3,rx['Frame'],rx['BatchNo'],:] = ZVQ.detach().numpy()
-        
-        
-        # rx["sig_eq_real"][0,rx['BatchNo'],:] = ZHI.detach().numpy()
-        # rx["sig_eq_real"][1,rx['BatchNo'],:] = ZHQ.detach().numpy()
-        # rx["sig_eq_real"][2,rx['BatchNo'],:] = ZVI.detach().numpy()
-        # rx["sig_eq_real"][3,rx['BatchNo'],:] = ZVQ.detach().numpy()
         
         # Soft demapping
         # correction term for PCS: + nu_sc * amp_levels**2 -- see [2]

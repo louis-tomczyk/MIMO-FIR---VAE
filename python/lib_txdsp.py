@@ -1,11 +1,10 @@
-# %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.5
-#   Date            : 2024-07-10
+#   Version         : 2.0.1
+#   Date            : 2024-07-24
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -37,6 +36,7 @@
 #                        along with main (1.4.3)
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
+#   2.0.1 (2024-07-24) - server management
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -119,10 +119,10 @@ def transmitter(tx,rx,*varargin):
     
     for what_pilots_k in range(len(tx['pilots_info'])):
         
-        tx      = pilot_generation(tx, rx, what_pilots_k)#,"show")             # uncomment to check
-        tx,rx   = pilot_insertion(tx, rx, what_pilots_k)#,'show')              # uncomment to check
+        tx      = pilot_generation(tx, rx, what_pilots_k)#,"show")
+        tx,rx   = pilot_insertion(tx, rx, what_pilots_k)#,'show')
 
-    tx          = data_shaping(tx)#,rx)                                        # uncomment to check
+    tx          = data_shaping(tx)#,rx)
 
         
     if rx["Frame"] >= rx["FrameChannel"]:
@@ -132,7 +132,7 @@ def transmitter(tx,rx,*varargin):
             tx      = txhw.load_phase_noise(tx,rx)#'pn const','pn time trace')     # uncomment to check
 
     
-    if len(varargin)!= 0 and "plot" in varargin:
+    if (len(varargin)!= 0) and ("plot" in varargin) and (not tx['server']):
         plot.constellations(sig1 = tx['sig_real'],title ='tx')
         
 
@@ -145,9 +145,6 @@ def transmitter(tx,rx,*varargin):
 
 
 
-
-
-#%%
 
 
 #%% ===========================================================================
@@ -247,10 +244,8 @@ def data_shaping(tx,*varargin):
 
     del tx["sig_cplx_up"], tmp
 
-
-
     # ---------------------------------------------------------------- to check
-    if len(varargin) > 0 and varargin is not None:
+    if (len(varargin) > 0) and (varargin is not None) and (not tx['server']):
         rx = varargin[0]
         # cf. data_shaping, convolution with filter, mode valid
         # 
@@ -719,8 +714,8 @@ def pilot_generation(tx,rx,what_pilots_k,*varargin):
             tx  = misc.sort_dict_by_keys(tx)
         
 
-    # for checking
-    if len(varargin) > 0 and varargin is not None:
+    # ---------------------------------------------------------------- to check
+    if (len(varargin) > 0) and (varargin is not None) and (not rx['server']):
         tmpH = tx['{}_cplx_up'.format(pilots_function)][0].squeeze()
         tmpV = tx['{}_cplx_up'.format(pilots_function)][1].squeeze()
         
@@ -756,7 +751,8 @@ def pilot_generation(tx,rx,what_pilots_k,*varargin):
         plt.suptitle("pilot_generation, frame = {}".format(rx['Frame']))
         plt.show()
         # plot.constellations(tx['{}_cplx_up'.format(pilots_function)],polar='both',sps=2)
-            
+    # ---------------------------------------------------------------- to check
+    
     return tx
 
 
@@ -830,8 +826,8 @@ def pilot_insertion(tx,rx,what_pilots_k,*varargin):
         
         
         
-    # for checking
-    if len(varargin) > 0 and varargin is not None:
+    # ---------------------------------------------------------------- to check
+    if (len(varargin) > 0) and (varargin is not None) and (not rx['server']):
         tmpH = tx['Symb_{}_cplx'.format(pilots_function)][0].squeeze()
         tmpV = tx['Symb_{}_cplx'.format(pilots_function)][1].squeeze()
         
@@ -859,7 +855,7 @@ def pilot_insertion(tx,rx,what_pilots_k,*varargin):
 
         plt.suptitle("pilots insertion {}".format(rx['Frame']))
         plt.show()
-
+    # ---------------------------------------------------------------- to check
     return tx,rx
 
 #%%
@@ -1017,29 +1013,30 @@ def set_Nsymbols(tx,fibre,rx):
     # tx['dnu']           = int(tx['DeltaPhiC']**2 * tx['Rs']/4/rx["NSymbBatch"]/rx["SymbScale"])
     # fibre['fpol']       = int(fibre['DeltaThetaC']**2 * tx['Rs']/4/rx["NSymbFrame"]/rx["SymbScale"])
     
-    print('======= set-Nsymbols sum up =======')
-    print('------- general:')
-    print('symb scale           = {}'.format(rx["SymbScale"]))
-    print('Npol = NsymbFrame    = {}'.format(rx["NSymbFrame"]))
-    print('Nphi = NSymbBatch    = {}'.format(rx["NSymbBatch"]))
-    print('NSymb_Added_Net      = {}'.format(Nsymb_added_net))
-    print('Npol/Nphi            = {}'.format(rx["NSymbFrame"]/rx["NSymbBatch"]))
-    print('NsampTaps            = {}'.format(tx["NsampTaps"]))
+    if not tx['server']:
+        print('======= set-Nsymbols sum up =======')
+        print('------- general:')
+        print('symb scale           = {}'.format(rx["SymbScale"]))
+        print('Npol = NsymbFrame    = {}'.format(rx["NSymbFrame"]))
+        print('Nphi = NSymbBatch    = {}'.format(rx["NSymbBatch"]))
+        print('NSymb_Added_Net      = {}'.format(Nsymb_added_net))
+        print('Npol/Nphi            = {}'.format(rx["NSymbFrame"]/rx["NSymbBatch"]))
+        print('NsampTaps            = {}'.format(tx["NsampTaps"]))
+        
+        # spaces such as the printed lines on the shell are aligned
+        if rx['mode'].lower() != "blind":
+            print('\n------- if header:')
+            print(f"NSymbs_pilots        = {NSymbs_pilots}")
     
-    # spaces such as the printed lines on the shell are aligned
-    if rx['mode'].lower() != "blind":
-        print('\n------- if header:')
-        print(f"NSymbs_pilots        = {NSymbs_pilots}")
-
-        # print('Nsymb_data_Batch         = {}'.format(rx["NSymb_data_Batch"]))
-        # print('NSymb_pilots_tot_Batch   = {}'.format(rx['NSymb_pilots_tot_Batch']))
-        # print('NSymb_overhead_percent   = {}'.format(rx['NSymb_overhead_percent']))
-        # print('Effective baud rate      = {}'.format(rx['Rs_eff']))
-
-    # print('\n------- physics:')
-    # print("fpol                 = {}".format(fibre['fpol']))
-    # print('dnu                  = {}'.format(tx['dnu']))
-    print('===================================')
+            # print('Nsymb_data_Batch         = {}'.format(rx["NSymb_data_Batch"]))
+            # print('NSymb_pilots_tot_Batch   = {}'.format(rx['NSymb_pilots_tot_Batch']))
+            # print('NSymb_overhead_percent   = {}'.format(rx['NSymb_overhead_percent']))
+            # print('Effective baud rate      = {}'.format(rx['Rs_eff']))
+    
+        # print('\n------- physics:')
+        # print("fpol                 = {}".format(fibre['fpol']))
+        # print('dnu                  = {}'.format(tx['dnu']))
+        print('===================================')
 
     tx              = misc.sort_dict_by_keys(tx)
     fibre           = misc.sort_dict_by_keys(fibre)

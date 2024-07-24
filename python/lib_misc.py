@@ -1,11 +1,10 @@
-# %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.2
-#   Date            : 2024-07-15
+#   Version         : 2.0.3
+#   Date            : 2024-07-24
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -45,7 +44,9 @@
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
 #   2.0.1 (2024-07-13) - save2mat: adding 'flag_phase_noise' in output dict
-#   2.0.2 (2024-07-15)  save2mat: adding rx mode
+#   2.0.2 (2024-07-16) - save2mat: adding rx mode
+#                      - organise_files: managing phase noise 
+#   2.0.3 (2024-07-24) - init_dict: server mode
 # 
 # ----- MAIN IDEA -----
 #   Miscellaneous functions for logistics and plots
@@ -270,19 +271,27 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
 # default values in the filenames
 # =============================================================================
     if tx['nu'] != 0:
-        TX      = ["mod","nu","Nsps", "Rs","NsampTaps",'SNRdB','law']
+        TX      = ["mod","nu","Nsps", "Rs","NsampTaps",'SNRdB']
     else:
-        TX      = ["mod", "Nsps", "Rs","NsampTaps",'SNRdB','law']
+        TX      = ["mod", "Nsps", "Rs","NsampTaps",'SNRdB']
+        
+    if tx['PhiLaw']["kind"] == "Rwalk":
+        TX.append('dnu')
+    else:
+        TX.append('law')
 
     CHANNEL     = ["tauPMD", "tauCD", "law"]
     RX          = ["mimo",'lr',"NFrames", "NSymbBatch", "FrameChannel", "NSymbFrame","SNR_dB"]
     fields_list = [TX, CHANNEL, RX]
     
     if tx['nu'] != 0:
-        saving_list = ["mimo",'lr','Rs','mod',"nu",'dnu','SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        saving_list = ["mimo",'lr','Rs','mod',"nu",'SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        if tx['PhiLaw']["kind"] == "Rwalk":
+            saving_list.insert(5,"dnu")
     else:
-        saving_list = ["mimo",'lr','Rs','mod','dnu','SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
-        
+        saving_list = ["mimo",'lr','Rs','mod','SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        if tx['PhiLaw']["kind"] == "Rwalk":
+            saving_list.insert(4,"dnu")        
 
     CHANNELpar  = [np.round(fibre["tauPMD"]*1e12,0),           # [ps]
                    np.round(np.sqrt(fibre["tauCD"])*1e12,0),   # [ps]
@@ -312,7 +321,7 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
             CHANNEL.append('Th_std')
             
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_in']*180/np.pi,0))
-            CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_std']*180/np.pi,0))
+            CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_std']*1e3*180/np.pi,0))
             
         
         if fibre["ThetasLaw"]["law"] == "tri":
@@ -343,13 +352,13 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
 
 
     TXpar       = [tx["mod"],
-                   tx["Nsps"],
-                   int(tx["Rs"]*1e-9),
-                   tx['NsampTaps'],
-                   tx['SNRdB'],
-                   int(tx["dnu"]*1e-3) if tx['PhiLaw']["kind"] == "Rwalk"\
-                       else tx['PhiLaw']["law"]
-                   ]
+                    tx["Nsps"],
+                    int(tx["Rs"]*1e-9),
+                    tx['NsampTaps'],
+                    tx['SNRdB'],
+                    int(tx["dnu"]*1e-3) if tx['PhiLaw']["kind"] == "Rwalk"\
+                    else tx['PhiLaw']["law"],
+                    ]
     
     if tx["nu"] != 0:
         TXpar.insert(1, round(tx['nu'],3))
@@ -576,13 +585,12 @@ def import_data(Nsps = 2, scale = 1):
 
 
 #%%            
-def init_dict():
+def init_dict(server):
     
     tx          = dict()
     fibre       = dict()
     rx          = dict()
     saving      = dict()
-    flags       = dict()
 
     fibre['ThetasLaw']  = dict()
     tx["PhiLaw"]        = dict()
@@ -607,14 +615,19 @@ def init_dict():
     saving['root_path'] = mb.PWD(show = False)
     saving['merge_path']= saving['root_path']+'/data-'+str(date.today())
 
+    if server:
+        tx["server"] = 1
+        rx['server'] = 1
+    else:
+        tx["server"] = 0
+        rx['server'] = 0
+        
     tx      = sort_dict_by_keys(tx)
     fibre   = sort_dict_by_keys(fibre)
     rx      = sort_dict_by_keys(rx)
     saving  = sort_dict_by_keys(saving)
-    
-    flags["plot"] = False
-    
-    return tx,fibre,rx,saving,flags
+
+    return tx,fibre,rx,saving
 
 #%%
                 
@@ -785,52 +798,65 @@ def my_zeros_tensor(size,device='cpu',dtype=torch.float32,requires_grad=False):
 #%%
 def organise_files(directory):
     # Define the main target directories
-    figs_dir = os.path.join(directory, 'figs')
-    mat_dir = os.path.join(directory, 'mat')
-    err_dir = os.path.join(directory, 'err')
-    csv_dir = os.path.join(directory, 'csv')
-    xml_dir = os.path.join(directory, 'xml')
+    figs_dir    = os.path.join(directory, 'figs')
+    mat_dir     = os.path.join(directory, 'mat')
+    csv_dir     = os.path.join(directory, 'csv')
+    xml_dir     = os.path.join(directory, 'xml')
+    err_dir     = os.path.join(directory, 'err')
+    err_dir_bt  = os.path.join(err_dir, 'betas')
+    err_dir_th  = os.path.join(err_dir, 'thetas')
+    err_dir_ph  = os.path.join(err_dir, 'phis')
     
     # Create the main target directories if they don't exist
-    os.makedirs(figs_dir, exist_ok=True)
-    os.makedirs(mat_dir, exist_ok=True)
-    os.makedirs(err_dir, exist_ok=True)
-    os.makedirs(csv_dir, exist_ok=True)
-    os.makedirs(xml_dir, exist_ok=True)
+    os.makedirs(figs_dir,   exist_ok=True)
+    os.makedirs(mat_dir,    exist_ok=True)
+    os.makedirs(csv_dir,    exist_ok=True)
+    os.makedirs(xml_dir,    exist_ok=True)
+    os.makedirs(err_dir,    exist_ok=True)
+    os.makedirs(err_dir_bt, exist_ok=True)
+    os.makedirs(err_dir_th, exist_ok=True)
+    os.makedirs(err_dir_ph, exist_ok=True)
     
     # Create subdirectories for images
-    svg_dir = os.path.join(figs_dir, 'svg')
-    poincare_dir = os.path.join(figs_dir, 'poincare')
-    fir_dir = os.path.join(figs_dir, 'fir')
+    python_dir      = os.path.join(figs_dir, 'python')
+    poincare_dir    = os.path.join(figs_dir, 'poincare')
+    fir_dir         = os.path.join(figs_dir, 'fir')
 
-    os.makedirs(svg_dir, exist_ok=True)
+    os.makedirs(python_dir  , exist_ok=True)
     os.makedirs(poincare_dir, exist_ok=True)
-    os.makedirs(fir_dir, exist_ok=True)
+    os.makedirs(fir_dir     , exist_ok=True)
 
-    # Iterate over all files in the given directory
     for filename in os.listdir(directory):
         filepath = os.path.join(directory, filename)
         
-        # Vérifie que l'élément est un fichier (et non un dossier)
+        # check it is a file and not a folder
         if os.path.isfile(filepath):
             if filename.endswith('.svg'):
-                # Move .svg files to the svg subdirectory
-                shutil.move(filepath, os.path.join(svg_dir, filename))
+                shutil.move(filepath, os.path.join(python_dir, filename))
+
             elif filename.endswith('.png'):
-                # Determine if the file is 'poincare' or 'fir'
+
                 if 'poincare' in filename.lower():
                     shutil.move(filepath, os.path.join(poincare_dir, filename))
                 else:
                     shutil.move(filepath, os.path.join(fir_dir, filename))
+
             elif filename.endswith('.mat'):
                 shutil.move(filepath, os.path.join(mat_dir, filename))
+
             elif filename.endswith('.xml'):
                 shutil.move(filepath, os.path.join(xml_dir, filename))
+
             elif filename.endswith('.csv'):
-                if 'err' in filename.lower():
-                    shutil.move(filepath, os.path.join(err_dir, filename))
+                if 'err_bt' in filename.lower():
+                    shutil.move(filepath, os.path.join(err_dir_bt, filename))
+                elif 'err_th' in filename.lower():
+                    shutil.move(filepath, os.path.join(err_dir_th, filename))
+                elif 'err_ph' in filename.lower():
+                    shutil.move(filepath, os.path.join(err_dir_ph, filename))
                 else:
                     shutil.move(filepath, os.path.join(csv_dir, filename))
+
             else:
                 print(f'Unrecognized file type: {filename}')
 

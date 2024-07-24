@@ -1,11 +1,10 @@
-# %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.3
-#   Date            : 2024-07-10
+#   Version         : 1.2.4
+#   Date            : 2024-07-24
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -26,6 +25,7 @@
 #                           corrected the variance
 #   1.2.3 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
 #                        along with main (1.4.3)
+#   1.2.4 (2024-07-24) - server management
 #
 # ----- MAIN IDEA -----
 #   Generation and management of phase noise and ASE noise in optical telecommunication systems
@@ -72,7 +72,6 @@ pi = np.pi
 # - gen_phase_noise             --- called in : processing.init_processing
 # - load_ase                    --- called in : txdsp.transmitter
 # - load_phase_noise            --- called in : txdsp.transmitter
-# - set_phis                    --- called in : processing.init_processing
 # =============================================================================
 
 
@@ -81,7 +80,7 @@ pi = np.pi
 # =============================================================================
 
 #%%
-def gen_phase_noise(tx,rx):
+def gen_phase_noise(tx,rx,*varargin):
 
     if tx['flag_phase_noise'] == 1:
             
@@ -145,13 +144,6 @@ def gen_phase_noise(tx,rx):
             
             # phase noise estimation after filtering
             tx['pn_fil_losses']     = np.zeros((rx['NFrames'],tx['pn_filt_par']['niter_max']))
-            
-            # for checking
-            # for frame in range(rx['FrameChannel']-1,rx['FrameChannel']+2):
-            #     plt.plot(tx['PhaseNoise'][0,:,frame], label = 'frame No {}'.format(frame))
-            
-            # plt.legend()
-
 
         # --------------------------------------- SAMP-WISE
         else:
@@ -181,9 +173,14 @@ def gen_phase_noise(tx,rx):
                 tmp[:,:,k]      = tx['PhaseNoise'][:,k*tx["NsampFrame"]:(k+1)*tx["NsampFrame"]]
     
             tx['PhaseNoise']    = tmp
-
-
-
+            
+    # ---------------------------------------------------------------- to check
+        if (len(varargin) != 0) and ('pn' in varargin) and (not tx['server']):
+            for frame in range(rx['FrameChannel']-1,rx['FrameChannel']+2):
+                plt.plot(tx['PhaseNoise'][0,:,frame], label = 'frame No {}'.format(frame))
+            
+            plt.legend()
+    # ---------------------------------------------------------------- to check
 
     tx                      = misc.sort_dict_by_keys(tx)
     return tx
@@ -191,9 +188,9 @@ def gen_phase_noise(tx,rx):
 
 
 #%%
-def load_ase(tx,rx):
+def load_ase(tx,rx,*varargin):
     
-    if rx['Frame'] == rx['FrameChannel']:
+    if (rx['Frame'] == rx['FrameChannel']) and (not tx['server']):
         print('loading ASE @ TX\n')
     # noise added at the transmitter:
     # When we set a value of SNR, it will be divided into 4 equal noise components: HI,HQ,VI,VQ
@@ -223,7 +220,14 @@ def load_ase(tx,rx):
     tx['sig_real'][2]   = torch.tensor(np.real(tx_sig_cplx[1]))
     tx['sig_real'][3]   = torch.tensor(np.imag(tx_sig_cplx[1]))
     
-    # plot.constellation(tx["sig_cplx"][0],title = "TX ase loading)
+    # ---------------------------------------------------------------- to check
+    if (len(varargin) != 0) and ('pn time' in varargin) and (not tx['server']):
+        for frame in range(rx['FrameChannel']-1,rx['FrameChannel']+2):
+            plt.plot(tx['PhaseNoise'][0,:,frame], label = 'frame No {}'.format(frame))
+            
+            plt.legend()
+    # ---------------------------------------------------------------- to check
+
 
     return tx
 
@@ -232,7 +236,7 @@ def load_ase(tx,rx):
 #%%
 def load_phase_noise(tx,rx,*varargin):
 
-    if rx['Frame'] == rx['FrameChannel']:
+    if (rx['Frame'] == rx['FrameChannel']) and (not tx['server']):
         print('loading PhaseNoise @ TX\n')
         
     exp_phase           = np.exp(1j*tx['PhaseNoise'][:,:,rx['Frame']])
@@ -247,7 +251,8 @@ def load_phase_noise(tx,rx,*varargin):
     tx['sig_real'][2]   = torch.tensor(np.real(tx_sig_cplx[1]))
     tx['sig_real'][3]   = torch.tensor(np.imag(tx_sig_cplx[1]))
 
-    if len(varargin) != 0 and 'pn time trace' in varargin:
+    # ---------------------------------------------------------------- to check
+    if (len(varargin) != 0) and ('pn time trace' in varargin) and (not tx['server']):
         for k in range(rx['NFrames']):
             pns = round(tx['PhaseNoise'][0,0,k]*180/pi,3)
             pne = round(tx['PhaseNoise'][0,-1,k]*180/pi,3)
@@ -257,12 +262,14 @@ def load_phase_noise(tx,rx,*varargin):
             plt.title(f"frame {k}, pn-s = {pns}, pn-e = {pne}")
             plt.show()
             
-    if len(varargin) != 0 and 'pn const' in varargin:
-        plot.constellations(tx["sig_cplx"],title = 'phase noise laoding')
-
+    if (len(varargin) != 0) and ('pn const' in varargin) and (not tx['server']):
+        plot.constellation(tx["sig_cplx"][0],title = "TX ase loading")
+    # ---------------------------------------------------------------- to check
+    
     tx              = misc.sort_dict_by_keys(tx)
 
     return tx
+
 
 
 

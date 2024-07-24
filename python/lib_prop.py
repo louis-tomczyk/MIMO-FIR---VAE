@@ -1,11 +1,10 @@
-# %%
 # ---------------------------------------------
 # ----- INFORMATIONS -----
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.0.5
-#   Date            : 2024-07-10
+#   Version         : 2.0.1
+#   Date            : 2024-07-24
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -24,7 +23,8 @@
 #                        along with main (1.4.3)
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
-#
+#   2.0.1 (2024-07-24) - server management
+# 
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
 #   Authors             :
@@ -62,7 +62,7 @@ import lib_prop as prop
 import lib_plot as plot
 
 pi = np.pi
-
+from lib_matlab import clc
 
 
 #%% ===========================================================================
@@ -81,12 +81,12 @@ def propagation(tx,fibre,rx,*varargin):
     rx      = simulate_dispersion(tx,fibre,rx)
     rx      = rxhw.load_ase(tx,rx)
     
-    
-    if len(varargin) > 0 and varargin is not None:
+    # ---------------------------------------------------------------- to check
+    if len(varargin) > 0 and (varargin is not None) and (not rx['server']):
         # cf. data_shaping, convolution with filter, mode valid
         # 
-        # y         = conv(x,h,'valid) of len(x) = N, len(h) = M
-        # len(y)    = N-M+1
+        # y  = conv(x,h,'valid)
+        # len(x) = N,   len(h) = M,     len(y) = N-M+1
         #
         # formula: mode full    y[n] = sum_(k=0^{n})   x[k]   . h[n-k]
         # formula: mode valid   y[n] = sum_(k=0^{M-1}) x[k+n] . h[n-k]
@@ -127,7 +127,8 @@ def propagation(tx,fibre,rx,*varargin):
 
     # if rx['Frame'] >= rx['FrameChannel']:
     #     plot.constellations(rx['sig_real'], "prop  f-{}".format(rx['Frame']-rx['FrameChannel']),tx)
-        
+    # ---------------------------------------------------------------- to check
+    
     rx      = misc.sort_dict_by_keys(rx)
     
     return tx,fibre,rx
@@ -154,7 +155,7 @@ def gen_random_theta(fibre):
 
 
         elif law == "gauss":
-            mean        = ThetasLaw['theta_in']
+            mean        = 0
             std         = ThetasLaw['theta_std']
             output      = np.cumsum(np.random.normal(mean,std,numelvalid))
 
@@ -190,6 +191,7 @@ def gen_random_theta(fibre):
         output   = -theta2
         
     return output
+
 
 
 
@@ -242,7 +244,7 @@ def set_thetas(tx,fibre,rx):
                 ThetaStart                              = fibre["ThetasLaw"]["Start"]
                 ThetaEnd                                = fibre["ThetasLaw"]["End"]
                 fibre["ThetasLaw"]["Sth"]               = (ThetaEnd-ThetaStart)/numelvalid
-                fibre["thetas"][numel-numelvalid:,1]    = np.linspace(ThetaStart,ThetaEnd, numelvalid)
+                fibre["thetas"][numel-numelvalid:,1]    = np.linspace(0,ThetaEnd-ThetaStart, numelvalid)
     
             # obtention of angle shifts
             fibre["thetadiffs"]             = fibre["thetas"][numelvalid:,1]-fibre["ThetasLaw"]['theta_in']
@@ -255,16 +257,11 @@ def set_thetas(tx,fibre,rx):
             fibre["thetas"][numelvalid:,1]  =  fibre["thetadiffs"]
 
 
-    # fibre   = misc.sort_dict_by_keys(fibre)
+    fibre   = misc.sort_dict_by_keys(fibre)
 
     return fibre
 
-
-
-
-
-
-#%% [C1]
+#%%
 def simulate_dispersion(tx,fibre,rx):
 
     if fibre['channel'].lower() != "awgn":
@@ -290,10 +287,10 @@ def simulate_dispersion(tx,fibre,rx):
             theta2          = theta[1]
 
         R1                  = np.asarray([[np.cos(theta1)  , np.sin(theta1)],
-                                 [-np.sin(theta1)  , np.cos(theta1)]])
+                                          [-np.sin(theta1) , np.cos(theta1)]])
 
         R2                  = np.asarray([[np.cos(theta2)  , np.sin(theta2)],
-                                 [-np.sin(theta2)  , np.cos(theta2)]])
+                                          [-np.sin(theta2) , np.cos(theta2)]])
 
         Diag_pmd            = np.asarray([[exp_pmd*exp_phiIQ[0], 0],
                                   [0, 1/exp_pmd*exp_phiIQ[1]]], 
@@ -312,20 +309,15 @@ def simulate_dispersion(tx,fibre,rx):
         rx['sig_real'][2]   = torch.tensor(np.real(rx_sig_cplx[1]), dtype = torch.float32)
         rx['sig_real'][3]   = torch.tensor(np.imag(rx_sig_cplx[1]), dtype = torch.float32)
 
-
         if rx['save_channel_gnd']:        
             rx["h_gnd"].append(h_gnd)
 
-        
     else:
 
         rx['sig_real'][0]   = torch.tensor(tx['sig_real'][0], dtype = torch.float32)
         rx['sig_real'][1]   = torch.tensor(tx['sig_real'][1], dtype = torch.float32)
         rx['sig_real'][2]   = torch.tensor(tx['sig_real'][2], dtype = torch.float32)
         rx['sig_real'][3]   = torch.tensor(tx['sig_real'][3], dtype = torch.float32)
-
-
-
 
     rx          = misc.sort_dict_by_keys(rx)
 
