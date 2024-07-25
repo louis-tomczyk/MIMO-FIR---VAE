@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 2.0.5
-%   Date            : 2024-07-16
+%   Version         : 2.1.0
+%   Date            : 2024-07-25
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -26,6 +26,9 @@
 %                       import_data: caps structuring
 %   2024-07-16  (2.0.5) multiple files processing
 %   2024-07-19  (2.0.6) import_data: managing files not containing data
+%   2024-07-23  (2.0.7) progression bar
+%   2024-07-25  (2.1.0) import_data (1.1.0): finner selection of files
+%                       wrong values saved in <Err *> corrected
 %
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -46,90 +49,110 @@
 
 %% MAINTENANCE
 rst
+Th_in   = [0,5,10,15,20,25,45];
+fpol    = [6,18,57,180];
 
-caps.log.Date = '24-07-19';
-cd(strcat('../python/data-',caps.log.Date,"/mat"))
-caps.log.myInitPath     = pwd();
-[allData,caps]          = import_data({'.mat'},caps,'manual selection'); % {,manual selection}
-cd(caps.log.myInitPath)
+% caps.log.Date = '24-07-23';
 
-caps.plot.fir           = 1;
-caps.plot.poincare      = 0;
-caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
-caps.plot.phis.xlabel   = 'comparison per batch';
-caps.method.thetas      = 'fft';                    % {fft, mat, svd}
-caps.method.phis        = 'eig';
-
-
-
-
-for kdata = 1:length(allData)
-
-    data                        = allData{kdata};
-    caps.kdata                  = kdata;
-    caps                        = extract_infos(caps,data);
-    [caps,thetas,phis, H_est]   = channel_estimation(data,caps);
-    [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
-    
-    if caps.phis_est
-        metrics                 = get_metrics(caps,thetas,phis);
-        plot_results(caps,H_est, thetas,metrics,phis);
-    else
-        metrics                 = get_metrics(caps,thetas);
-        plot_results(caps,H_est, thetas,metrics);
-    end
-
-    cd ../err/thetas
-
-    if kdata == 1
-        Mthetas         =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
-        if caps.phis_est
-            Mthetas     =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
+for nth = 1:length(Th_in)
+    for nfpol = 1:length(fpol)
+        cd(strcat('../python/data-',caps.log.Date,"/mat"))
+        caps.log.myInitPath     = pwd();
+        
+        selected_caracs         = [sprintf("Th_in %.1f",Th_in(nth));sprintf("fpol %.1f",fpol(nfpol))];
+        [allData,caps]          = import_data({'.mat'},caps,selected_caracs); % {,manual selection}
+        cd(caps.log.myInitPath)
+        
+        caps.what_carac         = "Th_in";
+        
+        caps.plot.fir           = 0;
+        caps.plot.poincare      = 0;
+        caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
+        caps.plot.phis.xlabel   = 'comparison per batch';
+        caps.method.thetas      = 'mat';                    % {fft, mat, svd}
+        caps.method.phis        = 'eig';
+        caps.save.mean_errs     = 1;
+        
+        
+        if length(allData) > 5 f = waitbar(0, 'Starting'); end
+        
+        for kdata = 1:length(allData)
+        
+            data                        = allData{kdata};
+            caps.kdata                  = kdata;
+            caps                        = extract_infos(caps,data);
+            [caps,thetas,phis, H_est]   = channel_estimation(data,caps);
+            [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
+            
+            if caps.phis_est
+                metrics                 = get_metrics(caps,thetas,phis);
+                plot_results(caps,H_est, thetas,metrics,phis);
+            else
+                metrics                 = get_metrics(caps,thetas);
+                plot_results(caps,H_est, thetas,metrics);
+            end
+        
+            cd ../err/thetas
+        
+            if kdata == 1
+                Mthetas         =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
+                if caps.phis_est
+                    Mthetas     =  zeros(caps.log.Nfiles+1,caps.carac.Ncarac+3);
+                end
+            end
+        
+            Mthetas(kdata,:)    = [caps.carac.values(kdata,:),...
+                                   metrics.thetas.ErrMean,...
+                                   metrics.thetas.ErrStd,...
+                                   metrics.thetas.ErrRms];
+        
+            if caps.phis_est
+                cd ../phis
+                Mphis(kdata,:)  = [caps.carac.values(kdata,:),...
+                                   metrics.phis.ErrMean(end),...
+                                   metrics.phis.ErrStd(end),...
+                                   metrics.phis.ErrRms(end)];
+        
+            end
+        
+            if length(allData) > 5
+                waitbar(kdata/length(allData), f,...
+                    sprintf('Progress: %d %%', floor(kdata/length(allData)*100)));
+            end
         end
-    end
-    Mthetas(kdata,:)    = [caps.carac.values(kdata,:),...
-                           metrics.thetas.ErrMean,...
-                           metrics.thetas.ErrStd,...
-                           metrics.thetas.ErrRms];
-
-    if caps.phis_est
-        cd ../phis
-        Mphis(kdata,:)  = [caps.carac.values(kdata,:),...
-                           metrics.phis.ErrMean(end),...
-                           metrics.phis.ErrStd(end),...
-                           metrics.phis.ErrRms(end)];
-
+        if length(allData) > 5 close(f); end
+        
+        
+        if caps.save.mean_errs 
+            cd ../thetas
+            Mthetas(end,:)  = [caps.carac.values(kdata,:),...
+                               median(Mthetas(1:end-1,end-2)),...
+                               median(Mthetas(1:end-1,end-1)),...
+                               median(Mthetas(1:end-1,end))];
+            writematrix(Mthetas,strcat('<Err Theta>-',caps.log.filename,'.csv'))
+        
+            if caps.phis_est
+                cd ../phis
+                Mphis(end,:)= [caps.carac.values(kdata,:),...
+                               median(Mphis(1:end-1,end-2)),...
+                               median(Mphis(1:end-1,end-1)),...
+                               median(Mphis(1:end-1,end))];
+                writematrix(Mphis,strcat('<Err Phi>-',caps.log.filename,'.csv'))
+            end
+        end
+        
+        
+        
+        cd(caps.log.myRootPath)
     end
 end
-
-
-cd ../thetas
-Mthetas(end,:)  = [caps.carac.values(kdata,:),...
-                   median(metrics.thetas.ErrMean),...
-                   median(metrics.thetas.ErrStd),...
-                   median(metrics.thetas.ErrRms)];
-writematrix(Mthetas,strcat('<Err Theta>-',caps.log.filename,'.csv'))
-
-
-if caps.phis_est
-    cd ../phis
-    Mphis(end,:)= [caps.carac.values(kdata,:),...
-                   median(metrics.phis.ErrMean(end)),...
-                   median(metrics.phis.ErrStd(end)),...
-                   median(metrics.phis.ErrRms(end))];
-    writematrix(Mphis,strcat('<Err Phi>-',caps.log.filename,'.csv'))
-end
-
-
-
-cd(caps.log.myRootPath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----             
-%   import_data (1.0.1)
+%   import_data         (1.1.0)
 % ---------------------------------------------
 
 function [allData, caps] = import_data(acceptedFormats,caps,varargin)
@@ -150,18 +173,21 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
         filenames   = {filenames.name};                         % Extract file names
         filenames   = filenames(~startsWith(filenames, '.'));   % Exclude hidden files
     
-    elseif nargin == 1
-        pathname    = pwd;                                      % Get current directory
-        filenames   = dir(fullfile(pathname, strcat('*', acceptedFormats)));           % Get all files
-        filenames   = {filenames.name};                         % Extract file names
-        filenames   = filenames(~startsWith(filenames, '.'));   % Exclude hidden files
-        filenames   = filenames(~startsWith(filenames, 'SUM_UP'));   % Exclude hidden files
-    else
+    elseif nargin == 2
         % User interface
         [filenames, pathname] = uigetfile(...
             strcat('*', acceptedFormats),...
             'Select files',...
             'MultiSelect', 'on');
+    else
+        pathname    = pwd;                                      % Get current directory
+        filenames   = dir(fullfile(pathname, '*.*'));           % Get all files
+        filenames   = {filenames.name};                         % Extract file names
+        filenames   = filenames(~startsWith(filenames, '.'));   % Exclude hidden files
+        for k = 1:length(varargin{1})
+            filenames   = filenames(contains(filenames, varargin{1}(k)));
+            % Exclude files not containing the specific keywords given in varargin
+        end
     end
 
     % Convert to cell array if needed
