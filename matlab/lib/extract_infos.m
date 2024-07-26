@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 1.0.7
-%   Date            : 2024-07-25
+%   Version         : 1.1.0
+%   Date            : 2024-07-26
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -19,7 +19,8 @@
 %   2024-07-16  (1.0.5) multiple files processing
 %   2024-07-23  (1.0.6) ThStd -> Th_std
 %   2024-07-25  (1.0.7) custom what_carac
-%
+%   2024-07-26  (1.1.0) removed what_carac, along with main_0_python2matlab (2.1.1)
+%                       [REMOVED] nested functions
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
 % ----- OUTPUTS -----
@@ -112,117 +113,8 @@ caps.FIR.tap                = ceil(caps.FIR.length/2);
 caps.FIR.taps               = linspace(1,caps.FIR.length,caps.FIR.length)-caps.FIR.tap;
 
 
-% caracs
-what_carac         = string({''});
-
-
-if ~isfield(caps,'what_carac')
-    if strcmpi(data.ThLaw,'lin')
-        what_carac    = [what_carac,string({'ThEnd','Sth'})];
-    elseif strcmpi(data.ThLaw,'gauss')
-        disp("Warning: all possible models implemented in Python's simulator")
-        disp("are not taken into account. If not LINEAR model, Rwalk-Gauss by")
-        disp("default is considered. Future versions may need to take it into")
-        disp("account")
-        what_carac    = [what_carac,string({'Th_std'})];  % {dnu, Sth, Sph, ThEnd, PhEnd,Thstd, Phstd}
-    end
-else
-    what_carac    = [what_carac,string({caps.what_carac})];
-end
-
-
-
-
-if caps.phis_est && strcmpi(data.PhLaw,'lin') && ~sum(sum(isnan(data.Phis_gnd)))
-    what_carac    = [what_carac,string({'PhEnd','Sph'})];
-elseif strcmp(data.PhLaw,'Linewidth')
-    what_carac    = [what_carac,string({'dnu'})];
-end
-
-caps.carac.what     = what_carac(2:end);
-
-caps.carac.values   = zeros(length(caps.log.Fn),length(caps.carac.what));
-for k = 1:length(caps.carac.what)
-    caps.carac.values(:,k)   = get_value_from_filename_in(caps.log.PathSave,caps.carac.what{k},caps.log.Fn);
-end
-
-caps.carac.Ncarac   = length(caps.carac.what);
-
+cd(caps.log.PathSave{1})
 caps = sort_struct_alphabet(caps);
 
 end
 
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% NESTED FUNCTIONS
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ---------------------------------------------
-% ----- CONTENTS -----
-%   get_value_from_filename_in
-%   get_number_from_string_in
-% ---------------------------------------------
-
-
-function out = get_value_from_filename_in(folderPath,quantity,varargin)
-
-    cd(folderPath{1})
-  
-    if nargin == 2
-        nfiles          = length(dir(pwd))-2;
-        folder_struct   = dir(pwd);
-        out             = zeros(nfiles,1);
-
-        for k=1:nfiles
-            filename    = folder_struct(k+2).name;
-            out(k)      = get_number_from_string_in(filename,quantity);
-        end
-
-    else
-        nfiles          = length(varargin{1});
-        out             = zeros(nfiles,1);
-        for k=1:nfiles
-            out(k)      = get_number_from_string_in(varargin{1}{k},quantity);
-        end
-    end
-
-    out = sort(out);
-    
-end
-%-----------------------------------------------------
-
-
-
-function out = get_number_from_string_in(stringIn,what,varargin)
-
-    stringIn    = char(stringIn);
-    iwhat       = strfind(stringIn,what);
-
-    if nargin == 2
-        iendwhat    = iwhat+length(what);
-        idashes     = strfind(stringIn,'-');
-        [~,itmp]    = max(idashes-iendwhat>0);
-        idashNext   = idashes(itmp);
-        strTmp      = stringIn(iendwhat+1:idashNext-1);
-    else
-        if nargin > 2
-            if iwhat-varargin{1}<1
-                istart = 1;
-            else
-                istart = iwhat-varargin{1};
-            end
-            if nargin == 4
-                if iwhat+varargin{2}>length(stringIn)
-                    iend = length(stringIn);
-                else
-                    iend = iwhat+varargin{2};
-                end
-            end
-            strTmp  = stringIn(istart:iend);
-        end
-    end
-
-    indexes = regexp(strTmp,'[0123456789.]');
-    out     = str2double(strTmp(indexes));
-end
-%-----------------------------------------------------

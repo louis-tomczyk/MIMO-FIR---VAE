@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-15
-%   Version         : 1.1.4
+%   Version         : 1.1.5
+%   Date            : 2024-07-26
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -17,7 +17,8 @@
 %   2024-07-10 (1.1.1)  flexibility and naming standardisation
 %   2024-07-11 (1.1.2)  plot for phase estimation per batch (1.1.0 == per frame)
 %   2024-07-12 (1.1.3)  phase noise management --- for rx['mode'] = 'pilots'
-%   2024-07-15 (1.1.4)  multiple files processing
+%   2024-07-16 (1.1.4)  multiple files processing
+%   2024-07-26 (1.1.5)  lighten the filenames + include estimation method
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -73,11 +74,21 @@ if caps.plot.fir
     
 end
 
-cd ../err
-writematrix(metrics.thetas.Err,strcat('Err Theta-',caps.log.filename,'.csv'))
-
-if ~isempty(varargin)
-    writematrix(metrics.phis.Err,strcat('Err Phi-',caps.log.filename,'.csv'))
+if caps.save.errs
+    cd ../err/thetas/
+    str_tmp         = strcat( ...
+                        sprintf('ErrTh-%s-',caps.method.thetas), ...
+                        caps.log.filename(7:end),'.csv'); % 7 == 'X - mimo...'
+    
+    writematrix(metrics.thetas.Err,str_tmp)
+    
+    if ~isempty(varargin)
+        cd ../phis/
+        str_tmp     = strcat( ...
+                    sprintf('ErrPh-%s-',caps.method.phis), ...
+                    caps.log.filename(7:end),'.csv'); % 7 == 'X - mimo...'
+        writematrix(metrics.phis.Err,str_tmp)
+    end
 end
 
 cd(caps.log.myInitPath)
@@ -181,23 +192,23 @@ if caps.phis_est
     if strcmpi(caps.plot.phis.xlabel,'error per batch')
         scatter(caps.Batches.array,...
                 phis.est.channel(:,caps.plot.phis.pol)-phis.gnd.channel(:,caps.plot.phis.pol),...
-                100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+                25,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         xlabel("batch")
         ylabel("$\hat{\phi}-\phi$ [deg]")
     
     elseif strcmpi(caps.plot.phis.xlabel,'error per phi')
         scatter(phis.gnd.channel(:,caps.plot.phis.pol), ...
                 phis.est.channel(:,caps.plot.phis.pol)-phis.gnd.channel(:,caps.plot.phis.pol), ...
-                100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+                25,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         xlabel("$\phi$ [deg]")
         ylabel("$\hat{\phi}-\phi$ [deg]")
     
     elseif strcmpi(caps.plot.phis.xlabel,'comparison per batch')
+        scatter(caps.Batches.array,phis.est.channel(:,caps.plot.phis.pol),...
+                25,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
         plot(caps.Batches.array, ...
              phis.gnd.channel, ...
-             'color',[1,1,1]*0.83, LineWidth=5)
-        scatter(caps.Batches.array,phis.est.channel(:,caps.plot.phis.pol),...
-                100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+             'color',[1,1,1]*0.83, LineWidth=2)
         legend("ground truth","estimation",Location="northwest")
         xlabel("batch")
         ylabel("$\hat{\phi},\phi$ [deg]")
