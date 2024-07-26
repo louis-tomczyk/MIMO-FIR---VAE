@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 1.2.0
-%   Date            : 2024-07-22
+%   Version         : 2.0.0
+%   Date            : 2024-07-26
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -13,8 +13,9 @@
 % ----- CHANGE LOG -----
 %   2024-07-19  (1.0.0)
 %   2024-07-22  (1.0.1)
-%   2024-07-23  (1.2.0)     [NEW] go_to_folder, set_caps,
-%                           -> standardising matlab codes as in main_1_sort_custom_carac
+%   2024-07-23  (1.2.0) [NEW] go_to_folder, set_caps,
+%                       -> standardising matlab codes as in main_1_sort_custom_carac
+%   2024-07-26  (2.0.0) restructuration + plot
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -66,119 +67,83 @@ for ncarac1 = 1:length(caracs1{2})
     end
 end
 
+% ---------------------------------------------
+% ---------------------------------------------
+% ---------------------------------------------
+dnu             = caracs1{2};
+fpol            = caracs2{2};
 
+% ---------------------------------------------
+yfpol_m(:,1)    = Errs(Errs.fpol == 1,:).mean;
+yfpol_m(:,2)    = Errs(Errs.fpol == 10,:).mean;
+yfpol_m(:,3)    = Errs(Errs.fpol == 100,:).mean;
+
+yfpol_s(:,1)    = Errs(Errs.fpol == 1,:).std;
+yfpol_s(:,2)    = Errs(Errs.fpol == 10,:).std;
+yfpol_s(:,3)    = Errs(Errs.fpol == 100,:).std;
+
+% ---------------------------------------------
+ydnu_m(:,1)    = Errs(Errs.dnu == 1,:).mean;
+ydnu_m(:,2)    = Errs(Errs.dnu == 5,:).mean;
+ydnu_m(:,3)    = Errs(Errs.dnu == 10,:).mean;
+ydnu_m(:,4)    = Errs(Errs.dnu == 50,:).mean;
+ydnu_m(:,5)    = Errs(Errs.dnu == 100,:).mean;
+
+ydnu_s(:,1)    = Errs(Errs.dnu == 1,:).std;
+ydnu_s(:,2)    = Errs(Errs.dnu == 5,:).std;
+ydnu_s(:,3)    = Errs(Errs.dnu == 10,:).std;
+ydnu_s(:,4)    = Errs(Errs.dnu == 50,:).std;
+ydnu_s(:,5)    = Errs(Errs.dnu == 100,:).std;
+
+% ---------------------------------------------
+
+figure
+subplot(1,2,1)
+hold on
+plot(fpol,yfpol_m(1,:),'-r',    DisplayName="$\Delta\nu = 1$",LineWidth= 2)
+plot(fpol,yfpol_m(2,:),'--b',   DisplayName="$\Delta\nu = 5$",LineWidth= 2)
+plot(fpol,yfpol_m(3,:),'-.k',   DisplayName="$\Delta\nu = 10$",LineWidth= 2)
+plot(fpol,yfpol_m(4,:),'-',     DisplayName="$\Delta\nu = 50$",LineWidth= 3)
+plot(fpol,yfpol_m(5,:),'--m',   DisplayName="$\Delta\nu = 100$",LineWidth= 3)
+set(gca,'Xscale','log','Yscale','log')
+ylim([5e-2,5])
+xlabel('$f_{pol}~[kHz]$')
+ylabel('$<\hat{\theta}-\theta>~[deg]$')
+xticks([1,10,100])
+xticklabels({'1','10','100'});
+hleg = legend('show');
+legend boxoff
+title(hleg,'units in [kHz]')
+grid on
+box on
+
+subplot(1,2,2)
+hold on
+plot(dnu,ydnu_m(1,:),'-r', DisplayName="$f_{pol} = 1$",LineWidth= 2)
+plot(dnu,ydnu_m(2,:),'--b',DisplayName="$f_{pol} = 10$",LineWidth= 2)
+plot(dnu,ydnu_m(3,:),'-.k', DisplayName="$f_{pol} = 100$",LineWidth= 2)
+set(gca,'Xscale','log','Yscale','log')
+ylim([5e-2,5])
+xlabel('$\Delta\nu~[kHz]$')
+ylabel('$<\hat{\theta}-\theta>~[deg]$')
+xticks([1,10,100])
+xticklabels({'1','10','100'});
+hleg = legend('show');
+legend boxoff
+title(hleg,'units in [kHz]')
+grid on
+box on
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----
-%   get_errors
 %   get_number_from_string_in
 %   get_value_from_filename_in
-%   go_to_dir                       (1.2.0)
-%   import_data                     (1.0.2)
-%   select_files
-%   set_caps
+%   import_data                     (1.1.1)
 % ---------------------------------------------
 
-%-----------------------------------------------------
-
-function out = get_number_from_string_in(stringIn,what,varargin)
-
-    stringIn    = char(stringIn);
-    iwhat       = strfind(stringIn,what);
-
-    if nargin == 2
-        iendwhat    = iwhat+length(what);
-        idashes     = strfind(stringIn,'-');
-        [~,itmp]    = max(idashes-iendwhat>0);
-        idashNext   = idashes(itmp);
-        strTmp      = stringIn(iendwhat+1:idashNext-1);
-    else
-        if nargin > 2
-            if iwhat-varargin{1}<1
-                istart = 1;
-            else
-                istart = iwhat-varargin{1};
-            end
-            if nargin == 4
-                if iwhat+varargin{2}>length(stringIn)
-                    iend = length(stringIn);
-                else
-                    iend = iwhat+varargin{2};
-                end
-            end
-            strTmp  = stringIn(istart:iend);
-        end
-    end
-
-    indexes = regexp(strTmp,'[0123456789.]');
-    out     = str2double(strTmp(indexes));
-end
-%-----------------------------------------------------
-
-function out = get_value_from_filename_in(folderPath,quantity,varargin)
-
-    cd(folderPath{1})
-  
-    if nargin == 2
-        nfiles          = length(dir(pwd))-2;
-        folder_struct   = dir(pwd);
-        out             = zeros(nfiles,1);
-
-        for k=1:nfiles
-            filename    = folder_struct(k+2).name;
-            out(k)      = get_number_from_string_in(filename,quantity);
-        end
-
-    else
-        nfiles          = length(varargin{1});
-        out             = zeros(nfiles,1);
-        for k=1:nfiles
-            out(k)      = get_number_from_string_in(varargin{1}{k},quantity);
-        end
-    end
-
-    out = sort(out);
-    
-end
-%-----------------------------------------------------
-
-function caps = go_to_dir(caps,what,varargin)
-
-cd(caps.log.myRootPath)
-
-if strcmpi(what,'forward')
-    k           = varargin{1};
-    tmp         = cellstr(caps.what_all);
-    caps.what   = char(tmp(k));
-    carac       = varargin{2};
-
-    switch lower(caps.what)
-        case 'betas'
-            dir_path = strcat('../python/data-',caps.log.Date,'/err/betas');
-            caps.ext = ".csv";
-        case 'phis'
-            dir_path = strcat('../python/data-',caps.log.Date,'/err/phis');
-            caps.ext = ".csv";
-        case 'thetas'
-            dir_path = strcat('../python/data-',caps.log.Date,'/err/thetas');
-            caps.ext = ".csv";
-        otherwise
-            assert(1==0,'files do not exist')
-    end
-
-    cd(dir_path)
-    filenames   = {dir(fullfile(pwd, '*.*')).name};           % Get all files
-    if length(filenames) == 2
-        cd(strcat(...
-            sprintf('%s',caps.carac.(carac).what), " ", num2str(caps.carac.(carac).value(caps.jphys))...
-            ))
-    end
-end
-end
-%-----------------------------------------------------
 
 function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     if nargin < 1
@@ -290,31 +255,4 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
 end
 %-----------------------------------------------------
 
-
-function caps = select_files(caps,carac)
-    
-if caps.log.Nfiles ~= 0
-    wanted      = caps.carac.(carac).("what");
-    NSbB        = get_value_from_filename_in(caps.log.PathSave,wanted,caps.log.Fn).';
-    Ndraws      = sum(NSbB == caps.carac.(carac).("value")(1));
-    Fn_2keep    = cell(1,caps.log.Nfiles);
-    
-    n_files     = 0;
-    indexes     = zeros(1,caps.log.Nfiles);
-    for k = 1:caps.log.Nfiles
-        carac_value_tmp = get_value_from_filename_in(caps.log.PathSave,wanted,caps.log.Fn{k});
-        if carac_value_tmp == caps.carac.(carac).("value")(caps.kalgo)
-            indexes(k)  = k;
-            n_files     = n_files+1;
-            Fn_2keep{k} = caps.log.Fn{k};
-        end
-    end
-    
-    caps.Fn_2keep       = Fn_2keep(~cellfun('isempty',Fn_2keep));
-
-    caps.indexes        = indexes(indexes ~= 0);
-    caps.Nfiles_keep    = n_files;
-end
-end
-%-----------------------------------------------------
 
