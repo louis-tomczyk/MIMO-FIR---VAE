@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.3
-#   Date            : 2024-07-24
+#   Version         : 2.1.0
+#   Date            : 2024-09-11
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -47,9 +47,15 @@
 #   2.0.2 (2024-07-16) - save2mat: adding rx mode
 #                      - organise_files: managing phase noise 
 #   2.0.3 (2024-07-24) - init_dict: server mode
+#                        create_xml_file: Th_std -> fpol for filenameing
+#   2.1.0 (2024-09-11) - [NEW] rename_files
+#                      - move_files_to_folder: adding optional argument for
+#                           moving to custom folder
+#                      - remove_n_characters_from_filenames: do not remove
+#                           characters if it is not a date
 # 
 # ----- MAIN IDEA -----
-#   Miscellaneous functions for logistics and plots
+#   Miscellaneous functions for logistics
 # 
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books:
@@ -128,6 +134,7 @@ pi = np.pi
 # - plot_3y_axes
 # - remove_using_index
 # - remove_n_characters_from_filenames  (1.3.0)
+# - rename_files                        (2.1.0)
 # - replace_string_in_filenames         (1.3.0)
 # - save2mat
 # - select_and_read_files
@@ -275,21 +282,22 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
     else:
         TX      = ["mod", "Nsps", "Rs","NsampTaps",'SNRdB']
         
-    if tx['PhiLaw']["kind"] == "Rwalk":
-        TX.append('dnu')
-    else:
-        TX.append('law')
+    if tx['flag_phase_noise']:
+        if tx['PhiLaw']["kind"] == "Rwalk":
+            TX.append('dnu')
+        else:
+            TX.append('law')
 
     CHANNEL     = ["tauPMD", "tauCD", "law"]
     RX          = ["mimo",'lr',"NFrames", "NSymbBatch", "FrameChannel", "NSymbFrame","SNR_dB"]
     fields_list = [TX, CHANNEL, RX]
     
     if tx['nu'] != 0:
-        saving_list = ["mimo",'lr','Rs','mod',"nu",'SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        saving_list = ["mimo",'lr','Rs','mod',"nu",'SNRdB',"CD","PMD",'Thlaw',"NSymbBatch","NSymbFrame","SNR_dB","NsampTaps"]
         if tx['PhiLaw']["kind"] == "Rwalk":
             saving_list.insert(5,"dnu")
     else:
-        saving_list = ["mimo",'lr','Rs','mod','SNRdB',"CD","PMD",'Thlaw',"NSymbFrame","NSymbBatch","SNR_dB","NsampTaps"]
+        saving_list = ["mimo",'lr','Rs','mod','SNRdB',"CD","PMD",'Thlaw',"NSymbBatch","NSymbFrame","SNR_dB","NsampTaps"]
         if tx['PhiLaw']["kind"] == "Rwalk":
             saving_list.insert(4,"dnu")        
 
@@ -315,13 +323,13 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
         
         if fibre["ThetasLaw"]["law"] == "gauss":
             saving_list.insert(6,'Th_in')
-            saving_list.insert(7,'Th_std')
+            saving_list.insert(7,'fpol')
             
             CHANNEL.append('Th_in')
-            CHANNEL.append('Th_std')
+            CHANNEL.append('fpol')
             
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_in']*180/np.pi,0))
-            CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_std']*1e3*180/np.pi,0))
+            CHANNELpar.append(np.round(fibre["ThetasLaw"]['fpol']**2/2/pi*tx['Rs']*1e-3,0))
             
         
         if fibre["ThetasLaw"]["law"] == "tri":
@@ -375,6 +383,8 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
                 Sph = (tx["PhiLaw"]['End']-tx["PhiLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
                 TXpar.append(int(tx["PhiLaw"]['End']*180/pi))
                 TXpar.append(np.round(Sph*180/pi,2))
+    else:
+        TXpar = TXpar[:-1]
     
     
     if rx['mode'].lower() == 'pilots':
@@ -384,7 +394,8 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
 
     
     RXpar       = [rx['mimo'],
-                   round(rx['lr']*1000,4),
+                   round(rx['lr']*1000,4) if rx['mimo'].lower() == 'vae'
+                       else round(rx['lr']*1e6,2),
                    rx["NFrames"],
                    rx["NSymbBatch"],
                    rx["FrameChannel"],
@@ -616,12 +627,14 @@ def init_dict(server):
     saving['merge_path']= saving['root_path']+'/data-'+str(date.today())
 
     if server:
-        tx["server"] = 1
-        rx['server'] = 1
+        tx["server"]        = 1
+        rx['server']        = 1
+        saving['server']    = 1
     else:
-        tx["server"] = 0
-        rx['server'] = 0
-        
+        tx["server"]        = 0
+        rx['server']        = 0
+        saving['server']    = 0        
+
     tx      = sort_dict_by_keys(tx)
     fibre   = sort_dict_by_keys(fibre)
     rx      = sort_dict_by_keys(rx)
@@ -758,27 +771,38 @@ def merge_data_folders(saving, deletion=True):
             shutil.rmtree(path_tmp)
 
 
+                
 #%%
-def move_files_to_folder(year):
+def move_files_to_folder(year, target_folder=None):
     # Obtenez la liste des fichiers dans le répertoire actuel
     files = [f for f in os.listdir('.') if os.path.isfile(f)]
-
+    
     for filename in files:
+        # Vérifiez si le nom du fichier commence par l'année spécifiée
+        if filename.startswith(str(year).zfill(2)):
+            if target_folder:
+                # Vérifiez si le dossier cible existe, sinon, créez-le
+                if not os.path.exists(target_folder):
+                    os.mkdir(target_folder)
+                # Déplacez le fichier dans le dossier spécifié
+                shutil.move(filename, os.path.join(target_folder, filename))
+            else:
+                # Comportement original basé sur la date dans le nom du fichier
+                parts       = filename.split(' - ')
+                date_part   = parts[0].split(' ')
+                day_part    = date_part[0]
 
-        # Vérifiez si le nom de fichier suit le format date attendu
-        parts       = filename.split(' - ')
-        date_part   = parts[0].split(' ')
-        day_part    = date_part[0]
+                if is_date(day_part):
+                    date_folder = f'data-{day_part}'
 
-        if is_date(day_part) == True:
-            date_folder = f'data-{day_part}'
-                            
-            # Vérifiez si le dossier existe déjà, sinon, créez-le
-            if not os.path.exists(date_folder):
-                os.mkdir(date_folder)
-            # Déplacez le fichier dans le dossier approprié
-            shutil.move(filename, os.path.join(date_folder, filename))
-                
+                    # Vérifiez si le dossier existe déjà, sinon, créez-le
+                    if not os.path.exists(date_folder):
+                        os.mkdir(date_folder)
+                    # Déplacez le fichier dans le dossier approprié
+                    shutil.move(filename, os.path.join(date_folder, filename))
+
+
+
       
 #%%
 
@@ -884,17 +908,20 @@ def remove_using_index(All_Indexes,List_or_Array):
     
     
 
-#%%
-def remove_n_characters_from_filenames(directory, n):
+#%%           
+def remove_n_characters_from_filenames(directory, n,*varargin):
 
     for filename in os.listdir(directory):
 
         if os.path.isfile(os.path.join(directory, filename)):
-            new_filename = filename[n:]
-            os.rename(
-                os.path.join(directory, filename),
-                os.path.join(directory, new_filename)
-            )
+            if len(varargin) != 0 and filename[0].isnumeric() == False:
+                continue
+            else:
+                new_filename = filename[n:]
+                os.rename(
+                    os.path.join(directory, filename),
+                    os.path.join(directory, new_filename)
+                )
 
 #%% ChatGPT
 def replace_string_in_filenames(string, old_string, new_string):
@@ -919,6 +946,35 @@ def replace_string_in_filenames(string, old_string, new_string):
         new_filename = string.replace(old_string, new_string)
         return new_filename
         
+#%%
+def rename_files(path, string, position):
+    # Check if the directory exists
+    if not os.path.isdir(path):
+        raise ValueError(f"The path {path} is not a valid directory.")
+    
+    count = 0
+    # Iterate over all files in the directory
+    for filename in os.listdir(path):
+        str_len = len(string)
+        
+        if filename[0:str_len] != string:
+            # Split the file name and its extension
+            file_base, file_ext = os.path.splitext(filename)
+            
+            # If the position is valid, insert the string at the given position
+            if 0 <= position <= len(file_base):
+                new_name = file_base[:position] + string + file_base[position:] + file_ext
+            else:
+                raise ValueError(f"The position {position} exceeds the length of the file name {file_base}.")
+            
+            # Create the full paths for the old and new file names
+            old_path = os.path.join(path, filename)
+            new_path = os.path.join(path, new_name)
+            count = count + 1
+            
+            # Rename the file
+            os.rename(old_path, new_path)
+    print(f"{count} files renamed")
         
 #%%
 def save2mat(tx,fibre,rx,saving):
@@ -964,6 +1020,10 @@ def save2mat(tx,fibre,rx,saving):
 
     else:
         save_dict['Var_real']   = rx["noise_var"]
+        
+        
+    if "thetadiffs" in fibre:
+        del fibre['thetadiffs']
         
     io.savemat(name,save_dict)
 
