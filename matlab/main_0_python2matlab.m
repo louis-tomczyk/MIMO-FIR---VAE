@@ -52,111 +52,125 @@
 
 %% MAINTENANCE
 rst
-caracs1   = {'dnu',[1,5,10,50,100]};
-caracs2   = {'fpol',[1,10,100]};
+caps.log.Date = '24-09-11';
+caracs1   = {'dnu',[1,10,100]};         % {Nplts, dnu}
+caracs2   = {'ThEnd',10};       % {fpol, ThEnd}
+caracs2b  = {'Sth',[0.5,1]};
+caracs3   = {'SNR_dB',linspace(25,5,21)};
 
 caps.plot.fir           = 0;
 caps.plot.poincare      = 0;
 caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
 caps.plot.phis.xlabel   = 'comparison per batch';
-caps.method.thetas      = 'fft';                    % {fft, mat, svd}
+caps.method.thetas      = 'mat';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
 caps.save.errs          = 1;
 caps.save.mean_errs     = 1;
 caps.what_carac         = caracs1{1};
+nrea                    = 10;
 
 count = 0;
 for ncarac1 = 1:length(caracs1{2})
     for ncarac2 = 1:length(caracs2{2})
-        
-        cd(strcat('../python/data-',caps.log.Date,"/mat"))
-        caps.log.myInitPath     = pwd();
-        
+%         for ncarac2b = 1:length(caracs2b{2})
+%             fprintf("\t\t %s = %.1f\n",caracs2b{1},caracs2b{2}(ncarac2b))
 
-        selected_caracs         = [sprintf("%s %.0f ",caracs1{1},caracs1{2}(ncarac1));...
-                                   sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2))];
+            for ncarac3 = 1:length(caracs3{2})     
+                cd(strcat('../python/data-',caps.log.Date,"/mat"))
+                caps.log.myInitPath     = pwd();
+                
+        
+                selected_caracs         = [sprintf("%s %d ",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space
+                                           sprintf("%s %d",caracs2{1},caracs2{2}(ncarac2));...  % {%d ThEnd,%.1f fpol}
+%                                            sprintf("%s %.1f",caracs2b{1},caracs2b{2}(ncarac2b));...
+                                           sprintf("%s %d",caracs3{1},caracs3{2}(ncarac3))];  % {%d for SNR_dB,%.1f}    
+        
+                [allData,caps]          = import_data({'.mat'},caps,selected_caracs); % {,manual selection}
+                cd(caps.log.myInitPath)
+                NfilesTot   = length(caracs1{2})*(length(caracs2{2}))*(length(caracs3{2}))*nrea;
+                
+                for kdata = 1:length(allData)
+                
+                    data                        = allData{kdata};
+                    caps.kdata                  = kdata;
+                    caps                        = extract_infos(caps,data);
+                    [caps,thetas,phis,H_est]    = channel_estimation(data,caps);
+                    [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
+                    
+                    if caps.phis_est
+                        metrics         = get_metrics(caps,thetas,phis);
+                        plot_results(caps,H_est, thetas,metrics,phis);
+                    else
+                        metrics         = get_metrics(caps,thetas);
+                        plot_results(caps,H_est, thetas,metrics);
+                    end
+                
+                    cd ../err/thetas
+                
+                    if kdata == 1
+                        Mthetas         =  zeros(caps.log.Nfiles+1,length(selected_caracs)+3);
+                        if caps.phis_est
+                            Mphis     =  zeros(caps.log.Nfiles+1,length(selected_caracs)+3);
+                        end
+                    end
 
-
-        [allData,caps]          = import_data({'.mat'},caps,selected_caracs); % {,manual selection}
-        cd(caps.log.myInitPath)
-        NfilesTot   = caps.log.Nfiles * length(caracs1{2})*(length(caracs2{2}));
+%                     Mthetas(kdata,:)    = [caracs1{2}(ncarac1),caracs2{2}(ncarac2),caracs2b{2}(ncarac2b),caracs3{2}(ncarac3),...              
+                    Mthetas(kdata,:)    = [ caracs1{2}(ncarac1),caracs2{2}(ncarac2),caracs3{2}(ncarac3),...
+                                            metrics.thetas.ErrMean,...
+                                            metrics.thetas.ErrStd,...
+                                            metrics.thetas.ErrRms];
+                
+                    if caps.phis_est
+                        cd ../phis
+%                         Mphis(kdata,:)    = [caracs1{2}(ncarac1),caracs2{2}(ncarac2),caracs2b{2}(ncarac2b),caracs3{2}(ncarac3),...
+                        Mphis(kdata,:)  = [ caracs1{2}(ncarac1),caracs2{2}(ncarac2),caracs3{2}(ncarac3),...
+                                            metrics.phis.ErrMean(end),...
+                                            metrics.phis.ErrStd(end),...
+                                            metrics.phis.ErrRms(end)];
         
-        for kdata = 1:length(allData)
+                    end
+                
         
-            data                        = allData{kdata};
-            caps.kdata                  = kdata;
-            caps                        = extract_infos(caps,data);
-            [caps,thetas,phis,H_est]    = channel_estimation(data,caps);
-            [thetas, phis]              = extract_ground_truth(data,caps,thetas,phis);
-            
-            if caps.phis_est
-                metrics         = get_metrics(caps,thetas,phis);
-                plot_results(caps,H_est, thetas,metrics,phis);
-            else
-                metrics         = get_metrics(caps,thetas);
-                plot_results(caps,H_est, thetas,metrics);
-            end
-        
-            cd ../err/thetas
-        
-            if kdata == 1
-                Mthetas         =  zeros(caps.log.Nfiles+1,length(selected_caracs)+3);
-                if caps.phis_est
-                    Mphis     =  zeros(caps.log.Nfiles+1,length(selected_caracs)+3);
+                    count       = count + 1;
+                    fprintf('Progress: %.1f/100 --- %s - %s - %s\n',...
+                        round(count/NfilesTot*100,1),...
+                        selected_caracs');
                 end
+                
+                
+                if caps.save.mean_errs && caps.log.Nfiles > 0
+                    cd ../thetas
+%                     Mthetas(end,:)  = [caracs1{2}(ncarac1),caracs2{2}(ncarac2),caracs3{2}(ncarac3),...
+                    Mthetas(end,:)  = [zeros(1,length(selected_caracs)),...
+                                       median(Mthetas(1:end-1,end-2)),...
+                                       median(Mthetas(1:end-1,end-1)),...
+                                       median(Mthetas(1:end-1,end))];
+        
+                    str_tmp         = strcat( ...
+                                        sprintf('<ErrTh>-%s-',caps.method.thetas), ...
+                                        caps.log.filename(11:end),'.csv'); % 11 == 'matlabX - '
+        
+                    writematrix(Mthetas,str_tmp)
+                
+                    if caps.phis_est
+                        cd ../phis
+%                         Mphis(end,:)= [caracs1{2}(ncarac1),caracs2{2}(ncarac2),caracs2b{2}(ncarac2b),caracs3{2}(ncarac3),...
+                        Mphis(end,:)= [caracs1{2}(ncarac1),caracs2{2}(ncarac2),caracs3{2}(ncarac3),...
+                                       median(Mphis(1:end-1,end-2)),...
+                                       median(Mphis(1:end-1,end-1)),...
+                                       median(Mphis(1:end-1,end))];
+                        str_tmp         = strcat( ...
+                                            sprintf('<ErrPh>-%s-',caps.method.phis), ...
+                                        caps.log.filename(11:end),'.csv'); % 11 == 'matlabX - '
+                        writematrix(Mphis,str_tmp)
+                    end
+                end
+                
+                
+                
+                cd(caps.log.myRootPath)
             end
-        
-            Mthetas(kdata,:)    = [caracs1{2}(ncarac1),caracs2{2}(ncarac2),...
-                                   metrics.thetas.ErrMean,...
-                                   metrics.thetas.ErrStd,...
-                                   metrics.thetas.ErrRms];
-        
-            if caps.phis_est
-                cd ../phis
-                Mphis(kdata,:)  = [caracs1{2}(ncarac1),caracs2{2}(ncarac2),...
-                                   metrics.phis.ErrMean(end),...
-                                   metrics.phis.ErrStd(end),...
-                                   metrics.phis.ErrRms(end)];
-
-            end
-        
-
-            count       = count + 1;
-            fprintf('Progress: %.1f/100 --- %s - %s\n',...
-                round(count/NfilesTot*100,1),...
-                selected_caracs');
-        end
-        
-        
-        if caps.save.mean_errs && caps.log.Nfiles > 0
-            cd ../thetas
-            Mthetas(end,:)  = [caracs1{2}(ncarac1),caracs2{2}(ncarac2),...
-                               median(Mthetas(1:end-1,end-2)),...
-                               median(Mthetas(1:end-1,end-1)),...
-                               median(Mthetas(1:end-1,end))];
-
-            str_tmp         = strcat( ...
-                                sprintf('<ErrTh>-%s-',caps.method.thetas), ...
-                                caps.log.filename(11:end),'.csv'); % 11 == 'matlabX - '
-
-            writematrix(Mthetas,str_tmp)
-        
-            if caps.phis_est
-                cd ../phis
-                Mphis(end,:)= [caracs1{2}(ncarac1),caracs2{2}(ncarac2),...
-                               median(Mphis(1:end-1,end-2)),...
-                               median(Mphis(1:end-1,end-1)),...
-                               median(Mphis(1:end-1,end))];
-                str_tmp         = strcat( ...
-                                    sprintf('<ErrPh>-%s-',caps.method.phis), ...
-                                caps.log.filename(11:end),'.csv'); % 11 == 'matlabX - '
-                writematrix(Mphis,str_tmp)
-            end
-        end
-        
-        
-        
-        cd(caps.log.myRootPath)
+%         end % comment if no carac2b
     end
 end
 

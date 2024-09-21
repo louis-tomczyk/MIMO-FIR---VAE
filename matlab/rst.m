@@ -1,12 +1,10 @@
-%%
 % ---------------------------------------------
 % ----- INFORMATIONS -----
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Arxivs          :
-%   Date            : 2024-07-09
 %   Version         : 1.0.0
+%   Date            : 2024-07-09
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -44,9 +42,9 @@ clc
 
 default_plots()
 addpath ./lib
-currentDate = datetime('now');
-Date        = datestr(currentDate, 'yy-mm-dd');
-myRootPath  = pwd();
+currentDate         = datetime('now');
+caps.log.Date       = datestr(currentDate, 'yy-mm-dd');
+caps.log.myRootPath = pwd();
 
 
 

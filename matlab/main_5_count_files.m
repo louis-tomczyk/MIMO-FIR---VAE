@@ -3,19 +3,15 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 2.0.0
-%   Date            : 2024-07-26
+%   Version         : 1.0.0
+%   Date            : 2024-09-21
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
 %
 % ----- CHANGE LOG -----
-%   2024-07-19  (1.0.0)
-%   2024-07-22  (1.0.1)
-%   2024-07-23  (1.2.0) [NEW] go_to_folder, set_caps,
-%                       -> standardising matlab codes as in main_1_sort_custom_carac
-%   2024-07-26  (2.0.0) restructuration + plot
+%   2024-09-21  (1.0.0)
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -33,118 +29,39 @@
 
 rst
 
-caps.log.Date = '24-09-13';
-caracs0     = 'ErrTh>'; % add '-' otherwise it also considers the <ErrTh>
-caracs1     = {"dnu",[1]};
-caracs2     = {"fpol",[1]};
+caps.log.Date   = '24-09-18';
+caracs1         = {"dnu",[1,10,100]};
+caracs2         = {"fpol",[1,10,100]};
 % caracs2b    = {'Sth',[0.5,1]};
-caracs3     = {"ma g",[1]};
-% caracs3     = {'SNR_dB',linspace(5,25,21)};
-entropy     = 5.72;
+% caracs3         = {"SNR_dB",[10]};
+caracs3     = {'SNR_dB',linspace(5,25,21)};
 
-
-
-NrowsErrs   = length(caracs1{1})*length(caracs1{2});
-
-Errs        = table('Size', [NrowsErrs,2+3], ... % 2 = ncaracs, 3 = {mean,std,rms}
-                    'VariableTypes', {'double', 'double', 'double', 'double', 'double'}, ...
-                    'VariableNames', {char(caracs1{1}), char(caracs2{1}), 'mean', 'std', 'rms'});
-
-row         = 1;
 for ncarac1 = 1:length(caracs1{2})
     for ncarac2 = 1:length(caracs2{2})
 %         for ncarac2b = 1:length(caracs2b{2})
-%             for ncarac3 = 1:length(caracs3{2})
+            for ncarac3 = 1:length(caracs3{2})
 
                 cd(strcat('../python/data-',caps.log.Date,"/err/thetas"))
         
-                selected_caracs         = [ caracs0;...
-                                            sprintf("%s %d ",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space, if PhiEnd
+                selected_caracs         = [ sprintf("%s %d ",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space, if PhiEnd
                                             sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));... % if ThEnd %d
 %                                             sprintf("%s %.1f",caracs2b{1},caracs2b{2}(ncarac2b));...
-%                                             sprintf("%s %d",caracs3{1},caracs3{2}(ncarac3));...
+                                            sprintf("%s %d",caracs3{1},caracs3{2}(ncarac3));...
                                             ];
                 [allData,caps]          = import_data({'.csv'},caps,selected_caracs);
                 caps.log.myInitPath     = pwd();
-                
-                disp(row)
-                Errs(row,:) = allData{1}(end,:);
-                % the end line is the median value of the errors of the previous lines
-                
-                cd(caps.log.myRootPath)
-                row = row+1;
 
-%             end % carac3
+                cd(caps.log.myRootPath)
+                fprintf("%s",join(selected_caracs))
+                fprintf("\tNfiles = %i\n",caps.log.Nfiles)
+            end % carac3
 %         end % carac2b
     end % carac2
 end % carac1
 
-% ---------------------------------------------
-% ---------------------------------------------
-% ---------------------------------------------
-dnu             = caracs1{2};
-fpol            = caracs2{2};
 
-% ---------------------------------------------
-% yfpol_m(:,1)    = Errs(Errs.fpol == 1,:).mean;
-% yfpol_m(:,2)    = Errs(Errs.fpol == 10,:).mean;
-yfpol_m(:,3)    = Errs(Errs.fpol == 100,:).mean;
 
-% yfpol_s(:,1)    = Errs(Errs.fpol == 1,:).std;
-% yfpol_s(:,2)    = Errs(Errs.fpol == 10,:).std;
-yfpol_s(:,3)    = Errs(Errs.fpol == 100,:).std;
 
-% ---------------------------------------------
-% ydnu_m(:,1)    = Errs(Errs.dnu == 1,:).mean;
-% ydnu_m(:,2)    = Errs(Errs.dnu == 5,:).mean;
-% ydnu_m(:,3)    = Errs(Errs.dnu == 10,:).mean;
-% ydnu_m(:,4)    = Errs(Errs.dnu == 50,:).mean;
-ydnu_m(:,5)    = Errs(Errs.dnu == 100,:).mean;
-
-% ydnu_s(:,1)    = Errs(Errs.dnu == 1,:).std;
-% ydnu_s(:,2)    = Errs(Errs.dnu == 5,:).std;
-% ydnu_s(:,3)    = Errs(Errs.dnu == 10,:).std;
-% ydnu_s(:,4)    = Errs(Errs.dnu == 50,:).std;
-ydnu_s(:,5)    = Errs(Errs.dnu == 100,:).std;
-
-% ---------------------------------------------
-
-figure
-subplot(1,2,1)
-hold on
-% plot(fpol,yfpol_m(1,:),'-r',    DisplayName="$\Delta\nu = 1$",LineWidth= 2)
-% plot(fpol,yfpol_m(2,:),'--b',   DisplayName="$\Delta\nu = 5$",LineWidth= 2)
-% plot(fpol,yfpol_m(3,:),'-.k',   DisplayName="$\Delta\nu = 10$",LineWidth= 2)
-% plot(fpol,yfpol_m(4,:),'-',     DisplayName="$\Delta\nu = 50$",LineWidth= 3)
-plot(fpol,yfpol_m(5,:),'--m',   DisplayName="$\Delta\nu = 100$",LineWidth= 3)
-set(gca,'Xscale','log','Yscale','log')
-ylim([5e-2,5])
-xlabel('$f_{pol}~[kHz]$')
-ylabel('$<\hat{\theta}-\theta>~[deg]$')
-xticks([1,10,100])
-xticklabels({'1','10','100'});
-hleg = legend('show');
-legend boxoff
-title(hleg,'units in [kHz]')
-grid on
-box on
-
-subplot(1,2,2)
-hold on
-% plot(dnu,ydnu_m(1,:),'-r', DisplayName="$f_{pol} = 1$",LineWidth= 2)
-% plot(dnu,ydnu_m(2,:),'--b',DisplayName="$f_{pol} = 10$",LineWidth= 2)
-plot(dnu,ydnu_m(3,:),'-.k', DisplayName="$f_{pol} = 100$",LineWidth= 2)
-set(gca,'Xscale','log','Yscale','log')
-ylim([5e-2,5])
-xlabel('$\Delta\nu~[kHz]$')
-ylabel('$<\hat{\theta}-\theta>~[deg]$')
-xticks([1,10,100])
-xticklabels({'1','10','100'});
-hleg = legend('show');
-legend boxoff
-title(hleg,'units in [kHz]')
-grid on
-box on
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS
