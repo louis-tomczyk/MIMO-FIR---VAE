@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-15
-%   Version         : 1.1.3
+%   Version         : 1.2.0
+%   Date            : 2024-09-26
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -19,6 +19,8 @@
 %   2024-07-12  (1.1.2) phase noise management --- for rx['mode'] = 'pilots'
 %                       [REMOVED] check_fir
 %   2024-07-15  (1.1.3) multiple files processing
+%   2024-09-26  (1.2.0) extract_thetas_est (1.1.0): removing abs
+%                       to measure negative angles + cleaning
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -140,7 +142,7 @@ end
 %   check_orthogonality             (1.1.0)
 %   extract_Hest
 %   extract_phis_est
-%   extract_thetas_est
+%   extract_thetas_est              (1.1.0)
 % ---------------------------------------------
 
 
@@ -228,35 +230,23 @@ end
 
 function [thetas_est, Hest_f] = extract_thetas_est(H_est,k,Hest_f,caps)
 
-Hest_f(k,1,1,:) = fftshift(fft(H_est.frame(1,1,:)));
-Hest_f(k,1,2,:) = fftshift(fft(H_est.frame(1,2,:)));
-Hest_f(k,2,1,:) = fftshift(fft(H_est.frame(2,1,:)));
-Hest_f(k,2,2,:) = fftshift(fft(H_est.frame(2,2,:)));
-
-Hest            = H_est.frame(:,:,caps.FIR.tap);
-
 if strcmpi(caps.method.thetas,'fft')
-    H_f0        = squeeze(Hest_f(k,:,:,caps.FIR.tap));
-    thetas_est  = atan(abs(H_f0(1,2)./H_f0(1,1)))*180/pi;   % [deg]
+    Hest_f(k,1,1,:) = fftshift(fft(H_est.frame(1,1,:)));
+    Hest_f(k,1,2,:) = fftshift(fft(H_est.frame(1,2,:)));
+    Hest_f(k,2,1,:) = fftshift(fft(H_est.frame(2,1,:)));
+    Hest_f(k,2,2,:) = fftshift(fft(H_est.frame(2,2,:)));
 
-elseif strcmpi(caps.method.thetas,'svd')
-    [U,~,~]     = svd(Hest);
-    Cos11       = -U(1,1);
-%     Cos22       = U(2,2);
-%     Sin12       = U(1,2);
-%     Sin21       = U(2,1);
-    
-    Tcos11      = acos(Cos11)*180/pi;
-%     Tcos22      = acos(Cos22)*180/pi;
-%     Tsin12      = asin(Sin12)*180/pi;
-%     Tsin21      = asin(Sin21)*180/pi;
-    thetas_est  = real(Tcos11);
+    H_f0        = squeeze(Hest_f(k,:,:,caps.FIR.tap));
+    thetas_est  = atan(H_f0(1,2)./H_f0(1,1))*180/pi;   % [deg]
+
 
 elseif strcmpi(caps.method.thetas,'mat')
+    Hest        = H_est.frame(:,:,caps.FIR.tap);
+
     Tr          = sum(eig(Hest));
     D           = prod(eig(Hest));
     C           = Tr/2/sqrt(D);
-    thetas_est  = real(acos(C)*180/pi);
+    thetas_est  = acos(C)*180/pi;
 end
 % ---------------------------------------------
 
