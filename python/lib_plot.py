@@ -91,6 +91,7 @@
 # --- LIBRARIES ---
 # =============================================================================
 import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator
 import numpy as np
 import pandas as pd
 import torch
@@ -700,7 +701,10 @@ def y2_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
             y2         = y2[varargin[0]:]
 
         fig, ax1 = plt.subplots(figsize=(10, 6.1423))
-
+        ax1.xaxis.set_minor_locator(AutoMinorLocator())
+        ax1.grid(True, which='both', axis='x')
+        ax1.minorticks_on()
+        
         ax1.plot(x, y1, color='tab:blue',linestyle='dashed',linewidth = 2)
         ax1.set_xlabel(xaxis)
         ax1.set_ylabel(yaxis_left   , color='tab:blue')
@@ -709,17 +713,20 @@ def y2_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
         
         # create right Y axis
         ax2 = ax1.twinx()
-
+        ax2.xaxis.set_minor_locator(AutoMinorLocator())
+        ax2.grid(True, which='both', axis='x')
+        ax2.minorticks_on()
+        
         ax2.plot(x, y2, color='tab:red')
-        # ax2.set_ylabel(yaxis_right, color='tab:red')
         ax2.set_ylabel(yaxis_right, color='tab:red')
-        # ax2.set_ylim(0, 40)
         ax2.tick_params(axis='y', labelcolor='tab:red')
         
         mytext  = ''.join([f"{key}:{values[key]} - "\
                            for key in keywords if key in values])
         
         text_lim = 50
+        
+        ax2.set_ylim(0.0001,1)    # SER
         
         if len(mytext)>text_lim:
 
@@ -754,6 +761,9 @@ def y2_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
         else:
             output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
             plt.savefig(output_file, bbox_inches='tight')
+
+        if saving['server']:
+            plt.close(fig)
             
         
 #%%
@@ -781,7 +791,10 @@ def y3_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
         y3          = df[yaxis_right_2]
 
         fig, ax1    = plt.subplots(figsize=(10, 6.1423))
-
+        ax1.xaxis.set_minor_locator(AutoMinorLocator())
+        ax1.grid(True, which='both', axis='x')
+        ax1.minorticks_on()
+        
         if yaxis_left.lower() == "ser":
             ax1.semilogy(x, y1, color='tab:blue')
         else:
@@ -794,6 +807,10 @@ def y3_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
         ax1.tick_params(axis='y', labelcolor='tab:blue')
         
         ax2 = ax1.twinx()
+        ax2.xaxis.set_minor_locator(AutoMinorLocator())
+        ax2.grid(True, which='both', axis='x')
+        ax2.minorticks_on()
+        
         if yaxis_right.lower() == "ser":
             ax2.semilogy(x, y2, color='tab:red')
         else:
@@ -803,6 +820,9 @@ def y3_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
         ax2.tick_params(axis='y', labelcolor='tab:red')
         
         ax3 = ax1.twinx()
+        ax3.xaxis.set_minor_locator(AutoMinorLocator())
+        ax3.grid(True, which='both', axis='x')
+        ax3.minorticks_on()
         ax3.spines['right'].set_position(('outward', 60))  # adjust axis pos
         ax3.set_ylabel(yaxis_right_2, color='tab:green')
         
@@ -813,6 +833,8 @@ def y3_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
             
         ax3.tick_params(axis='y', labelcolor='tab:green')
 
+
+        ax3.set_ylim(0.0001,1)    # SER
         
         mytext  = ''.join([f"{key}:{values[key]} - "\
                            for key in keys if key in values])
@@ -849,7 +871,8 @@ def y3_axes(saving,xaxis,yaxis_left,yaxis_right,yaxis_right_2,extensions):
             output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
             plt.savefig(output_file, bbox_inches='tight')
             
-        # plt.close('all')
+        if not saving['server']:
+            plt.close(fig)
 
 
 

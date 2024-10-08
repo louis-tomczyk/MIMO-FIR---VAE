@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.4
-#   Date            : 2024-07-24
+#   Version         : 1.2.6
+#   Date            : 2024-10-07
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -26,6 +26,8 @@
 #   1.2.3 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
 #                        along with main (1.4.3)
 #   1.2.4 (2024-07-24) - server management
+#   1.2.5 (2024-10-05) - phase noise variance: **2
+#   1.2.6 (2024-10-07) - phase noise variance: fs->Rs, *NBatchFrame
 #
 # ----- MAIN IDEA -----
 #   Generation and management of phase noise and ASE noise in optical telecommunication systems
@@ -107,7 +109,7 @@ def gen_phase_noise(tx,rx,*varargin):
                 for k in range(rx['NFramesChannel']):
 
                     if tx["PhiLaw"]["law"]      == "linewidth":
-                        tx['VAR_Phase']         = 2*pi*tx['dnu']/tx['fs']
+                        tx['VAR_Phase']         = (2*pi*tx['dnu']/tx['Rs'])**2*rx["NBatchFrame"]
                         
                         noise_tmp               = np.random.normal(0,np.sqrt(tx['VAR_Phase']),rx["NBatchFrame"])
                         tmp_phase_noise[0,k,:]  = tmp_last_phase + np.cumsum(noise_tmp)
@@ -151,7 +153,7 @@ def gen_phase_noise(tx,rx,*varargin):
             
             if tx["PhiLaw"]['kind']         == 'Rwalk':
                 if tx["PhiLaw"]["law"]      == "linewidth":
-                    tx['VAR_Phase']         = 2*pi*tx['dnu']/tx['fs']
+                    tx['VAR_Phase']         = (2*pi*tx['dnu']/tx['Rs'])**2*rx["NBatchFrame"]
     
                     noise_tmp               = np.random.normal(0,np.sqrt(tx['VAR_Phase']),tx["Nsamp_PhaseNoise"])
     

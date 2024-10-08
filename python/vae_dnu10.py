@@ -3,7 +3,7 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.6b
+#   Version         : 2.0.6
 #   Date            : 2024-10-07
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
@@ -35,9 +35,8 @@
 #   2.0.3 (2024-09-28) - server: avoid plotting
 #   2.0.4 (2024-10-03) - seed management for random generation, along with
 #                           processing (1.3.10)
-#   2.0.5b (2024-10-06)- SoP fpol modification + CFO
-#   2.0.6b (2024-10-06) - SoP fpol modificaton + CFO + phase noise: along
-#                           txhw (1.2.5)
+#   2.0.5 (2024-10-06) - SoP fpol modification
+#   2.0.6 (2024-10-06) - SoP fpol modificaton + phase noise: along txhw (1.2.5)
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -192,12 +191,9 @@ rx["NSymbFrame"]        = int(20000)
 # tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",5,0]]         #ok
 tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]         #ok
 
+tx['PhiLaw']["kind"]  = 'Rwalk'
+tx['PhiLaw']["law"]   = 'linewidth'
 
-tx['PhiLaw']["kind"]    = 'func'
-tx['PhiLaw']["law"]     = 'lin'
-tx["PhiLaw"]['Start']   = 0*pi/180                                                  # [rad]
-tx["PhiLaw"]['CFO']     = 2e1                                                       # [Hz]
-tx["PhiLaw"]['End']     = 2*pi*rx['NSymbFrame']/tx['Rs']*tx["PhiLaw"]['CFO']*pi/180 # [rad]
 
 win_width               = 10
 tx['pn_filt_par']       = {
@@ -222,7 +218,7 @@ rx['mode']              = "blind"                                             # 
 rx["mimo"]              = "vae"                                                # {cma,vae}
 paramFIRlen             = [7]
 paramNSbB               = [250]#list(np.linspace(50,250,5).astype(int))
-paramPHI                = [1e3]#,5e3,1e4,5e4,1e5]                                        # [Hz] laser linewidth
+paramPHI                = [1e4]#,5e3,1e4,5e4,1e5]                                        # [Hz] laser linewidth
 
 
 
@@ -248,11 +244,11 @@ else:
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 # if polarisation linewdith --- [[std],[NFramesChannel]]
 
-
 vsop                            = 1e6
 tmp_pol                         = list(np.array([vsop/tx['Rs']*np.sqrt(rx['NSymbFrame'])]))
 tmp_nfms                        = list((np.array([100])/1).astype(int))
 paramPOL                        = np.array([tmp_pol,tmp_nfms])
+
 
 
 
@@ -293,6 +289,7 @@ if rx['mimo'].lower() == "cma":
 else:
     rx['lr']        = 750*1e-6
 
+
 #%% ===========================================================================
 # --- FUNCTIONS ---
 # =============================================================================
@@ -315,9 +312,7 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
         fibre['fpol']                   = int(paramPOL[0][npol]**2/2/pi*tx['Rs'])
 
     rx["NFrames"]                       = rx["FrameChannel"] + NFrames_Channel
-    if nphi != 0:
-        tx["dnu"]                       = paramPHI[nphi]                       # [Hz]
-
+    tx["dnu"]                           = paramPHI[nphi]                       # [Hz]
     rx['SNRdB']                         = paramSNR[nsnr]                                                   # {>0}
     tx,fibre, rx                        = set_Nsymbols(tx,fibre,rx)
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,nrea)
@@ -344,24 +339,26 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
 # --- LOGISTICS ---
 # =============================================================================
 
-
 Nrea = 10
-paramSNR                = list(np.linspace(25,5,21).astype(int))
+paramSNR                = [25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5]
 
 for nsnr in range(len(paramSNR)):
     print(f"\t\t\tSNR = {paramSNR[nsnr]}")
 
     for nrea in range(Nrea):
         print(f"nrea = {nrea}")
+
         
-        for nSbB in range(len(paramNSbB)):
-
-            rx['NSymbBatch']  = paramNSbB[nSbB]
-
-            for npol in range(len(paramPOL[0])):
-                        
-                tx,fibre,rx     = process_data(nrea,npol,0,nsnr,tx,fibre,rx) 
-                         
+        for nphi in range(len(paramPHI)):
+            for nSbB in range(len(paramNSbB)):
+    
+                rx['NSymbBatch']  = paramNSbB[nSbB]
+    
+                for npol in range(len(paramPOL[0])):
+                            
+                    tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx) 
+                           
+                            
                         
 cuda.empty_cache()
 

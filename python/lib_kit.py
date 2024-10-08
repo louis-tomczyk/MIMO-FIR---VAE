@@ -74,6 +74,8 @@ import lib_misc as misc
 import lib_rxdsp as rxdsp
 import lib_plot as plot
 
+from lib_matlab import clc
+import time
 
 pi = np.pi
 
@@ -137,6 +139,7 @@ def CMA(tx,rx): # Constant Modulus Algorithm
     y                   = np.concatenate((pad, rx_sig_real, pad), -1)
     y                   = y/np.mean(y[:,0,:]**2 + y[:,1,:]**2 )
 
+
     # training
     for i in np.arange(mh,N+mh,tx['Nsps']):
         ind = np.arange(-mh+i,i+mh+1)
@@ -166,6 +169,20 @@ def CMA(tx,rx): # Constant Modulus Algorithm
             np.matmul(yhi,h11i)  + np.matmul(yvi,h12i) -
             np.matmul(yhq,h11q)  - np.matmul(yvq,h12q)
         )
+        
+        # np.matmul(yhi,h11i) == NspT multiplications + NspT additions = 2*NspT
+        #
+        # np.matmul(yhi,h11i)  + np.matmul(yvi,h12i) -
+        # np.matmul(yhq,h11q)  - np.matmul(yvq,h12q)
+        #            == Npol*Nch matmul + Npol*Nch additions
+        #            == Npol*Nch*(2*NspT)+ Npol*Nch = Npol*Nch*(2*NSpT+1)
+        #
+        # out[0,0,k] =  1 affectation
+        #
+        # out[0,0,k] = ( # HI out
+        #     np.matmul(yhi,h11i)  + np.matmul(yvi,h12i) -
+        #     np.matmul(yhq,h11q)  - np.matmul(yvq,h12q)
+        # ) ======> Npol*Nch*(2*NSpT+1)+1
 
         out[1,0,k] = ( # VI out
             np.matmul(yhi,h21i)  + np.matmul(yvi,h22i) -
@@ -181,22 +198,47 @@ def CMA(tx,rx): # Constant Modulus Algorithm
             np.matmul(yhq,h21i)  + np.matmul(yvq,h22i) +
             np.matmul(yhi,h21q)  + np.matmul(yvi,h22q)
         )
+        
+        
+# =============================================================================
+#         #  out[...,,k] =======> Npol*Nch*[Npol*Nch*(2*NSpT+1)+1]
+# =============================================================================
 
         # Calculate error
-        loss[k,0] = rx['CMA']['R'] - out[0,0,k]**2 - out[0,1,k]**2
-        loss[k,1] = rx['CMA']['R'] - out[1,0,k]**2 - out[1,1,k]**2
-
+        loss[k,0] = rx['CMA']['R']**2 - out[0,0,k]**2 - out[0,1,k]**2
+        loss[k,1] = rx['CMA']['R']**2 - out[1,0,k]**2 - out[1,1,k]**2
+        
+        # out[0,0,k]**2 == 1 product
+        # rx['CMA']['R'] - out[0,0,k]**2 - out[0,1,k]**2 == 1+Npol additions
+        # loss[k,0] = ... == 1 affection
+        #
+        # loss[k,0] = rx['CMA']['R'] - out[0,0,k]**2 - out[0,1,k]**2
+        # ======> Npol+Npol+1+1 = 2*(Npol+1)
+        
+# =============================================================================
+#         # loss ==============> 2*(Npol+1)
+# =============================================================================
 
         rx['h_est'][0,0,0,:] += 2*rx['lr']*loss[k,0]* (out[0,0,k]*y[0,0,ind] + out[0,1,k]*y[0,1,ind])   # h11i
         rx['h_est'][0,0,1,:] += 2*rx['lr']*loss[k,0]* (out[0,1,k]*y[0,0,ind] - out[0,0,k]*y[0,1,ind])   # h11q 
+        
         rx['h_est'][0,1,0,:] += 2*rx['lr']*loss[k,0]* (out[0,0,k]*y[1,0,ind] + out[0,1,k]*y[1,1,ind])   # h12i
         rx['h_est'][0,1,1,:] += 2*rx['lr']*loss[k,0]* (out[0,1,k]*y[1,0,ind] - out[0,0,k]*y[1,1,ind])   # h12q
 
         rx['h_est'][1,0,0,:] += 2*rx['lr']*loss[k,1]* (out[1,0,k]*y[0,0,ind] + out[1,1,k]*y[0,1,ind])   # h21i
         rx['h_est'][1,0,1,:] += 2*rx['lr']*loss[k,1]* (out[1,1,k]*y[0,0,ind] - out[1,0,k]*y[0,1,ind])   # h21q
+        
         rx['h_est'][1,1,0,:] += 2*rx['lr']*loss[k,1]* (out[1,0,k]*y[1,0,ind] + out[1,1,k]*y[1,1,ind])   # h22i
         rx['h_est'][1,1,1,:] += 2*rx['lr']*loss[k,1]* (out[1,1,k]*y[1,0,ind] - out[1,0,k]*y[1,1,ind])   # h22q
 
+        # out[0,0,k]*y[0,0,ind] + out[0,1,k]*y[0,1,ind] === Npol*NspT operations
+        # += 2*rx['lr']*loss[k,0]*(out ...) === 3 mutliplications +1 addition
+        #                                       + 1 affectation
+        #       ====> (Npol*NspT+4)*Npol*Nch (Nch = 2 === I/Q)
+        
+# =============================================================================
+#         #  h_est ===============>  (Npol*NspT+4)*Npol*Nch 
+# =============================================================================
 
     rx['CMA']['losses'][str(rx['Frame'])] = loss
 
@@ -210,6 +252,13 @@ def CMA(tx,rx): # Constant Modulus Algorithm
     
     return rx, loss
 
+
+# Npol*Nch*[Npol*Nch*(2*NSpT+1)+1] + 2*(Npol+1) +  (Npol*NspT+4)*Npol*Nch =
+# 2*2*[2*2*(2*NSpT+1)+1]+ 2*(2+1) + (2*NspT+4)*2*2 =
+# 4 * [4*(2*NspT+1)+1] + 6 + (NspT+2)*8
+# 32*NspT+16+6+8*NspT+16
+#  40*NspT + 42
+# O(NspT)
 
 
 
@@ -351,6 +400,7 @@ def CMAflex(Rx, R, h, lr, NSymbBatch, symb_step, sps, eval):
 #%% [C3]
 def compute_vae_loss(tx,rx):
     
+    # q.size [2,8,NSbB]
     q       = rx["minibatch_output"].squeeze()
     tmp     = rx["minibatch_real"].squeeze()
     
@@ -372,20 +422,50 @@ def compute_vae_loss(tx,rx):
     Var     = misc.my_zeros_tensor((tx["Npolars"],2,rx["NsampBatch"]))
     
     # compute expectation (with respect to q) of x and x**2
+    # size [2,8,NSbB]
     amps_mat= tx["amps"].repeat(tx["Npolars"],rx["NSymbBatch"],2).transpose(1,2)
     
-    xc_0    = (amps_mat * q)[:,:tx["N_amps"],:]
-    xc_1    = (amps_mat * q)[:,tx["N_amps"]:,:]
+    xc_0    = (amps_mat * q)[:,:tx["N_amps"],:]         # size [2,4,NSbB]
+    xc_1    = (amps_mat * q)[:,tx["N_amps"]:,:]         # size [2,4 NSbB]
     
-    xc2_0   = ((amps_mat**2) * q)[:,:tx["N_amps"],:]
-    xc2_1   = ((amps_mat**2) * q)[:,tx["N_amps"]:,:]
+    xc2_0   = ((amps_mat**2) * q)[:,:tx["N_amps"],:]    # size [2,4 NSbB]
+    xc2_1   = ((amps_mat**2) * q)[:,tx["N_amps"]:,:]    # size [2,4 NSbB]
+    
+    # xco_<*> == 2*4*NSbB multiplications + 2*4*NSbB affectations
+    # xc2_<*> == (2*4*NSbB)^2 multiplcations + 2*4*NSbB affectations
+    
+# =============================================================================
+#     # xc<*> =====> (2*4*NSbB) * 2 multiplications = 16*NSbB
+#     # xc2<*> =====> [(2*4*NSbB)^2] * 2 multiplications = 64*NSbB^2
+#
+#     # xc<*> =====> (2*4*NSbB) * 2 affectations == 16*NSbB affectations
+#     # xc2<*> =====> (2*4*NSbB) * 2 affectations == 16*NSbB affectations
+# =============================================================================
 
-    Eq[:,0,::tx["Nsps"]]    = torch.sum(xc_0, dim=1)
-    Eq[:,1,::tx["Nsps"]]    = torch.sum(xc_1, dim=1)
-    Var[:,0,::tx["Nsps"]]   = torch.sum(xc2_0, dim=1)
-    Var[:,1,::tx["Nsps"]]   = torch.sum(xc2_1, dim=1)
+    Eq[:,0,::tx["Nsps"]]    = torch.sum(xc_0, dim=1)    # size [2,NSbB]
+    Eq[:,1,::tx["Nsps"]]    = torch.sum(xc_1, dim=1)    # size [2,NSbB]
+    
+    Var[:,0,::tx["Nsps"]]   = torch.sum(xc2_0, dim=1)   # size [2,NSbB]
+    Var[:,1,::tx["Nsps"]]   = torch.sum(xc2_1, dim=1)   # size [2,NSbB]
+    
+    # sum(xc_<*>)     == 2*NSbB summations + 2*NSbB affectations
+    # sum(xc2_<*>)    == 2*NSbB summations + 2*NSbB affectations
+    # 
+    # Eq            == 2*(2*NSbB) summations + 2*(2*NSbB) affectations
+    # Var           == 2*(2*NSbB) summations + 2*(2*NSbB) affectations
+
     Var                     = Var - Eq**2
 
+    # Eq**2         == [2*2*NspB]**2 multiplications = [4*(2NSbB-1)]^2= 64*NSbB^2-16
+    # Var-Eq**2     == 2*2*NspB summations  = 4*(2*NSbB-1) = 8NSbB - 4
+    # Var           == 2*2*NspB affectations = 8NSbB - 4
+    
+# =============================================================================
+#     # Var =======>    16*NSbB-4 Summations,
+#                       64*NSbB^2-16 NSbB multiplications,
+#                       16*NSbB-4 affectations
+# =============================================================================
+    
     D_real  = misc.my_zeros_tensor((2,rx["NsampBatch"]-Mh))  
     D_imag  = misc.my_zeros_tensor((2,rx["NsampBatch"]-Mh))
     Etmp    = misc.my_zeros_tensor((2))
@@ -398,33 +478,77 @@ def compute_vae_loss(tx,rx):
                          + h[:,1,0:1,j].expand(-1,nm) * Eq[1,0:1,idx-j].expand(tx["Npolars"],-1)\
                          - h[:,1,1:2,j].expand(-1,nm) * Eq[1,1:2,idx-j].expand(tx["Npolars"],-1)
 
+        
         D_imag  = D_imag + h[:,0,1:2,j].expand(-1,nm) * Eq[0,0:1,idx-j].expand(tx["Npolars"],-1)\
                          + h[:,0,0:1,j].expand(-1,nm) * Eq[0,1:2,idx-j].expand(tx["Npolars"],-1)\
                          + h[:,1,1:2,j].expand(-1,nm) * Eq[1,0:1,idx-j].expand(tx["Npolars"],-1)\
                          + h[:,1,0:1,j].expand(-1,nm) * Eq[1,1:2,idx-j].expand(tx["Npolars"],-1)
 
-        Var_sum = torch.sum(Var[:,:,idx-j], dim=(1,2))
+
+# =============================================================================
+#         # x = NspB-NspT = 2*NSbB - 2*NSbT -1
+# =============================================================================
+        #  h<*>.* Eq[0,0:1,idx-j].expand(tx["Npolars"],-1) ==
+        #           2*x multiplications
+        # D_<*> + <*>   == 4*{2*x} summations + 4*2*x multiplications
+        # D_<*> =       == 2*x affectations
+        
+        
+        Var_sum = torch.sum(Var[:,:,idx-j], dim=(1,2))        
         Etmp    = Etmp+h_absq[:,0,j] * Var_sum[0] + h_absq[:,1,j] * Var_sum[1]
+        # Var_sum == 2*2*x summations + 1 affectation
+        # Etmp    == 2*2 multiplications + 2 summations + 1 affectation
+   
     
+# =============================================================================
+#           | S             | M                 | A
+# Dreal     | 4x*Mh         | 8*x*Mh            | 2x*Mh
+# Dimag     | 4x*Mh         | 8*x*Mh            | 2x*Mh
+# VarSUm    | 4x*Mh         |                   | 1*Mh
+# Etmp      | 2x*Mh         | 4*x*Mh            | 1*Mh
+#            O(NSbT*NSbB)       O(NSbT*NSbB)        O(NSbT*NSbB)
+# =============================================================================
+
     TT          = tx["prob_amps"].repeat(rx["NSymbBatch"]-Mh,2).transpose(0,1)   # P(x)
 
     ynorm2      = torch.sum(rxsig[:,:,mh:-mh]**2, dim=(1,2))
-    yIT         = rxsig[:,0,mh:-mh]
-    yQT         = rxsig[:,1,mh:-mh]
+    
+    # (2*2*x)^2 mulitplications + 2*2*x summations + 2*2*x affectations
+
     DInorm2     = torch.sum(D_real**2, dim=1)
     DQnorm2     = torch.sum(D_imag**2, dim=1)
+    # D<*>  == (2*x)^2 multiplications + x summations + 2 affectations
     E           = DInorm2+DQnorm2+Etmp
+    # E == 3*2 sommations + 2 affectations
+    
+    yIT         = rxsig[:,0,mh:-mh]
+    yQT         = rxsig[:,1,mh:-mh]
     C           = ynorm2-2*torch.sum(yIT*D_real+yQT*D_imag,dim=1)+E
+    # y<*>*D_<*> == 2*[2*(2*x)] mulitplications + 2*x+2+2 summations + 2 affectations
     
     Llikelihood = torch.sum((rx["NsampBatch"]-Mh)*torch.log(C))
+    # 2 multiplications + 1 summation + 1 affectation
     DKL         = torch.sum(q[0,:,mh:-mh]*torch.log(q[0,:,mh:-mh]/TT+ 1e-12) \
                            +q[1,:,mh:-mh]*torch.log(q[1,:,mh:-mh]/TT+ 1e-12) )
-
+    #  q[0,:,mh:-mh]*torch.log(q[0,:,mh:-mh]/TT+ 1e-12) == 2*8*NSbB multiplications+ 8*NSbB summations
+    # DKL == 2*(8*NSbB) summations
 
     loss        = Llikelihood - 1*DKL 
-
-        
     Pnoise_batch= (C/(rx["NsampBatch"]-Mh)).detach()
+
+# =============================================================================
+#           | S             | M                         | A
+# ynorm2    | 4x            | 16*x^2                    | 4x 
+# DInorm2   | x             | 4x^2                      | 2
+# DQnorm2   | x             | 4x^2                      | 2
+# E         | 6             |                           | 2
+# C         | 2x+4          | 8x                        | 2
+# Llike     | 1             | 2                         | 1
+# DKL       | 16x           | 32*x                      | 2
+# loss      | 1             |                           | 1
+# Pnoise_   | 1             | 1                         | 1
+#             24x = O(NSbB)  24x^2+40x = O(NSbB^2)         4x = O(NSbB)
+# =============================================================================
 
 
     rx['losses_subframe'][rx["Frame"]][rx['BatchNo']]       = loss.item()
@@ -432,9 +556,14 @@ def compute_vae_loss(tx,rx):
     rx['Llikelihood_subframe'][rx["Frame"]][rx['BatchNo']]  = Llikelihood.item()
     rx['Pnoise_batches'][:,rx['BatchNo']]                   = Pnoise_batch
     
-    tx      = misc.sort_dict_by_keys(tx)
-    rx      = misc.sort_dict_by_keys(rx)
     
+# =============================================================================
+#           | S             | M                         | A
+#            O(NSbT*NSbB)       O(NSbT*NSbB)                O(NSbT*NSbB)
+#            O(NSbB)            O(NSbB^2)                   O(NSbB)
+# -----------------------------------------------------------------------------
+#           O(NSbT*NSbB)        O(NSbB^2)                   O(NSbT*NSbB)
+# =============================================================================
     return rx,loss
 
 
@@ -919,9 +1048,6 @@ def train_vae(BatchNo,rx,tx):
 
     rx['out_train'][:,:,BatchNo*rx["NSymbBatch"]:(BatchNo+1)*rx["NSymbBatch"]] = \
                             rx['minibatch_output'].detach().clone()
-    
-    tx      = misc.sort_dict_by_keys(tx)
-    rx      = misc.sort_dict_by_keys(rx)
     
     return rx
 

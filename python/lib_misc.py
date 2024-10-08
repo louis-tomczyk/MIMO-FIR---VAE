@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.1.0
-#   Date            : 2024-09-11
+#   Version         : 2.1.1
+#   Date            : 2024-10-07
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -53,6 +53,8 @@
 #                           moving to custom folder
 #                      - remove_n_characters_from_filenames: do not remove
 #                           characters if it is not a date
+#   2.1.1 (2024-10-07) - save2mat: adding VSOP
+#                        create_xml_file: fpol -> vsop; Sph -> CFO filenameing
 # 
 # ----- MAIN IDEA -----
 #   Miscellaneous functions for logistics
@@ -323,13 +325,13 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
         
         if fibre["ThetasLaw"]["law"] == "gauss":
             saving_list.insert(6,'Th_in')
-            saving_list.insert(7,'fpol')
+            saving_list.insert(7,'vsop')
             
             CHANNEL.append('Th_in')
-            CHANNEL.append('fpol')
+            CHANNEL.append('vsop')
             
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_in']*180/np.pi,0))
-            CHANNELpar.append(np.round(fibre["ThetasLaw"]['fpol']**2/2/pi*tx['Rs']*1e-3,0))
+            CHANNELpar.append(np.round(fibre['vsop']*1e-6,0))          #[Mrad/s]
             
         
         if fibre["ThetasLaw"]["law"] == "tri":
@@ -375,14 +377,14 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
         if tx["PhiLaw"]["kind"] == "func":
             if tx["PhiLaw"]["law"] == "lin":
                 saving_list.insert(6,'PhEnd')
-                saving_list.insert(7,'Sph')
+                saving_list.insert(7,'CFO')
     
                 TX.append('PhEnd')
-                TX.append('Sph')
+                TX.append('CFO')
                 
                 Sph = (tx["PhiLaw"]['End']-tx["PhiLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
                 TXpar.append(int(tx["PhiLaw"]['End']*180/pi))
-                TXpar.append(np.round(Sph*180/pi,2))
+                TXpar.append(tx["PhiLaw"]['CFO']*1e-6)
     else:
         TXpar = TXpar[:-1]
     
@@ -955,9 +957,9 @@ def rename_files(path, string, position):
     count = 0
     # Iterate over all files in the directory
     for filename in os.listdir(path):
-        str_len = len(string)
+        str_len = 4 # 4 == ma g/u
         
-        if filename[0:str_len] != string:
+        if filename[0:str_len] != string[0:str_len]:
             # Split the file name and its extension
             file_base, file_ext = os.path.splitext(filename)
             
@@ -977,11 +979,47 @@ def rename_files(path, string, position):
     print(f"{count} files renamed")
         
 #%%
+def rename_files2(path, string, position):
+    # Check if the directory exists
+    if not os.path.isdir(path):
+        raise ValueError(f"The path {path} is not a valid directory.")
+    
+    count = 0
+    # Iterate over all items in the directory
+    for filename in os.listdir(path):
+        # Create the full path for the item
+        full_path = os.path.join(path, filename)
+        
+        # Skip directories
+        if os.path.isdir(full_path):
+            continue
+        
+        str_len = 4 # 4 == ma g/u
+        
+        # Check if the file name starts with the specified string
+        if filename[0:str_len] != string[0:str_len]:
+            # Split the file name and its extension
+            file_base, file_ext = os.path.splitext(filename)
+            
+            # If the position is valid, insert the string at the given position
+            if 0 <= position <= len(file_base):
+                new_name = file_base[:position] + string + file_base[position:] + file_ext
+            else:
+                raise ValueError(f"The position {position} exceeds the length of the file name {file_base}.")
+            
+            # Create the full paths for the old and new file names
+            new_path = os.path.join(path, new_name)
+            count += 1
+            
+            # Rename the file
+            os.rename(full_path, new_path)
+    
+    print(f"{count} files renamed")
+#%%
 def save2mat(tx,fibre,rx,saving):
 
 
     name        = saving["filename"]+".mat"
-    
     
     save_dict   = {
                 'NspTaps'           : tx['NsampTaps'],
@@ -1011,7 +1049,8 @@ def save2mat(tx,fibre,rx,saving):
                 'ThLaw'             : fibre["ThetasLaw"]['law'],
                 'PhLaw'             : tx['PhiLaw']["law"],
                 'rx_mimo'           : rx['mimo'],
-                'rx_mode'           : rx['mode']
+                'rx_mode'           : rx['mode'],
+                'vsop'              : fibre['vsop']
                 }
     
     

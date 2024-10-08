@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.9
-#   Date            : 2024-07-24
+#   Version         : 1.3.11
+#   Date            : 2024-10-07
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -56,6 +56,10 @@
 #   1.3.8 (2024-07-18) - save_data: array columns reodered correctly after
 #                           adding "dt"
 #   1.3.9 (2024-07-24) - print_results: server management
+#   1.3.10(2024-10-03) - seed management for random generation, along with main
+#                           (2.0.4)
+#   1.3.11(2024-10-7) -  init_processing SYMBOLS AND SAMPLES MANAGEMENT moved
+#                           to txdsp.set_Nsymbols, txdsp (2.0.2)
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -104,6 +108,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 import matplotlib.pyplot as plt
+import random
 import time
 
 import lib_kit as kit
@@ -115,7 +120,7 @@ import lib_rxdsp as rxdsp
 import lib_plot as plot
 import lib_matlab as mat
 from lib_matlab import clc
-import timeit
+
 
 from lib_matlab import clc
 from lib_misc import KEYS as keys
@@ -128,12 +133,15 @@ pi      = np.pi
 # =============================================================================
 
 #%%
-def processing(tx, fibre, rx, saving):
+def processing(tx, fibre, rx, saving,seed_id):
 
     tx, fibre, rx       = init_processing(tx, fibre, rx, saving, device)
 
     for frame in range(rx['NFrames']):
 
+        seed_id = seed_id+frame
+        random.seed(seed_id)
+        
         rx              = init_train(tx, rx, frame)                            # if vae, otherwise: transparent
         tx              = txdsp.transmitter(tx, rx)
         tx, fibre, rx   = prop.propagation(tx, fibre, rx)
@@ -195,20 +203,21 @@ def init_processing(tx, fibre, rx, saving, device):
 # SYMBOLS AND SAMPLES MANAGEMENT
 # =============================================================================
 
-    rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
-    rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']
+    # rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
+    # rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']
 
-    rx["NFramesChannel"]    = rx["NFrames"]-rx["FrameChannel"]   
-    rx["NFramesTraining"]   = rx["NFrames"]-rx["NFramesChannel"]
+    # rx["NFramesChannel"]    = rx["NFrames"]-rx["FrameChannel"]   
+    # rx["NFramesTraining"]   = rx["NFrames"]-rx["NFramesChannel"]
      
-    rx["NBatchesChannel"]   = rx["NFramesChannel"]*rx['NBatchFrame'] 
-    rx["NBatchesTot"]       = rx["NFrames"]*rx['NBatchFrame']
-    rx["NBatchesTraining"]  = rx["NBatchesTot"]-rx['NBatchesChannel']
+    # rx["NBatchesChannel"]   = rx["NFramesChannel"]*rx['NBatchFrame'] 
+    # rx["NBatchesTot"]       = rx["NFrames"]*rx['NBatchFrame']
+    # rx["NBatchesTraining"]  = rx["NBatchesTot"]-rx['NBatchesChannel']
+
+    # tx['NsampChannel']      = tx['NsampFrame']*rx['NFramesChannel']
+    # tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel'] 
 
     
-    tx['NsampChannel']      = tx['NsampFrame']*rx['NFramesChannel']
-    tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel'] 
-
+        
 # =============================================================================
 # TRANSMITTER
 # =============================================================================
@@ -292,6 +301,10 @@ def init_processing(tx, fibre, rx, saving, device):
             rx['NSymbSER'] = rx["NSymbFrame"]
         else:
             rx['NSymbSER'] = rx["NSymbFrame"]-rx['NSymbCut_tot']+1
+            
+        
+
+            
 # =============================================================================
 # OUTPUT
 # =============================================================================
@@ -516,14 +529,16 @@ def save_data(tx, fibre, rx, saving, array):
         else:
             save_tmp = ["iteration","loss", "SNR", "SER", "Thetas","Phis"]
             
+        if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+                save_tmp.insert(4,"dt")
     else:
         if tx['flag_phase_noise'] == 0:
             save_tmp = ["iteration","loss", "SER", "Thetas"]
         else:
             save_tmp = ["iteration","loss", "SER", "Thetas","Phis"]
 
-    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
-            save_tmp.insert(4,"dt")
+        if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+                save_tmp.insert(3,"dt")
     
     misc.array2csv(array2,saving["filename"],save_tmp)
 

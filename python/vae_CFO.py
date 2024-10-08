@@ -36,7 +36,7 @@
 #   2.0.4 (2024-10-03) - seed management for random generation, along with
 #                           processing (1.3.10)
 #   2.0.5b (2024-10-06)- SoP fpol modification + CFO
-#   2.0.6b (2024-10-06) - SoP fpol modificaton + CFO + phase noise: along
+#   2.0.6b (2024-10-07) - SoP fpol modificaton + CFO + phase noise: along
 #                           txhw (1.2.5)
 # 
 # ----- MAIN IDEA -----
@@ -196,8 +196,7 @@ tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]         #ok
 tx['PhiLaw']["kind"]    = 'func'
 tx['PhiLaw']["law"]     = 'lin'
 tx["PhiLaw"]['Start']   = 0*pi/180                                                  # [rad]
-tx["PhiLaw"]['CFO']     = 2e1                                                       # [Hz]
-tx["PhiLaw"]['End']     = 2*pi*rx['NSymbFrame']/tx['Rs']*tx["PhiLaw"]['CFO']*pi/180 # [rad]
+tx["PhiLaw"]['CFO']     = 10e6                                                       # [Hz]
 
 win_width               = 10
 tx['pn_filt_par']       = {
@@ -218,6 +217,7 @@ tx['get_exec_time']     = ['frame',[]]
 ###############################################################################
 
 tx['flag_phase_noise']  = 1
+rx['CFO']               = 1
 rx['mode']              = "blind"                                             # {blind, pilots}
 rx["mimo"]              = "vae"                                                # {cma,vae}
 paramFIRlen             = [7]
@@ -249,8 +249,8 @@ else:
 # if polarisation linewdith --- [[std],[NFramesChannel]]
 
 
-vsop                            = 1e6
-tmp_pol                         = list(np.array([vsop/tx['Rs']*np.sqrt(rx['NSymbFrame'])]))
+fibre['vsop']                   = 1e6
+tmp_pol                         = list(np.array([fibre['vsop']/tx['Rs']*np.sqrt(rx['NSymbFrame'])]))
 tmp_nfms                        = list((np.array([100])/1).astype(int))
 paramPOL                        = np.array([tmp_pol,tmp_nfms])
 
@@ -315,11 +315,14 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
         fibre['fpol']                   = int(paramPOL[0][npol]**2/2/pi*tx['Rs'])
 
     rx["NFrames"]                       = rx["FrameChannel"] + NFrames_Channel
+
     if nphi != 0:
         tx["dnu"]                       = paramPHI[nphi]                       # [Hz]
 
     rx['SNRdB']                         = paramSNR[nsnr]                                                   # {>0}
     tx,fibre, rx                        = set_Nsymbols(tx,fibre,rx)
+    
+    tx["PhiLaw"]['End']                 = 2*pi*rx['NBatchesChannel']/tx['Rs']*tx["PhiLaw"]['CFO']# [rad]
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,nrea)
     
     seed_id                             = (nrea+randint(0,10))*(npol+randint(0,10))*(nphi+randint(0,10))*(nsnr+randint(0,10))
@@ -345,8 +348,8 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
 # =============================================================================
 
 
-Nrea = 10
-paramSNR                = list(np.linspace(25,5,21).astype(int))
+Nrea = 1
+paramSNR                = [25]#list(np.linspace(25,5,21).astype(int))
 
 for nsnr in range(len(paramSNR)):
     print(f"\t\t\tSNR = {paramSNR[nsnr]}")

@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.1
-#   Date            : 2024-07-24
+#   Version         : 2.0.2
+#   Date            : 2024-10-07
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -37,6 +37,8 @@
 # ---------------------
 #   2.0.0 (2024-07-12) - LIBRARY NAME CHANGED: LIB_GENERAL -> LIB_PLOT
 #   2.0.1 (2024-07-24) - server management
+#   2.0.2 (2024-10-07) - set_NSymbols: import from processing.init_processing
+#                           symbols and frames management: processing (1.3.11)
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -873,7 +875,6 @@ def set_Nsymbols(tx,fibre,rx):
     # else:
     #     rx['NSymbBatch']    = 100
     
-
         
     tx['NSymbFrame']        = rx["NSymbFrame"]
     tx["NSymbConv"]         = rx["NSymbFrame"]+tx['NSymbTaps']+1
@@ -1004,7 +1005,18 @@ def set_Nsymbols(tx,fibre,rx):
         rx['NSymbEq']       -= rx['NSymbCut_tot']-1
 
 
+    rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
+    rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']
 
+    rx["NFramesChannel"]    = rx["NFrames"]-rx["FrameChannel"]   
+    rx["NFramesTraining"]   = rx["NFrames"]-rx["NFramesChannel"]
+     
+    rx["NBatchesChannel"]   = rx["NFramesChannel"]*rx['NBatchFrame'] 
+    rx["NBatchesTot"]       = rx["NFrames"]*rx['NBatchFrame']
+    rx["NBatchesTraining"]  = rx["NBatchesTot"]-rx['NBatchesChannel']
+
+    tx['NsampChannel']      = tx['NsampFrame']*rx['NFramesChannel']
+    tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel'] 
 ###############################################################################
 ############################# displaying results ##############################
 ###############################################################################

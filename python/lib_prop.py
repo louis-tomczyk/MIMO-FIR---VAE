@@ -244,7 +244,7 @@ def set_thetas(tx,fibre,rx):
                 ThetaStart                              = fibre["ThetasLaw"]["Start"]
                 ThetaEnd                                = fibre["ThetasLaw"]["End"]
                 fibre["ThetasLaw"]["Sth"]               = (ThetaEnd-ThetaStart)/numelvalid
-                fibre["thetas"][numel-numelvalid:,1]    = np.linspace(0,ThetaEnd-ThetaStart, numelvalid)
+                fibre["thetas"][numel-numelvalid:,1]    = np.linspace(ThetaStart+fibre["ThetasLaw"]["Sth"],ThetaEnd-ThetaStart, numelvalid)
     
             # obtention of angle shifts
             fibre["thetadiffs"]             = fibre["thetas"][numelvalid:,1]-fibre["ThetasLaw"]['theta_in']
