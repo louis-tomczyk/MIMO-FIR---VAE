@@ -62,7 +62,7 @@ function default_plots()
     set(groot,'defaultLegendInterpreter','latex');
     set(groot,'defaultFigureUnits','normalized')
     set(groot,'defaultFigurePosition',[0 0 1 1])
-    set(groot,'defaultAxesFontSize', 18);
+    set(groot,'defaultAxesFontSize', 20);
     set(groot,'defaultfigurecolor',[1 1 1])
     set(groot,'defaultAxesFontWeight', 'bold')
 end

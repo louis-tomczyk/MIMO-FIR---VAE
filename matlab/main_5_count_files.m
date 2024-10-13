@@ -29,33 +29,47 @@
 
 rst
 
-caps.log.Date   = '24-09-18';
-caracs1         = {"dnu",[1,10,100]};
-caracs2         = {"fpol",[1,10,100]};
-% caracs2b    = {'Sth',[0.5,1]};
+caps.log.Date   = '24-10-13';
+caracs1         = {"CFO",[0.1,0.5,1,5,10,]};
+% caracs1         = {"dnu",[1,10,100]};
+caracs2         = {"vsop",[0.1,1,10]};
+caracs2b    = {'Rs',128};
 % caracs3         = {"SNR_dB",[10]};
-caracs3     = {'SNR_dB',linspace(5,25,21)};
+caracs3     = {'NSbB',[50,100,150,200,250,300,350,400,450,500]};
+
+what = "csv";
+if strcmpi(what,'mat')
+    fprintf(join(["\t,","\t,","\t,","\t,","\t,","\t,","\t,","\t,","\t,","mat\n"]))
+else
+    fprintf("csv\n")
+end
 
 for ncarac1 = 1:length(caracs1{2})
     for ncarac2 = 1:length(caracs2{2})
-%         for ncarac2b = 1:length(caracs2b{2})
+        for ncarac2b = 1:length(caracs2b{2})
             for ncarac3 = 1:length(caracs3{2})
 
-                cd(strcat('../python/data-',caps.log.Date,"/err/thetas"))
+                cd(strcat('../python/data-',caps.log.Date,sprintf("/%s/",what)))
         
-                selected_caracs         = [ sprintf("%s %d ",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space, if PhiEnd
-                                            sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));... % if ThEnd %d
-%                                             sprintf("%s %.1f",caracs2b{1},caracs2b{2}(ncarac2b));...
-                                            sprintf("%s %d",caracs3{1},caracs3{2}(ncarac3));...
-                                            ];
-                [allData,caps]          = import_data({'.csv'},caps,selected_caracs);
+                caracs = [ sprintf("%s %.1f",caracs1{1},caracs1{2}(ncarac1));... % if dnu %d add space, if CFO %.1f
+                            sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));... % if %.1f vsop
+                            sprintf("%s %d",caracs2b{1},caracs2b{2}(ncarac2b));... % Rs
+                            sprintf("%s %d ",caracs3{1},caracs3{2}(ncarac3));... % if  NSbB add space
+                        ];
+               
+                [allData,caps]          = import_data({sprintf('.%s',what)},caps,caracs);
                 caps.log.myInitPath     = pwd();
 
                 cd(caps.log.myRootPath)
-                fprintf("%s",join(selected_caracs))
-                fprintf("\tNfiles = %i\n",caps.log.Nfiles)
+                if strcmpi(what,'mat')
+                    fprintf("%s",join(caracs))
+                    fprintf(",\tNfiles %i\n",caps.log.Nfiles)
+                else
+                    fprintf("%i\n",caps.log.Nfiles)
+                end
+
             end % carac3
-%         end % carac2b
+        end % carac2b
     end % carac2
 end % carac1
 
@@ -181,5 +195,4 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     caps.log.Nfiles     = length(allData);
 end
 %-----------------------------------------------------
-
 

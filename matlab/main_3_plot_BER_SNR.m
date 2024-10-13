@@ -13,6 +13,7 @@
 % ----- CHANGE LOG -----
 %   2024-09-09  (1.0.0)
 %   2024-09-10  (1.0.1) automatic legend
+%   2024-10-02  (1.0.2) symbol rate in legend
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -30,14 +31,15 @@
 
 %% import data
 rst
+caps.log.myInitPath     = [pwd(),'/../data/data-JLT'];
+cd(caps.log.myInitPath)
 [allData,caps]          = import_data({'.csv'},caps);
-caps.log.myInitPath     = pwd();
 
 
 
-keys            = {'dnu','PhEnd','fpol','ThEnd'};
+keys            = {'Rs','dnu','PhEnd','fpol','ThEnd'};
 leg_keys        = strings();
-leg_keys_vals   = zeros(caps.log.Nfiles,4);
+leg_keys_vals   = zeros(caps.log.Nfiles,5);
 leg_keys_kept   = strings();
 
 for k = 1:caps.log.Nfiles
@@ -53,22 +55,14 @@ for k = 1:caps.log.Nfiles
             tmp_key             = keys(j);
             tmp_val             = str2double(fname(index_val_min:index_val_max));
             leg_keys(k,j)       = strcat(tmp_key," ",num2str(tmp_val));
-
-            if contains(keys(j), 'fpol')
-                leg_keys(k,j)   = strcat(leg_keys(k,j)," [Hz]-");
-            elseif contains(keys(j), 'dnu')
-                leg_keys(k,j)   = strcat(leg_keys(k,j)," [kHz]-");
-            elseif contains(keys(j), 'End')
-                leg_keys(k,j)   = strcat(leg_keys(k,j)," [deg]-");
-            end
-
+            leg_keys(k,j)       = strcat(leg_keys(k,j)," -");
         end
     end
     tmp = char(join(cellstr(leg_keys(k,leg_keys_vals(k,:)~=0))));
     if strcmpi(tmp(end),'-')
         leg_keys_kept(k) = tmp(1:end-1);
     end
-    leg_keys_kept(k)
+%      leg_keys_kept(k);
 end
 
 
@@ -87,18 +81,18 @@ for k = 1:caps.log.Nfiles
     indexesMin(k)   = tmp-(SNRmin(k)-min(SNRmin));
 end
 
-colors = lines(10);
+colors      = lines(10);
 line_styles = {'-', '--', ':', '-.'};
-markers = {'o', 's', 'd', '^', 'v', '>', '<', 'p', 'h', 'x'};
+markers     = {'o', 's', 'd', '^', 'v', '>', '<', 'p', 'h', 'x'};
 
 
 figure1 = figure;
 hold on
 set(gca, 'ColorOrder', lines(10), 'LineStyleOrder', {'-', '--', ':', '-.'}, 'NextPlot', 'add');
 for k = 1:caps.log.Nfiles
-    color_idx = mod(k-1, size(colors, 1)) + 1;
-    line_style_idx = mod(k-1, length(line_styles)) + 1;
-    marker_idx = mod(k-1, length(markers)) + 1;
+    color_idx       = mod(k-1, size(colors, 1)) + 1;
+    line_style_idx  = mod(k-1, length(line_styles)) + 1;
+    marker_idx      = mod(k-1, length(markers)) + 1;
 
     plot(SNRdBs,allData{k}.BER(indexesMin(k):end),...
         'Color', colors(color_idx, :), ...
@@ -111,7 +105,8 @@ end
 plot([5,25],[1,1]*2.8e-2,'-r',LineWidth=5)
 xlabel("SNR [dB]")
 ylabel('BER')
-legend(leg_keys_kept, Location="southwest")
+xlim([8,25])
+lgd = legend(leg_keys_kept, Location="southwest");
 set(gca,"YScale",'log')
 grid on
 axis square
@@ -126,6 +121,8 @@ annotation(figure1,'textbox',...
     'FontSize',18,...
     'FitBoxToText','off',...
     'EdgeColor','none');
+
+title(lgd,'$\mathbf{R_s~[GBd]-\Delta\nu~[kHz]-\theta_{end}~[deg]}$');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS

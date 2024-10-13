@@ -52,17 +52,17 @@
 
 %% MAINTENANCE
 rst
-caps.log.Date = '24-09-11';
-caracs1   = {'dnu',[1,10,100]};         % {Nplts, dnu}
-caracs2   = {'ThEnd',10};       % {fpol, ThEnd}
-caracs2b  = {'Sth',[0.5,1]};
+% caps.log.Date = '24-09-26';
+caracs1   = {'CFO',[20]};         % {Nplts, dnu}
+caracs2   = {'vsop',1};       % {fpol, ThEnd}
+% caracs2b  = {'Sth',[0.5,1]};
 caracs3   = {'SNR_dB',linspace(25,5,21)};
 
-caps.plot.fir           = 0;
+caps.plot.fir           = 1;
 caps.plot.poincare      = 0;
 caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
 caps.plot.phis.xlabel   = 'comparison per batch';
-caps.method.thetas      = 'mat';                    % {fft, mat, svd}
+caps.method.thetas      = 'fft';                    % {fft, mat, svd}
 caps.method.phis        = 'eig';
 caps.save.errs          = 1;
 caps.save.mean_errs     = 1;
@@ -80,8 +80,8 @@ for ncarac1 = 1:length(caracs1{2})
                 caps.log.myInitPath     = pwd();
                 
         
-                selected_caracs         = [sprintf("%s %d ",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space
-                                           sprintf("%s %d",caracs2{1},caracs2{2}(ncarac2));...  % {%d ThEnd,%.1f fpol}
+                selected_caracs         = [sprintf("%s %d",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space
+                                           sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));...  % {%d ThEnd,%.1f fpol}
 %                                            sprintf("%s %.1f",caracs2b{1},caracs2b{2}(ncarac2b));...
                                            sprintf("%s %d",caracs3{1},caracs3{2}(ncarac3))];  % {%d for SNR_dB,%.1f}    
         
