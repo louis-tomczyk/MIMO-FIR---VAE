@@ -8,7 +8,7 @@ def merge_if_fail():
     Date                            = date.today().strftime("%Y-%m-%d")
     tx,fibre,rx,saving              = misc.init_dict(server)
     
-    path = PWD(show=False)+f'/data-{Date[2:]}'
+    path = PWD(show=False)+f'/complexite'#'-{Date[2:]}'
     misc.remove_n_characters_from_filenames(path, 20)
     
     misc.organise_files(path)

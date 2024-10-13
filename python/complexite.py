@@ -92,11 +92,12 @@ clc()
 np.set_printoptions(linewidth=160)
 
 
-if "infres" in PWD(show = False):
-    server  = 1                                                                   # if = 1, cancels all the checks
-else:
-    server  = 0
+# if "infres" in PWD(show = False):
+#     server  = 1                                                                   # if = 1, cancels all the checks
+# else:
+#     server  = 0
 
+server      = 1
 gen_xml     = 0
 sort_files  = 0
 
@@ -104,16 +105,16 @@ sort_files  = 0
 #%% ===========================================================================
 # --- MAIN parameters
 # =============================================================================
-Nrea        = 1
+Nrea        = 10
 paramSNR    = [25]
 Rs          = 128e9                                         # [Baud] Symbol rate
-paramNSbB   = [50,100,150,200,250,300,350,400,450,500]
+paramNSbB   = [500,450,400,350,300,250,200,150,100]
 rxmimo      = "vae"
 fibre_vsop  = 1*1e4 # [rad/s]
 # fibre_fpol  = 2.487
 CFO_or_dnu      = 'CFO'
 paramPHI        = list(np.array([0.1,0.5,1,5,10,50])*1e4)                   # [Hz]
-NframesChannel  = 1
+NframesChannel  = 50
 
 
 
@@ -223,7 +224,7 @@ tx['pn_filt_par']       = {
 
 
 
-tx['get_exec_time']     = ['frame',[]]
+# tx['get_exec_time']     = ['frame',[]]
 ###############################################################################
 ################################## RECEIVER ###################################
 ###############################################################################
@@ -398,7 +399,7 @@ for nsnr in range(len(paramSNR)):
         print(f"nrea = {nrea}")
 
         for nSbB in range(len(paramNSbB)):
-            print(f"nSbB = {paramNSbB[nSbB]}")
+            # print(f"nSbB = {paramNSbB[nSbB]}")
 
             rx['NSymbBatch']    = paramNSbB[nSbB]
             rx['FrameChannel']  = int(np.ceil(paramNSbB[nSbB]/37.5))
