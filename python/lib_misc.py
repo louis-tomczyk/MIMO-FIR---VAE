@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.1.1
-#   Date            : 2024-10-07
+#   Version         : 2.1.3
+#   Date            : 2024-10-11
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -55,6 +55,9 @@
 #                           characters if it is not a date
 #   2.1.1 (2024-10-07) - save2mat: adding VSOP
 #                        create_xml_file: fpol -> vsop; Sph -> CFO filenameing
+#   2.1.2 (2024-10-09) - create_xml_file: vsop rounding
+#   2.1.3 (2024-10-11) - create_xml_file: vsop/CFO rounding + creation or not
+#                           xml file
 # 
 # ----- MAIN IDEA -----
 #   Miscellaneous functions for logistics
@@ -271,7 +274,7 @@ def convert_byte(num, suffix="B"):
 #%%
 
 # ChatGPT
-def create_xml_file(tx,fibre,rx,saving,*varargin):
+def create_xml_file(tx,fibre,rx,saving,gen,*varargin):
     
     sections    = ["TX","CHANNEL","RX"]
 
@@ -331,7 +334,7 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
             CHANNEL.append('vsop')
             
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_in']*180/np.pi,0))
-            CHANNELpar.append(np.round(fibre['vsop']*1e-6,0))          #[Mrad/s]
+            CHANNELpar.append(np.round(fibre['vsop']*1e-4,0))          #[Mrad/s]
             
         
         if fibre["ThetasLaw"]["law"] == "tri":
@@ -384,7 +387,7 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
                 
                 Sph = (tx["PhiLaw"]['End']-tx["PhiLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
                 TXpar.append(int(tx["PhiLaw"]['End']*180/pi))
-                TXpar.append(tx["PhiLaw"]['CFO']*1e-6)
+                TXpar.append(round(tx["PhiLaw"]['CFO']*1e-4,1))
     else:
         TXpar = TXpar[:-1]
     
@@ -407,19 +410,21 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
     params_list             = [TXpar, CHANNELpar,RXpar]
     [base_path, my_path]    = set_saving_params()
     
+    
     os.chdir(base_path)
     
-    # root element for XML
-    root = ET.Element("SIMULATION-PARAMETERS")
-
-    # create the sub sections and their fields from the given lists
-    for section, section_params in zip(sections, params_list):
-        section_element = ET.SubElement(root, section)
-        
-        for field_name, field_value in zip(fields_list[sections.index(section)], section_params):
-            # use the field name as the element name
-            field_element       = ET.SubElement(section_element, field_name)
-            field_element.text  = str(field_value)
+    if gen:
+        # root element for XML
+        root = ET.Element("SIMULATION-PARAMETERS")
+    
+        # create the sub sections and their fields from the given lists
+        for section, section_params in zip(sections, params_list):
+            section_element = ET.SubElement(root, section)
+            
+            for field_name, field_value in zip(fields_list[sections.index(section)], section_params):
+                # use the field name as the element name
+                field_element       = ET.SubElement(section_element, field_name)
+                field_element.text  = str(field_value)
 
     # file name creation
     filename    = datetime.now().strftime("%y-%m-%d %H:%M:%S")
@@ -453,9 +458,10 @@ def create_xml_file(tx,fibre,rx,saving,*varargin):
     filename = truncate_lr_in_filename(filename)
     
 
-    # # create the xml file
-    tree = ET.ElementTree(root)
-    tree.write(filename, encoding="utf-8", xml_declaration=True)
+    if gen:
+        # create the xml file
+        tree = ET.ElementTree(root)
+        tree.write(filename, encoding="utf-8", xml_declaration=True)
     
     os.chdir("../")
 

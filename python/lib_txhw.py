@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.2.6
-#   Date            : 2024-10-07
+#   Version         : 1.2.7
+#   Date            : 2024-10-11
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -17,8 +17,8 @@
 #   1.0.0 (2024-03-04) - creation
 #   1.1.1 (2024-03-27) - gen_phase_noise: new slicing mode
 #                      - [NEW] set_phis
-#   1.2.0 (2024-05-29) - load_ase, load_phase_noise --- replaces 1.1.1 slicing mode from frame-wise 
-#                           to batch-wise
+#   1.2.0 (2024-05-29) - load_ase, load_phase_noise --- replaces 1.1.1 slicing 
+#                           mode from frame-wise to batch-wise
 #                      - [REMOVED] set_phis, included into gen_phase_noise
 #   1.2.1 (2024-07-01) - load_ase: SNR -> tx['SNR']
 #   1.2.2 (2024-07-02) - gen_phase_noise: tx["PhiLaw"]["law"]  == "linewidth",
@@ -26,11 +26,14 @@
 #   1.2.3 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
 #                        along with main (1.4.3)
 #   1.2.4 (2024-07-24) - server management
-#   1.2.5 (2024-10-05) - phase noise variance: **2
-#   1.2.6 (2024-10-07) - phase noise variance: fs->Rs, *NBatchFrame
+#   1.2.5 (2024-10-05) - gen_phase_noise: phase noise variance: **2
+#   1.2.6 (2024-10-07) - gen_phase_noise: phase noise variance: fs->Rs,
+#                           *NBatchFrame
+#   1.2.7 (2024-10-11) - gen_phase_noise: CFO - func lin, cleaning
 #
 # ----- MAIN IDEA -----
-#   Generation and management of phase noise and ASE noise in optical telecommunication systems
+#   Generation and management of phase noise and ASE noise in optical
+#   telecommunication systems
 #
 # ----- BIBLIOGRAPHY -----
 #   Articles/Books
@@ -109,7 +112,7 @@ def gen_phase_noise(tx,rx,*varargin):
                 for k in range(rx['NFramesChannel']):
 
                     if tx["PhiLaw"]["law"]      == "linewidth":
-                        tx['VAR_Phase']         = (2*pi*tx['dnu']/tx['Rs'])**2*rx["NBatchFrame"]
+                        tx['VAR_Phase']         = (2*pi)**2*tx['dnu']/(2*pi*tx['Rs'])*rx["NSymbBatch"]
                         
                         noise_tmp               = np.random.normal(0,np.sqrt(tx['VAR_Phase']),rx["NBatchFrame"])
                         tmp_phase_noise[0,k,:]  = tmp_last_phase + np.cumsum(noise_tmp)
@@ -119,17 +122,16 @@ def gen_phase_noise(tx,rx,*varargin):
                 # circshift to put the zeros phases where they should be
                 tmp_phase_noise[0]      = np.roll(tmp_phase_noise[0], -rx['NFramesChannel'], axis = 0) # axis 0 = rows
                 
-
             else:
                 if tx["PhiLaw"]["law"]      == "lin":
                     PhiStart                = tx["PhiLaw"]["Start"]            # [rad]
                     PhiEnd                  = tx["PhiLaw"]["End"]
-                    tx["PhiLaw"]["Sph"]     = (PhiEnd-PhiStart)/tx["NsampFrame"]
+                    tx["PhiLaw"]["Sph"]     = (PhiEnd-PhiStart)/rx['NBatchesChannel']
+                    
+                    tmp_channel             = np.linspace(PhiStart,PhiEnd,rx['NBatchesChannel'])
+                    tmp_training            = np.zeros((rx["NBatchFrame"]*rx['NFramesTraining']))
+                    tmp                     = np.concatenate((tmp_training,tmp_channel),axis = 0)
 
-                    tmp_training            = np.linspace(PhiStart,PhiEnd,rx["NBatchFrame"]*rx['NFramesChannel'])
-                    tmp_channel             = np.zeros((rx["NBatchFrame"]*rx['NFramesTraining']))
-
-                    tmp                     = np.concatenate((tmp_channel,tmp_training),axis = 0)
                     tmp_phase_noise[0]      = np.reshape(tmp,(rx['NFrames'],-1))
             
 
@@ -153,7 +155,7 @@ def gen_phase_noise(tx,rx,*varargin):
             
             if tx["PhiLaw"]['kind']         == 'Rwalk':
                 if tx["PhiLaw"]["law"]      == "linewidth":
-                    tx['VAR_Phase']         = (2*pi*tx['dnu']/tx['Rs'])**2*rx["NBatchFrame"]
+                    tx['VAR_Phase']         = (2*pi)**2*tx['dnu']/(2*pi*tx['Rs'])
     
                     noise_tmp               = np.random.normal(0,np.sqrt(tx['VAR_Phase']),tx["Nsamp_PhaseNoise"])
     

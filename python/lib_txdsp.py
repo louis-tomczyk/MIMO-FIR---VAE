@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.2
-#   Date            : 2024-10-07
+#   Version         : 2.0.3
+#   Date            : 2024-10-11
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -39,6 +39,7 @@
 #   2.0.1 (2024-07-24) - server management
 #   2.0.2 (2024-10-07) - set_NSymbols: import from processing.init_processing
 #                           symbols and frames management: processing (1.3.11)
+#   2.0.3 (2024-10-11) - set_NSymbols: show scaling only if applied
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -910,10 +911,13 @@ def set_Nsymbols(tx,fibre,rx):
         Nsymb_added_net     -=  NsymbRemoved
 
     if rx["NSymbFrame"] > 5e4:
-        flag                = flag +1        
+        flag                = flag +1    
+        flag_scale          = 1
         rx["NSymbFrame"]    = int(rx["NSymbFrame"]/rx["SymbScale"])
         rx['NSymbBatch']    = int(rx['NSymbBatch']/rx["SymbScale"])
         Nsymb_added_net     /= rx["SymbScale"]
+    else:
+        flag_scale = 0
 
     if rx['NSymbFrame']%100 != 0:
         flag                = flag +1
@@ -1016,7 +1020,9 @@ def set_Nsymbols(tx,fibre,rx):
     rx["NBatchesTraining"]  = rx["NBatchesTot"]-rx['NBatchesChannel']
 
     tx['NsampChannel']      = tx['NsampFrame']*rx['NFramesChannel']
-    tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel'] 
+    tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel']
+    tx['PolPhi_ratio']      = rx["NSymbFrame"]/rx["NSymbBatch"]
+    
 ###############################################################################
 ############################# displaying results ##############################
 ###############################################################################
@@ -1028,11 +1034,11 @@ def set_Nsymbols(tx,fibre,rx):
     if not tx['server']:
         print('======= set-Nsymbols sum up =======')
         print('------- general:')
-        print('symb scale           = {}'.format(rx["SymbScale"]))
+        print('symb scale           = {}'.format(rx["SymbScale"])) if flag_scale else None
         print('Npol = NsymbFrame    = {}'.format(rx["NSymbFrame"]))
         print('Nphi = NSymbBatch    = {}'.format(rx["NSymbBatch"]))
         print('NSymb_Added_Net      = {}'.format(Nsymb_added_net))
-        print('Npol/Nphi            = {}'.format(rx["NSymbFrame"]/rx["NSymbBatch"]))
+        print('Npol/Nphi            = {}'.format(tx['PolPhi_ratio']))
         print('NsampTaps            = {}'.format(tx["NsampTaps"]))
         
         # spaces such as the printed lines on the shell are aligned

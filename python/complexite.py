@@ -98,7 +98,7 @@ else:
     server  = 0
 
 gen_xml     = 0
-sort_files  = 1
+sort_files  = 0
 
 
 #%% ===========================================================================
@@ -107,14 +107,15 @@ sort_files  = 1
 Nrea        = 1
 paramSNR    = [25]
 Rs          = 128e9                                         # [Baud] Symbol rate
-paramNSbB   = [250]
+paramNSbB   = [50,100,150,200,250,300,350,400,450,500]
 rxmimo      = "vae"
 fibre_vsop  = 1*1e4 # [rad/s]
 # fibre_fpol  = 2.487
 CFO_or_dnu      = 'CFO'
-paramPHI        = [10*1e4]#,5e3,1e4,5e4,1e5]                   # [Hz]
-NframesTrain    = 5
-NframesChannel  = 3
+paramPHI        = list(np.array([0.1,0.5,1,5,10,50])*1e4)                   # [Hz]
+NframesChannel  = 1
+
+
 
 #%% ===========================================================================
 # --- PARAMETERS ---
@@ -246,7 +247,7 @@ else:
     # rx["FrameChannel"]  = 10
     rx["SymbScale"]     = 150
     
-rx["FrameChannel"]  = NframesTrain
+
 
 
 ###############################################################################
@@ -350,11 +351,18 @@ def process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx):
 
 
     rx['SNRdB']                         = paramSNR[nsnr]                                                   # {>0}
+    
+    # if rx['SNRdB'] >= 20:
+    #     rx["FrameChannel"]  = int(rx['NSymbBatch']/50)
+    # else:
+    #     rx["FrameChannel"]  = int(rx['NSymbBatch']/25)
+    
+    
     tx,fibre, rx                        = set_Nsymbols(tx,fibre,rx)
 
     if tx['PhiLaw']["kind"]     == 'func':
         tx["PhiLaw"]['CFO']     = paramPHI[nphi]                                                      # [Hz]
-        tx["PhiLaw"]['End']     = 2*pi*rx['NBatchesChannel']*paramPHI[nphi]/tx['Rs']# [rad]
+        tx["PhiLaw"]['End']     = 2*pi*rx['NBatchesChannel']*paramPHI[nphi]/tx['Rs']*rx['NSymbBatch']
         
     elif tx['PhiLaw']["kind"]   == 'Rwalk':
         tx["dnu"]                       = paramPHI[nphi]                       # [Hz]
@@ -391,10 +399,13 @@ for nsnr in range(len(paramSNR)):
 
         for nSbB in range(len(paramNSbB)):
             print(f"nSbB = {paramNSbB[nSbB]}")
-            rx['NSymbBatch']  = paramNSbB[nSbB]
 
+            rx['NSymbBatch']    = paramNSbB[nSbB]
+            rx['FrameChannel']  = int(np.ceil(paramNSbB[nSbB]/37.5))
+            
             for npol in range(len(paramPOL[0])):
                 for nphi in range(len(paramPHI)):
+
 
                     if server:
                         try:
