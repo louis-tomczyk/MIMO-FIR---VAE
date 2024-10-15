@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.2.0
-#   Date            : 2024-10-11
+#   Version         : 2.2.2
+#   Date            : 2024-10-15
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -42,6 +42,9 @@
 #                           txhw (1.2.5)
 #   2.1.0  (2024-10-10) - reordering the parameters
 #   2.2.0  (2024-10-11) - try-except + xml generation, along misc (2.1.3)
+#   2.2.1  (2024-10-13) - fail_log
+#   2.2.2  (2024-10-15) - moving to parameters_explanations.yaml params
+#                           details (entropy tables, pilots management,..)
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -107,7 +110,7 @@ sort_files  = 1
 Nrea        = 1
 paramSNR    = [25]
 Rs          = 128e9                                         # [Baud] Symbol rate
-paramNSbB   = [250]
+paramNSbB   = [400]
 rxmimo      = "vae"
 fibre_vsop  = 1*1e4 # [rad/s]
 # fibre_fpol  = 2.487
@@ -132,81 +135,11 @@ tx['SNRdB']                     = 50
 tx['Rs']                        = Rs
 
 
-# -----------------------------------------------------------------------------
-# Entropies table
-# -----------------------------------------------------------------------------
-
-
-# -------------------------------------------------------
-# |        16 QAM :          |        64 QAM :          |
-# |--------------------------|--------------------------|
-# | H        | nu            | H        | nu            |
-# |----------|---------------|----------|---------------|
-# | 4        | 0             | 6        | 0             |
-# | 3.75     | 0.1089375     | 5.75     | 0.0254        |
-# | 3.5      | 0.16225       | 5.5      | 0.038718      |
-# | 3.25     | 0.210875      | 5.25     | 0.051203125   |
-# | 3        | 0.2613125     | 5        | 0.0641        |
-# | 2.75     | 0.3186875     | 4.75     | 0.078046875   |
-# | 2.49     | 0.3953125     | 4.5      | 0.0938125     |
-# | 2.25     | 0.50619       | 4.25     | 0.11          |
-# | 2        | 6.14375       | 4        | 0.133375      |
-# -------------------------------------------------------
-
-
 tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
 tx["nu"]                        = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
 
-# tx["mod"]                       = '16QAM'                                      # {4,16,64}QAM
-# tx["nu"]                        = 0.1089375                                       # for PCS: exp(-nu*|x|^2)/...
-
-# -----------------------------------------------------------------------------
-# Pilots management
-# -----------------------------------------------------------------------------
-# parameters description
-# 0 = {cpr, synchro_once, synchro_frame} ======== pilots locations
-# 1 = {rand, file, custom, cazac, data, ...} ==== pilots selection method
-# 2 = {same, batchwise, framewise} ============== pilots changes?
-#                                                   batchwise : cpr
-#                                                   framewise : synchro(_once)
-# 3 = {same, polwise} =========================== same for both polarisations?
-# 4 = {4, 16, 64}QAM ============================ modulation format used
-# 5 = {>0} ====================================== percentage of pilots
-#                                                   if not cazac
-#                                                 number of cazac symbol
-#                                                   otherwise
-# 6 = {>0} ====================================== number of pilots per batch
-#                                                   if not cazac
-# -----------------------------------------------------------------------------
-# Examples
-# tx['pilots_info']       = [['synchro','rand',"framewise","same","4QAM",3,0]]   #ok
-# tx['pilots_info']       = [['synchro','rand',"framewise","polwise","4QAM",3,0]]#ok
-# tx['pilots_info']       = [['synchro','cazac',"framewise","","",64]]           #ok
-# tx['pilots_info']       = [['synchro','data',"framewise","same","",10]]        #ok
-# tx['pilots_info']       = [['synchro','data',"framewise","polwise","",10]]     #ok
-
-# tx['pilots_info']       = [['synchro_once','rand',"","same","4QAM",3,0]]       #ok
-# tx['pilots_info']       = [['synchro_once','rand',"","polwise","4QAM",3,0]]    #ok
-# tx['pilots_info']       = [['synchro_once','cazac',"","","",64]]               #ok
-# tx['pilots_info']       = [['synchro_once','data',"","polwise","",10]]         #ok
-# tx['pilots_info']       = [['synchro_once','data',"","same","",10]]            #ok
-
-# tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",3,0]]            #ok
-# tx['pilots_info']       = [['cpr','rand',"same","polwise","4QAM",3,0]]         #ok
-# tx['pilots_info']       = [['cpr','rand',"batchwise","same","4QAM",3,0]]       #ok
-# tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",3,0]]    #ok
-# tx['pilots_info']       = [['cpr','cazac',"","","",64]]                        #ok
-# -----------------------------------------------------------------------------
-
-
-# tx['pilots_info']       = [['synchro_once','data',"","same","",10],
-#                            ['cpr','rand',"same","same","4QAM",3,0]]
-
-
 rx["NSymbFrame"]        = int(20000)
 
-
-# tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",5,0]]
 tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]
 
 win_width               = 10
@@ -354,7 +287,7 @@ def process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx):
 
     if tx['PhiLaw']["kind"]     == 'func':
         tx["PhiLaw"]['CFO']     = paramPHI[nphi]                                                      # [Hz]
-        tx["PhiLaw"]['End']     = 2*pi*rx['NBatchesChannel']*paramPHI[nphi]/tx['Rs']# [rad]
+        tx["PhiLaw"]['End']     = 2*pi*rx['NBatchesChannel']*rx['NSymbBatch']*paramPHI[nphi]/tx['Rs']# [rad]
         
     elif tx['PhiLaw']["kind"]   == 'Rwalk':
         tx["dnu"]                       = paramPHI[nphi]                       # [Hz]
@@ -381,8 +314,6 @@ def process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx):
 # --- LOGISTICS ---
 # =============================================================================
 
-
-
 for nsnr in range(len(paramSNR)):
     print(f"\t\t\tSNR = {paramSNR[nsnr]}")
 
@@ -390,17 +321,26 @@ for nsnr in range(len(paramSNR)):
         print(f"nrea = {nrea}")
 
         for nSbB in range(len(paramNSbB)):
-            print(f"nSbB = {paramNSbB[nSbB]}")
-            rx['NSymbBatch']  = paramNSbB[nSbB]
+            # print(f"nSbB = {paramNSbB[nSbB]}")
 
+            rx['NSymbBatch']    = paramNSbB[nSbB]
+            rx['FrameChannel']  = int(np.ceil(paramNSbB[nSbB]/37.5))
+            
             for npol in range(len(paramPOL[0])):
                 for nphi in range(len(paramPHI)):
+
 
                     if server:
                         try:
                             tx,fibre,rx     = process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx)
                         except:
-                            print(f'failed SNR = {paramSNR[nsnr]} Nrea = {nrea} NSbB = {paramNSbB[nSbB]} POL = {paramPOL[npol]} PHI = {paramPHI[nphi]}')
+
+                            text    = f'failed SNR = {paramSNR[nsnr]} Nrea = {nrea} NSbB = {paramNSbB[nSbB]} POL = {paramPOL[npol]} PHI = {paramPHI[nphi]}' 
+                            tmp_fn  = saving['filename'][0:20]+'fail.log'
+                            f       = open(tmp_fn, "a")
+
+                            f.write(text)
+                            f.close()
                             
                     else:
                         tx,fibre,rx     = process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx)

@@ -1,0 +1,102 @@
+# ---------------------------------------------
+# ----- INFORMATIONS -----
+#   Author          : louis tomczyk
+#   Institution     : Telecom Paris
+#   Email           : louis.tomczyk@telecom-paris.fr
+#   Version         : 1.0.0
+#   Date            : 2024-10-15
+#   License         : GNU GPLv2
+#                       CAN:    commercial use - modify - distribute -
+#                               place warranty
+#                       CANNOT: sublicense - hold liable
+#                       MUST:   include original - disclose source -
+#                               include copyright - state changes -
+#                               include license
+#
+# ----- CHANGELOG -----
+#   1.0.0 (2023-03-13) - creation
+# 
+# ----- MAIN IDEA -----
+#   Simulation of an end-to-end linear optical telecommunication system
+#
+# ----- BIBLIOGRAPHY -----
+#   Articles/Books:
+#   [A1] Authors         :
+#        Title           :
+#        Journal/Editor  :
+#        Volume - N°     :
+#        Date            :
+#        DOI/ISBN        :
+#        Pages           :
+#  ----------------------
+#   CODE
+#   [C1] Author          :
+#        Contact         :
+#        Laboratory/team :
+#        Institution     :
+#        Date            :
+#        Program Title   :
+#        Code Version    :
+#        Type            :
+#        Web Address     :
+# ---------------------------------------------
+
+# -----------------------------------------------------------------------------
+# Entropies table
+# -----------------------------------------------------------------------------
+
+# -------------------------------------------------------
+# |        16 QAM :          |        64 QAM :          |
+# |--------------------------|--------------------------|
+# | H        | nu            | H        | nu            |
+# |----------|---------------|----------|---------------|
+# | 4        | 0             | 6        | 0             |
+# | 3.75     | 0.1089375     | 5.75     | 0.0254        |
+# | 3.5      | 0.16225       | 5.5      | 0.038718      |
+# | 3.25     | 0.210875      | 5.25     | 0.051203125   |
+# | 3        | 0.2613125     | 5        | 0.0641        |
+# | 2.75     | 0.3186875     | 4.75     | 0.078046875   |
+# | 2.49     | 0.3953125     | 4.5      | 0.0938125     |
+# | 2.25     | 0.50619       | 4.25     | 0.11          |
+# | 2        | 6.14375       | 4        | 0.133375      |
+# -------------------------------------------------------
+
+
+# -----------------------------------------------------------------------------
+# Pilots management
+# -----------------------------------------------------------------------------
+
+# parameters description
+# 0 = {cpr, synchro_once, synchro_frame} ======== pilots locations
+# 1 = {rand, file, custom, cazac, data, ...} ==== pilots selection method
+# 2 = {same, batchwise, framewise} ============== pilots changes?
+#                                                   batchwise : cpr
+#                                                   fr0.1mewise : synchro(_once)
+# 3 = {same, polwise} =========================== same for both polarisations?
+# 4 = {4, 16, 64}QAM ============================ modulation format used
+# 5 = {>0} ====================================== percentage of pilots
+#                                                   if not cazac
+#                                                 number of cazac symbol
+#                                                   otherwise
+# 6 = {>0} ====================================== number of pilots per batch
+#                                                   if not cazac
+# -----------------------------------------------------------------------------
+# Examples
+# tx['pilots_info']       = [['synchro','rand',"framewise","same","4QAM",3,0]]   #ok
+# tx['pilots_info']       = [['synchro','rand',"framewise","polwise","4QAM",3,0]]#ok
+# tx['pilots_info']       = [['synchro','cazac',"framewise","","",64]]           #ok
+# tx['pilots_info']       = [['synchro','data',"framewise","same","",10]]        #ok
+# tx['pilots_info']       = [['synchro','data',"framewise","polwise","",10]]     #ok
+
+# tx['pilots_info']       = [['synchro_once','rand',"","same","4QAM",3,0]]       #ok
+# tx['pilots_info']       = [['synchro_once','rand',"","polwise","4QAM",3,0]]    #ok
+# tx['pilots_info']       = [['synchro_once','cazac',"","","",64]]               #ok
+# tx['pilots_info']       = [['synchro_once','data',"","polwise","",10]]         #ok
+# tx['pilots_info']       = [['synchro_once','data',"","same","",10]]            #ok
+
+# tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",3,0]]            #ok
+# tx['pilots_info']       = [['cpr','rand',"same","polwise","4QAM",3,0]]         #ok
+# tx['pilots_info']       = [['cpr','rand',"batchwise","same","4QAM",3,0]]       #ok
+# tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",3,0]]    #ok
+# tx['pilots_info']       = [['cpr','cazac',"","","",64]]                        #ok
+# -----------------------------------------------------------------------------
