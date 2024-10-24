@@ -29,15 +29,15 @@
 
 rst
 
-caps.log.Date   = '24-10-13';
+caps.log.Date   = '24-10-16';
 caracs1         = {"CFO",[0.1,0.5,1,5,10,]};
 % caracs1         = {"dnu",[1,10,100]};
-caracs2         = {"vsop",[0.1,1,10]};
-caracs2b    = {'Rs',128};
+caracs2         = {"vsop",[100]};
+caracs2b    = {'Rs',64};
 % caracs3         = {"SNR_dB",[10]};
 caracs3     = {'NSbB',[50,100,150,200,250,300,350,400,450,500]};
 
-what = "csv";
+what = "mat";
 if strcmpi(what,'mat')
     fprintf(join(["\t,","\t,","\t,","\t,","\t,","\t,","\t,","\t,","\t,","mat\n"]))
 else

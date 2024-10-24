@@ -36,14 +36,14 @@
 
 %% import data
 rst
-caps.log.Date = '24-10-14';
+caps.log.Date = '24-10-14-16';
 
 % caracs1     = {'NSbB',[50,75,100,125,150,175,200,225,250,300,400,500,750]};
 % caracs1     = {'NspT',[13,17,21,25,29]};
 caracs1     = {'CFO',[0.1,0.5,1,5,10]};
 % caracs1     = {'CFO',[0.1]};
-caracs2     = {'vsop',1};
-caracs2b    = {'Rs',128};
+caracs2     = {'vsop',[1,10]};w
+caracs2b    = {'Rs',64};
 % caracs3     = {'ma g',[1,5,10,15,20,25]};
 % caracs3     = {'SNR_dB',linspace(8,25,18)};
 caracs3     = {'NSbB',[500,400,300,250,200,150,100,50]};
@@ -255,7 +255,7 @@ for j = 1:length(fieldnames(res))
 
         ylabel('Bit Error Rate (BER)',FontWeight='bold')
         if contains(caracs{end},'17')
-            ylim([1e-2,1])
+            ylim([5e-3,5e-1])
         else
             ylim([1e-5,1])
         end
@@ -309,8 +309,8 @@ end
 
 
 
-% saveas(f,[filename(1:end-3),'fig'])
-% saveas(f,[filename(1:end-3),'svg'])
+saveas(f,[filename(1:end-3),'fig'])
+saveas(f,[filename(1:end-3),'svg'])
 saveas(f,[filename(1:end-3),'png'])
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS

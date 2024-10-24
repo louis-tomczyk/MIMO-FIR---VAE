@@ -31,15 +31,16 @@
 
 %% import data
 rst
+% caps.log.Date = '24-10-14';
 caps.log.myInitPath     = [pwd(),'/../data/data-JLT'];
 cd(caps.log.myInitPath)
 [allData,caps]          = import_data({'.csv'},caps);
 
 
 
-keys            = {'Rs','dnu','PhEnd','fpol','ThEnd'};
+keys            = {'Rs','dnu','CFO','vsop'};
 leg_keys        = strings();
-leg_keys_vals   = zeros(caps.log.Nfiles,5);
+leg_keys_vals   = zeros(caps.log.Nfiles,4);
 leg_keys_kept   = strings();
 
 for k = 1:caps.log.Nfiles

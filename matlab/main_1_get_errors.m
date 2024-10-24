@@ -29,122 +29,192 @@
 %   Type                : 
 %   Web Address         : 
 % ----------------------------------------------
-%%
 
+
+%% MAINTENANCE
 rst
+format short
+caps.log.Date = '24-10-14-16';
+caracs0   = '<ErrTh>'; % add '-' otherwise it also considers the <ErrTh>
+caracs1   = {'CFO',1};         % {Nplts, dnu}
+caracs2   = {'vsop',1};       % {fpol, ThEnd}
+caracs3   = {'NSbB',[50,100,150,200,250,300,350,400,450]};
+caracs4   = {'SNR_dB',17};
+caracs5   = {'Rs',128};
+caracs6   = {'','mat'};
 
-caps.log.Date = '24-09-13';
-caracs0     = 'ErrTh>'; % add '-' otherwise it also considers the <ErrTh>
-caracs1     = {"dnu",[1]};
-caracs2     = {"fpol",[1]};
-% caracs2b    = {'Sth',[0.5,1]};
-caracs3     = {"ma g",[1]};
-% caracs3     = {'SNR_dB',linspace(5,25,21)};
-entropy     = 5.72;
+table_varnames = {'CFO','vsop','NSbB','SNR_dB','Rs','mean','std','rms'};
 
+caps.save.errs          = 1;
+caps.save.mean_errs     = 1;
+caps.what_carac         = caracs1{1};
+nrea                    = 10;
 
-
-NrowsErrs   = length(caracs1{1})*length(caracs1{2});
-
-Errs        = table('Size', [NrowsErrs,2+3], ... % 2 = ncaracs, 3 = {mean,std,rms}
-                    'VariableTypes', {'double', 'double', 'double', 'double', 'double'}, ...
-                    'VariableNames', {char(caracs1{1}), char(caracs2{1}), 'mean', 'std', 'rms'});
-
+count = 0;
 row         = 1;
 for ncarac1 = 1:length(caracs1{2})
+    fprintf("%s = %.1f\n",caracs1{1},caracs1{2}(ncarac1))
+
     for ncarac2 = 1:length(caracs2{2})
-%         for ncarac2b = 1:length(caracs2b{2})
-%             for ncarac3 = 1:length(caracs3{2})
+        fprintf("\t%s = %.1f\n",caracs2{1},caracs2{2}(ncarac2))
+    
+        for ncarac3 = 1:length(caracs3{2})
+            fprintf("\t\t %s = %.1f\n",caracs3{1},caracs3{2}(ncarac3))
 
-                cd(strcat('../python/data-',caps.log.Date,"/err/thetas"))
-        
-                selected_caracs         = [ caracs0;...
-                                            sprintf("%s %d ",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space, if PhiEnd
-                                            sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));... % if ThEnd %d
-%                                             sprintf("%s %.1f",caracs2b{1},caracs2b{2}(ncarac2b));...
-%                                             sprintf("%s %d",caracs3{1},caracs3{2}(ncarac3));...
-                                            ];
-                [allData,caps]          = import_data({'.csv'},caps,selected_caracs);
-                caps.log.myInitPath     = pwd();
-                
-                disp(row)
-                Errs(row,:) = allData{1}(end,:);
-                % the end line is the median value of the errors of the previous lines
-                
-                cd(caps.log.myRootPath)
-                row = row+1;
+            for ncarac4 = 1:length(caracs4{2})
+                fprintf("\t\t\t%s = %.1f\n",caracs4{1},caracs4{2}(ncarac4))
 
-%             end % carac3
-%         end % carac2b
+                for ncarac5 = 1:length(caracs5{2})
+                    fprintf("\t\t\t\t%s = %.1f\n",caracs5{1},caracs5{2}(ncarac5))
+
+%                     cd(strcat('../python/data-',caps.log.Date,"/err/thetas/"))
+                    cd(strcat('../python/data-',caps.log.Date,"/err/sum_up_theta"))
+                    caps.log.myInitPath     = pwd();
+    
+                    caracs         = [...
+                                      sprintf("%s %.1f",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space
+                                      sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));...  % {%d ThEnd,%.1f fpol}
+                                      sprintf("%s %d ",caracs3{1},caracs3{2}(ncarac3));...
+                                      sprintf("%s %d",caracs4{1},caracs4{2}(ncarac4));...
+                                      sprintf("%s %d",caracs5{1},caracs5{2}(ncarac5));...
+                                      sprintf("%s%s",caracs6{1},caracs6{2});...
+                                      ];
+            
+                    [allData,caps]  = import_data({'.csv'},caps,caracs); % {,manual selection}
+                    cd(caps.log.myInitPath)
+%                     disp(row)
+                    Errs(row,:) = allData{1}(end,:);
+                    % the end line is the median value of the errors of the previous lines
+                    
+                    cd(caps.log.myRootPath)
+                    row = row+1;
+                end % carac5
+            end % carac4
+        end % carac3
     end % carac2
 end % carac1
 
-% ---------------------------------------------
-% ---------------------------------------------
-% ---------------------------------------------
-dnu             = caracs1{2};
-fpol            = caracs2{2};
+Errs.Properties.VariableNames = table_varnames;
+cd error_estimation_theta/csv
+writetable(Errs,caps.log.Fn{1})
+% cd ..
+% f = figure;
+% xlabel('$\mathbf{N_{symb,batch}}$')
+% 
+% set(gcf, 'Position', [0.0198,0.0009,0.5255,0.8824])
+%     yyaxis left
+%         plot(Errs.NSbB,abs(Errs.mean),...
+%             'color', 'k',...
+%             'LineStyle', '-', ...
+%             'Marker', 'o', ...
+%             'MarkerFaceColor','k',...
+%             'MarkerEdgeColor','k',...
+%             'MarkerSize',15,...
+%             'LineWidth', 2);
+%         ylabel('$\mathbf{|<\theta-\hat{\theta}>|}$ [deg]', ...
+%             Interpreter='latex', FontWeight="bold")
+% 
+% 
+% 
+%     yyaxis right
+%         plot(Errs.NSbB,Errs.std,...
+%             'color', 'b',...
+%             'LineStyle', '-', ...
+%             'Marker', '^', ...
+%             'MarkerSize',15,...
+%             'MarkerFaceColor','b',...
+%             'MarkerEdgeColor','b',...
+%             'LineWidth', 2);
+%     ylabel('$\mathbf{\sigma(\theta-\hat{\theta})}$ [deg]',...
+%         FontWeight="bold")
+% 
+% ax = gca;
+% ax.YAxis(1).Color = 'k';
+% ax.YAxis(2).Color = 'b';
+% 
+% tmp_fname   = char(caps.log.Fn{1});
+% SNR_str     = num2str(caracs4{2});
+% Rs_str      = num2str(caracs5{2});
+% lgd_str     = strcat('Rs ',Rs_str, '- SNR ',SNR_str);
+% 
+% if contains(tmp_fname,'fft')
+%     lgd_str = strcat('FD-',lgd_str);
+% else
+%     lgd_str = strcat('TD-',lgd_str);
+% end
+% legend(lgd_str,Location="northwest")
+% 
+% saveas(f,[tmp_fname(1:end-4),'.png'])
+% saveas(f,[tmp_fname(1:end-4),'.svg'])
+% saveas(f,[tmp_fname(1:end-4),'.fig'])
 
-% ---------------------------------------------
-% yfpol_m(:,1)    = Errs(Errs.fpol == 1,:).mean;
-% yfpol_m(:,2)    = Errs(Errs.fpol == 10,:).mean;
-yfpol_m(:,3)    = Errs(Errs.fpol == 100,:).mean;
-
-% yfpol_s(:,1)    = Errs(Errs.fpol == 1,:).std;
-% yfpol_s(:,2)    = Errs(Errs.fpol == 10,:).std;
-yfpol_s(:,3)    = Errs(Errs.fpol == 100,:).std;
-
-% ---------------------------------------------
-% ydnu_m(:,1)    = Errs(Errs.dnu == 1,:).mean;
-% ydnu_m(:,2)    = Errs(Errs.dnu == 5,:).mean;
-% ydnu_m(:,3)    = Errs(Errs.dnu == 10,:).mean;
-% ydnu_m(:,4)    = Errs(Errs.dnu == 50,:).mean;
-ydnu_m(:,5)    = Errs(Errs.dnu == 100,:).mean;
-
-% ydnu_s(:,1)    = Errs(Errs.dnu == 1,:).std;
-% ydnu_s(:,2)    = Errs(Errs.dnu == 5,:).std;
-% ydnu_s(:,3)    = Errs(Errs.dnu == 10,:).std;
-% ydnu_s(:,4)    = Errs(Errs.dnu == 50,:).std;
-ydnu_s(:,5)    = Errs(Errs.dnu == 100,:).std;
-
-% ---------------------------------------------
-
-figure
-subplot(1,2,1)
-hold on
-% plot(fpol,yfpol_m(1,:),'-r',    DisplayName="$\Delta\nu = 1$",LineWidth= 2)
-% plot(fpol,yfpol_m(2,:),'--b',   DisplayName="$\Delta\nu = 5$",LineWidth= 2)
-% plot(fpol,yfpol_m(3,:),'-.k',   DisplayName="$\Delta\nu = 10$",LineWidth= 2)
-% plot(fpol,yfpol_m(4,:),'-',     DisplayName="$\Delta\nu = 50$",LineWidth= 3)
-plot(fpol,yfpol_m(5,:),'--m',   DisplayName="$\Delta\nu = 100$",LineWidth= 3)
-set(gca,'Xscale','log','Yscale','log')
-ylim([5e-2,5])
-xlabel('$f_{pol}~[kHz]$')
-ylabel('$<\hat{\theta}-\theta>~[deg]$')
-xticks([1,10,100])
-xticklabels({'1','10','100'});
-hleg = legend('show');
-legend boxoff
-title(hleg,'units in [kHz]')
-grid on
-box on
-
-subplot(1,2,2)
-hold on
-% plot(dnu,ydnu_m(1,:),'-r', DisplayName="$f_{pol} = 1$",LineWidth= 2)
-% plot(dnu,ydnu_m(2,:),'--b',DisplayName="$f_{pol} = 10$",LineWidth= 2)
-plot(dnu,ydnu_m(3,:),'-.k', DisplayName="$f_{pol} = 100$",LineWidth= 2)
-set(gca,'Xscale','log','Yscale','log')
-ylim([5e-2,5])
-xlabel('$\Delta\nu~[kHz]$')
-ylabel('$<\hat{\theta}-\theta>~[deg]$')
-xticks([1,10,100])
-xticklabels({'1','10','100'});
-hleg = legend('show');
-legend boxoff
-title(hleg,'units in [kHz]')
-grid on
-box on
+% 
+% % ---------------------------------------------
+% % ---------------------------------------------
+% % ---------------------------------------------
+% dnu             = caracs1{2};
+% fpol            = caracs2{2};
+% 
+% % ---------------------------------------------
+% % yfpol_m(:,1)    = Errs(Errs.fpol == 1,:).mean;
+% % yfpol_m(:,2)    = Errs(Errs.fpol == 10,:).mean;
+% yfpol_m(:,3)    = Errs(Errs.fpol == 100,:).mean;
+% 
+% % yfpol_s(:,1)    = Errs(Errs.fpol == 1,:).std;
+% % yfpol_s(:,2)    = Errs(Errs.fpol == 10,:).std;
+% yfpol_s(:,3)    = Errs(Errs.fpol == 100,:).std;
+% 
+% % ---------------------------------------------
+% % ydnu_m(:,1)    = Errs(Errs.dnu == 1,:).mean;
+% % ydnu_m(:,2)    = Errs(Errs.dnu == 5,:).mean;
+% % ydnu_m(:,3)    = Errs(Errs.dnu == 10,:).mean;
+% % ydnu_m(:,4)    = Errs(Errs.dnu == 50,:).mean;
+% ydnu_m(:,5)    = Errs(Errs.dnu == 100,:).mean;
+% 
+% % ydnu_s(:,1)    = Errs(Errs.dnu == 1,:).std;
+% % ydnu_s(:,2)    = Errs(Errs.dnu == 5,:).std;
+% % ydnu_s(:,3)    = Errs(Errs.dnu == 10,:).std;
+% % ydnu_s(:,4)    = Errs(Errs.dnu == 50,:).std;
+% ydnu_s(:,5)    = Errs(Errs.dnu == 100,:).std;
+% 
+% % ---------------------------------------------
+% 
+% figure
+% subplot(1,2,1)
+% hold on
+% % plot(fpol,yfpol_m(1,:),'-r',    DisplayName="$\Delta\nu = 1$",LineWidth= 2)
+% % plot(fpol,yfpol_m(2,:),'--b',   DisplayName="$\Delta\nu = 5$",LineWidth= 2)
+% % plot(fpol,yfpol_m(3,:),'-.k',   DisplayName="$\Delta\nu = 10$",LineWidth= 2)
+% % plot(fpol,yfpol_m(4,:),'-',     DisplayName="$\Delta\nu = 50$",LineWidth= 3)
+% plot(fpol,yfpol_m(5,:),'--m',   DisplayName="$\Delta\nu = 100$",LineWidth= 3)
+% set(gca,'Xscale','log','Yscale','log')
+% ylim([5e-2,5])
+% xlabel('$f_{pol}~[kHz]$')
+% ylabel('$<\hat{\theta}-\theta>~[deg]$')
+% xticks([1,10,100])
+% xticklabels({'1','10','100'});
+% hleg = legend('show');
+% legend boxoff
+% title(hleg,'units in [kHz]')
+% grid on
+% box on
+% 
+% subplot(1,2,2)
+% hold on
+% % plot(dnu,ydnu_m(1,:),'-r', DisplayName="$f_{pol} = 1$",LineWidth= 2)
+% % plot(dnu,ydnu_m(2,:),'--b',DisplayName="$f_{pol} = 10$",LineWidth= 2)
+% plot(dnu,ydnu_m(3,:),'-.k', DisplayName="$f_{pol} = 100$",LineWidth= 2)
+% set(gca,'Xscale','log','Yscale','log')
+% ylim([5e-2,5])
+% xlabel('$\Delta\nu~[kHz]$')
+% ylabel('$<\hat{\theta}-\theta>~[deg]$')
+% xticks([1,10,100])
+% xticklabels({'1','10','100'});
+% hleg = legend('show');
+% legend boxoff
+% title(hleg,'units in [kHz]')
+% grid on
+% box on
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% NESTED FUNCTIONS
