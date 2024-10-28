@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 1.1.5
-%   Date            : 2024-07-26
+%   Version         : 1.2.0
+%   Date            : 2024-10-28
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -19,6 +19,7 @@
 %   2024-07-12 (1.1.3)  phase noise management --- for rx['mode'] = 'pilots'
 %   2024-07-16 (1.1.4)  multiple files processing
 %   2024-07-26 (1.1.5)  lighten the filenames + include estimation method
+%   2024-10-28 (1.2.0)  *plot_fir/plot_sop* (1.1.1) mean -> median
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -99,8 +100,8 @@ cd(caps.log.myInitPath)
 % ---------------------------------------------
 % ----- CONTENTS -----
 %   plot_fir            (1.1.0)
-%   plot_phi            (1.1.0)
-%   plot_SOP            (1.1.0)
+%   plot_phi            (1.1.1)
+%   plot_SOP            (1.1.1)
 %   prepare_plots
 % ---------------------------------------------
 
@@ -176,7 +177,7 @@ end
 
 title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
       caps.method.thetas, caps.FIR.tap, ...
-      metrics.thetas.ErrMean,metrics.thetas.ErrStd))
+      metrics.thetas.ErrMedian,metrics.thetas.ErrStd))
 % ---------------------------------------------
 
 
@@ -216,7 +217,7 @@ if caps.phis_est
 
 title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
       caps.method.phis, caps.FIR.tap, ...
-      metrics.phis.ErrMean(caps.kdata),metrics.phis.ErrStd(caps.kdata)))
+      metrics.phis.ErrMedian(caps.kdata),metrics.phis.ErrStd(caps.kdata)))
 end
 
 % ---------------------------------------------

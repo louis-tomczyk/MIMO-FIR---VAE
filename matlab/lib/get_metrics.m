@@ -1,11 +1,10 @@
 % ---------------------------------------------
 % ----- INFORMATIONS -----
-%   Function name   : get_metrics
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Date            : 2024-07-15
-%   Version         : 1.1.1
+%   Version         : 1.1.2
+%   Date            : 2024-10-28
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -18,6 +17,7 @@
 %                       encapsulating in structures metrics
 %                       naming standardisation
 %   2024-07-15  (1.1.1) multiple files processing
+%   2024-10-28  (1.1.2) mean -> median
 % 
 % ----- MAIN IDEA -----
 %   Evaluate estimation errors
@@ -57,13 +57,10 @@ function metrics = get_metrics(caps,thetas,varargin)
 
 Err.thetas                  = thetas.est-thetas.gnd; % [deg]
 
-metrics.thetas.ErrMean      = mean(Err.thetas);
+metrics.thetas.ErrMedian    = mean(Err.thetas);
 metrics.thetas.ErrStd       = std(Err.thetas);
-metrics.thetas.ErrRms       = metrics.thetas.ErrStd/metrics.thetas.ErrMean;
-
+metrics.thetas.ErrRms       = metrics.thetas.ErrStd/metrics.thetas.ErrMedian;
 metrics.thetas.Err          = [zeros(caps.NFrames.Training,1);Err.thetas];
-
-
 params.method               = "mirror";
 params.period               = 5;
 
@@ -73,24 +70,26 @@ metrics.thetas.Err_mov_std  = (moving_stat_in(metrics.thetas.Err,params,"std")).
 
 if ~isempty(varargin)
     phis                                = varargin{1};
-    Err.phis                            = phis.est.channel-phis.gnd.channel;        % [deg]
-    if ~strcmpi(caps.rx_mode,'pilots')
-        metrics.phis.ErrMean            = zeros(caps.log.Nfiles,1);
+Err.phis                            = phis.est.channel-phis.gnd.channel;        % [deg]
+if ~strcmpi(caps.rx_mode,'pilots')
+% if strcmpi(caps.rx_mode,'pilots') % louis: to remove only if all tests pass
+        metrics.phis.ErrMedian          = zeros(caps.log.Nfiles,1);
     else
-        metrics.phis.ErrMean            = zeros(caps.log.Nfiles,3);
+        metrics.phis.ErrMedian          = zeros(caps.log.Nfiles,3);
     end
     
-    metrics.phis.ErrMean(caps.kdata,:)  = mean(Err.phis);
+    metrics.phis.ErrMedian(caps.kdata,:)= median(Err.phis);
     metrics.phis.ErrStd(caps.kdata,:)   = std(Err.phis);
-    metrics.phis.ErrRms(caps.kdata,:)   = metrics.phis.ErrStd(caps.kdata,:)./metrics.phis.ErrMean(caps.kdata,:);
+    metrics.phis.ErrRms(caps.kdata,:)   = metrics.phis.ErrStd(caps.kdata,:)./metrics.phis.ErrMedian(caps.kdata,:);
 
-    if ~strcmpi(caps.rx_mode,'pilots')
+%     if ~strcmpi(caps.rx_mode,'pilots')
+    if strcmpi(caps.rx_mode,'pilots')
         metrics.phis.Err                = [zeros(caps.NBatches.Training,1);Err.phis];
     else
         metrics.phis.Err                = Err.phis;
     end
     
-    metrics.phis.Err_mov_avg = (moving_stat_in(metrics.thetas.Err,params,"average")).';
+    metrics.phis.Err_mov_avg = (moving_stat_in(metrics.phis.Err,params,"average")).';
     metrics.phis.Err_mov_std = (moving_stat_in(metrics.phis.Err,params,"std")).';
 end
 
