@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 2.1.2
-%   Date            : 2024-10-22
+%   Version         : 2.2.0
+%   Date            : 2024-10-28
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -33,6 +33,7 @@
 %                       import_data (1.1.1): wrong loop conditin for finner
 %                           selection of files
 %   2024-10-10  (2.1.2) cleaning + carac5
+%   2024-10-28  (2.2.0) metrics.phis.ErrMedian(end) -> metrics.phis.ErrMedian(kdata)
 %
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -53,15 +54,16 @@
 
 %% MAINTENANCE
 rst
-format short
+format long
 caps.log.Date = '24-10-14-16';
 caracs1   = {'CFO',[1]};         % {Nplts, dnu}
 caracs2   = {'vsop',1};       % {fpol, ThEnd}
-caracs3   = {'NSbB',[50,100,150,200,250,300,350,400,450,500]};
-caracs4   = {'SNR_dB',[17,25]};
-caracs5   = {'Rs',[64,128]};
+% caracs3   = {'NSbB',[50,100,150,200,250,300,350,400,450,500]};
+caracs3   = {'NSbB',[500]};
+caracs4   = {'SNR_dB',[17]};
+caracs5   = {'Rs',[64]};
 
-caps.plot.fir           = 0;
+caps.plot.fir           = 1;
 caps.plot.poincare      = 0;
 caps.plot.SOP.xlabel    = 'comparison per frame';   % {'error per frame','error per theta''comparison per frame'}
 caps.plot.phis.xlabel   = 'comparison per batch';
@@ -135,7 +137,7 @@ for ncarac1 = 1:length(caracs1{2})
                                                caracs3{2}(ncarac3),...
                                                caracs4{2}(ncarac4),...
                                                caracs5{2}(ncarac5),...
-                                                    metrics.thetas.ErrMean,...
+                                                    metrics.thetas.ErrMedian,...
                                                     metrics.thetas.ErrStd,...
                                                     metrics.thetas.ErrRms];
                     
@@ -146,9 +148,9 @@ for ncarac1 = 1:length(caracs1{2})
                                                caracs3{2}(ncarac3),...
                                                caracs4{2}(ncarac4),...
                                                caracs5{2}(ncarac5),...
-                                                    metrics.phis.ErrMean(end),...
-                                                    metrics.phis.ErrStd(end),...
-                                                    metrics.phis.ErrRms(end)];
+                                                    metrics.phis.ErrMedian(kdata),...
+                                                    metrics.phis.ErrStd(kdata),...
+                                                    metrics.phis.ErrRms(kdata)];
             
                         end
                     
