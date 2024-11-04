@@ -399,11 +399,11 @@ def init_train(tx, rx, frame):
 def print_results(loss, frame, tx, fibre, rx, saving):
 
     
-    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
-        dt = time.time()-tx['get_exec_time'][1]
-        tx['get_exec_time'][1] = time.time()
-        tx['get_exec_time'][2][0,rx['Frame']] = dt
-        
+    # if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+    #     dt = time.time()-tx['get_exec_time'][1]
+    #     tx['get_exec_time'][1] = time.time()
+    #     tx['get_exec_time'][2][0,rx['Frame']] = dt
+
     SER_valid   = rx["SER_valid"]
     SERs        = rx["SERs"]
     Losses      = rx["Losses"]
@@ -460,43 +460,43 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                 print("frame %d" % frame,
                       '--- loss     = %.1f'     % lossk,
                       '--- SNRdB    = %.2f'     % SNRdBk,
-                      '--- Theta    = %.2f'     % (thetak*180/np.pi),
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
                       '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
                       '--- <SER>    = %.2e'     % SERmeank,
-                      '--- dt       = %.2e'     % dt \
-                          if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                          else None
+                      # '--- dt       = %.2e'     % dt \
+                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      #     else None
                       )
             else:
                 print("frame %d" % frame,
                       '--- loss     = %.1f'     % lossk,
                       '--- SNRdB    = %.2f'     % SNRdBk,
-                      '--- Theta    = %.2f'     % (thetak*180/np.pi),
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
                       '--- <SER>    = %.2e'     % SERmeank,
-                      '--- dt       = %.2e'     % dt \
-                          if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                          else None
+                      # '--- dt       = %.2e'     % dt \
+                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      #     else None
                       )
                 
         else:
             if tx['flag_phase_noise'] == 1:
                 print("frame %d" % frame,
                       '--- loss     = %.3e'     % lossk,
-                      '--- Theta    = %.2f'     % (thetak*180/np.pi),
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
                       '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
                       '--- <SER>    = %.2e'     % SERmeank,
-                      '--- dt       = %.2e'     % dt \
-                          if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                          else None
+                      # '--- dt       = %.2e'     % dt \
+                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      #     else None
                       )
             else:
                 print("frame %d" % frame,
                       '--- loss     = %.3e'     % lossk,
-                      '--- Theta    = %.2f'     % (thetak*180/np.pi),
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
                       '--- <SER>    = %.2e'     % SERmeank,
-                      '--- dt       = %.2e'     % dt \
-                          if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                          else None
+                      # '--- dt       = %.2e'     % dt \
+                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
+                      #     else None
                       )
     
     

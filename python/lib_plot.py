@@ -697,8 +697,8 @@ def y2_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
         
         if len(varargin) == 1:
             x  = x[varargin[0]:]
-            y1        = y1[varargin[0]:]
-            y2         = y2[varargin[0]:]
+            y1 = y1[varargin[0]:]
+            y2 = y2[varargin[0]:]
 
         fig, ax1 = plt.subplots(figsize=(10, 6.1423))
         ax1.xaxis.set_minor_locator(AutoMinorLocator())
@@ -717,7 +717,7 @@ def y2_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
         ax2.grid(True, which='both', axis='x')
         ax2.minorticks_on()
         
-        ax2.plot(x, y2, color='tab:red')
+        ax2.semilogy(x, y2, color='tab:red')
         ax2.set_ylabel(yaxis_right, color='tab:red')
         ax2.tick_params(axis='y', labelcolor='tab:red')
         

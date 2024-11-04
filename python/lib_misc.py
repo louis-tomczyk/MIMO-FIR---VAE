@@ -1056,7 +1056,10 @@ def save2mat(tx,fibre,rx,saving):
                 'PhLaw'             : tx['PhiLaw']["law"],
                 'rx_mimo'           : rx['mimo'],
                 'rx_mode'           : rx['mode'],
-                'vsop'              : fibre['vsop']
+                'vsop'              : fibre['vsop'] if fibre['ThetasLaw']['kind'].lower() == 'rwalk'\
+                                        else np.nan,
+                'SoPFO'             : fibre['ThetasLaw']["SoPFO"] if fibre['ThetasLaw']['kind'].lower() == 'func'\
+                                        else np.nan,
                 }
     
     

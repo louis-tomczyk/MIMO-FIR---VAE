@@ -3,14 +3,14 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 3.0.0
-#   Date            : 2024-11-03
+#   Version         : 3.0.1
+#   Date            : 2024-11-04
 #   License         : GNU GPLv2
-#                       CAN:    commercial use - modify - distribute -
+#                       CAN:    commercial use - modify - distribute
 #                               place warranty
 #                       CANNOT: sublicense - hold liable
-#                       MUST:   include original - disclose source -
-#                               include copyright - state changes -
+#                       MUST:   include original - disclose source
+#                               include copyright - state changes
 #                               include license
 #
 # ----- CHANGELOG -----
@@ -54,7 +54,8 @@
 #   3.0.0  (2024-11-03) - changing the slightly the structure: Number of frames
 #                           set by the targeted final angle/phase, along with
 #                           txdsp (2.4.0)
-# 
+#   3.0.1  (2024-11-04) - Wrong Nf_Th for Vsop + cleaning
+#
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
 #
@@ -105,7 +106,8 @@ from random             import randint
 from numpy              import floor
 from numpy              import sqrt
 
-pi = np.pi
+pi      = np.pi
+eps     = np.spacing(1)
 clc()
 np.set_printoptions(linewidth=160)
 
@@ -118,6 +120,7 @@ else:
 server      = 0
 gen_xml     = 0
 sort_files  = 1
+get_time    = 0
 
 
 #%% ===========================================================================
@@ -125,44 +128,47 @@ sort_files  = 1
 # =============================================================================
 Nrea                    = 1
 paramSNR                = [25]
-Rs                      = 128e9                                         # [Baud] Symbol rate
-rxmimo                  = "vae"
-rxmode                  = "pilots"
+Rs                      = 64e9          # [Baud] Symbol rate
+rxmimo                  = "vae"         # {cma, vae}
+rxmode                  = "pilots"      # {blind, pilots}
 
-CFO_or_dnu              = 'dnu'
-SoPFO_or_fpol           = 'SoPFO'
+CFO_or_dnu              = 'CFO'         # {CFO, dnu, none}
+SoPFO_or_fpol           = 'none'        # {SoPFO, fpol, none}
+Nf_lim                  = 'ph-cfo'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
 
-Ph_End                  = pi/2
-Th_End                  = pi/2
-Nf_lim                  = 'th-cfo'             # {phi-dnu,phi-cfo,theta-lin,theta-fpol}
+# -----------------------------------------------------------------------------
+if SoPFO_or_fpol.lower() != 'none' and SoPFO_or_fpol.lower() == 'fpol':
+    Vsop                = np.array([eps])                               # [rad/s]
+    Th_End_vsop         = eps
+    SoPFO               = 0
 
+elif SoPFO_or_fpol.lower() != 'none' and SoPFO_or_fpol.lower() == 'sopfo':
+    SoPFO               = np.array([eps])
+    Th_End_fo           = eps
+    Vsop                = 0
 
-if SoPFO_or_fpol.lower() == 'fpol':
-    Vsop                = np.array([1])*1e4                       # [rad/s]
 else:
-    SoPFO               = np.array([100])*1e4
+    Vsop, SoPFO = [eps,eps]
+# -----------------------------------------------------------------------------
+if CFO_or_dnu.lower() != "none" and CFO_or_dnu.lower() == 'dnu':
+    Dnus                = np.array([eps])                               # [Hz]
+    Ph_End_dnu          = eps
+    CFO                 = 0
 
-if CFO_or_dnu.lower() == 'dnu':
-    Dnus                = np.array([5*1e3])                 # [Hz]
+elif CFO_or_dnu.lower() != "none" and CFO_or_dnu.lower() == 'cfo':
+    CFO                 = np.array([5])*1e4
+    Ph_End_cfo          = pi/2
+    Dnus                = 0
+
 else:
-    CFO                 = np.array([1])*1e4
+    Dnus, CFO = [eps,eps]
+# -----------------------------------------------------------------------------
+
 
 # paramNSbB               = [250]
 # NframesTrain            = 10
 # NSbF                    = 1e4
 # NSbB                    = 250
-
-
-# R                       = int(Rs/(64e9))    # Rs' = R*Rs
-# if rxmimo == "cma":
-#     N                   = 0.5               # {1   == same mimo,
-# else:
-#     N                   = 1                 #  1/2 == VAE to CMA,
-                                            #  2   == CMA to VAE}
-                                            
-# NFramesChannel0         = 25
-# NFramesChannel          = int((R/N)**2 *NFramesChannel0)
-
 
 
 
@@ -181,23 +187,23 @@ tx['SNRdB']             = 50
 tx['Rs']                = Rs
 
 
-tx["mod"]               = '64QAM'                                      # {4,16,64}QAM
-tx["nu"]                = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
+tx["mod"]               = '64QAM' # {4,16,64}QAM
+tx["nu"]                = 0.0254  # for PCS: exp(-nu*|x|^2)/...
 
 
 if 'NSbF' not in locals():
     if rxmimo == 'vae':
-        rx["NSymbFrame"]        = int(2e4)
+        rx["NSymbFrame"]    = int(2e4)
     else:
-        rx["NSymbFrame"]        = int(1e4)
+        rx["NSymbFrame"]    = int(1e4)
 else:
-    rx["NSymbFrame"]            = int(NSbF)
+    rx["NSymbFrame"]        = int(NSbF)
 
-if rxmimo == 'vae':
-    if 'NSbB' not in locals():
-        rx["NSymbBatch"]    = int(250)
-    else:
-        rx['NSymbBatch']    = NSbB
+# even for CMA as the number of pilots is based on the NSbB
+if 'NSbB' not in locals():
+    rx["NSymbBatch"]    = int(250)
+else:
+    rx['NSymbBatch']    = NSbB
 
 tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]
 
@@ -212,29 +218,37 @@ tx['pn_filt_par']       = {
         'adaptative'    : 0                                                    # {1 == yes, 0 ==  no}
 }
 
-tx['get_exec_time']     = ['frame',[]]
+if get_time:
+    tx['get_time']          = 1
+    tx['get_exec_time']     = ['frame',[]]
+else:
+    tx['get_time']          = 0
+
+
 
 ###############################################################################
 ################################## RECEIVER ###################################
 ###############################################################################
 
+
 if 'CFO' in locals() or 'Dnus' in locals():
     tx['flag_phase_noise']  = 1
 else:
     tx['flag_phase_noise']  = 0
-    
-rx["mimo"]              = rxmimo                                                # {cma,vae}
+
+
+rx["mimo"]                  = rxmimo                                                # {cma,vae}
 
 if 'rxmode' not in locals():
     rx['mode']          = "blind"                                             # {blind, pilots}
 else:
     rx['mode']          = rxmode 
-    
+
 if rxmimo == "vae":
     rx['mode']          = "blind"                                             # {blind, pilots}
-    
+
 if 'NframesTrain' in locals():
-    rx["FrameChannel"]      = NframesTrain
+    rx["FrameChannel"]  = NframesTrain
 
 
 ###############################################################################
@@ -251,18 +265,29 @@ if SoPFO_or_fpol == 'fpol':
 
     Fpols                           = rx['NSymbFrame']*Vsop**2/(2*pi*tx['Rs'])      # [Hz]
     Std_Pol                         = sqrt((2*pi)**2*Fpols/(2*pi*tx['Rs']))               # [rad²]
-    Nf_Th                           = (sqrt(pi/2/rx['NSymbFrame'])*(tx['Rs']/Vsop*Th_End)**2).astype(int)
+
+    Nf_Th                           = (pi/2*(tx['Rs']*Th_End_vsop/Vsop/rx['NSymbFrame'])**2).astype(int)
     paramPOL                        = [list(Vsop),list(Fpols),list(Std_Pol)]
+
+elif SoPFO_or_fpol == 'sopfo':
+    fibre['ThetasLaw']["kind"]      = 'func'
+    fibre['ThetasLaw']["law"]       = 'lin'
+    fibre["ThetasLaw"]['Start']     = 0
+    fibre["ThetasLaw"]['End']       = Th_End_fo
+    fibre["ThetasLaw"]['SoPFO']     = SoPFO
+    Nf_Th                           = Th_End_fo*tx['Rs']/(2*pi*SoPFO*rx['NSymbFrame'])
+    paramPOL                        = [list(SoPFO)]
+
+    # keep the double list format
 
 else:
     fibre['ThetasLaw']["kind"]      = 'func'
     fibre['ThetasLaw']["law"]       = 'lin'
     fibre["ThetasLaw"]['Start']     = 0
-    fibre["ThetasLaw"]['End']       = Th_End
-    Nf_Th                           = Th_End*tx['Rs']/2*pi*SoPFO*rx['NSymbFrame']
-    paramPOL                        = [list(SoPFO)]
-    
-    # keep the double list format
+    fibre["ThetasLaw"]['End']       = 0
+    fibre["ThetasLaw"]['SoPFO']     = 0
+    Nf_Th                           = 0
+    paramPOL                        = [[0]]
 
 # -----------------------------------------------------------------------------
 
@@ -275,6 +300,7 @@ if CFO_or_dnu == 'CFO':
     tx["PhiLaw"]['Start']   = 0*pi/180                                                  # [rad]
 
     paramPHI                = list(CFO)
+    Nf_Ph                   = list((Ph_End_cfo*tx['Rs']/2/pi/rx['NSymbFrame']/CFO).astype(int))
 
 else:
     rx['CFO']               = 0
@@ -282,6 +308,7 @@ else:
     tx['PhiLaw']["law"]     = 'linewidth'
 
     paramPHI                = list(Dnus)
+    Nf_Ph                   = list(((Ph_End_dnu/2)**2/rx['NSymbFrame']*tx['Rs']/Dnus).astype(int))
 
 # -----------------------------------------------------------------------------
 
@@ -312,10 +339,17 @@ if 'lr' not in locals():
 else:
     rx['lr']        = lr
     
+    
+if SoPFO == eps or Vsop == eps:
+    plot_th = 0
+else:
+    plot_th = 1
+    
+if CFO[0] == eps or Dnus == eps:
+    plot_ph = 0
+else:
+    plot_ph = 1
 
-    
-    
-    
 
 #%% ===========================================================================
 # --- FUNCTIONS ---
@@ -328,13 +362,13 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
         if 'NframesTrain' not in locals():
             if paramSNR[nsnr]   < 20 and tx['Rs'] > 100:
                 rx['FrameChannel']  = int(np.ceil(13.12+0.07*rx['NSymbBatch']))
-                
+
             elif paramSNR[nsnr] < 20 and tx['Rs'] < 100:
                 rx['FrameChannel']  = int(np.ceil(10.88+0.07*rx['NSymbBatch']))
-                
+
             elif paramSNR[nsnr] > 20 and tx['Rs'] > 100:
                 rx['FrameChannel']  = int(np.ceil(-0.12+0.03*rx['NSymbBatch']))
-                
+
             elif paramSNR[nsnr] > 20 and tx['Rs'] < 100:
                 rx['FrameChannel']  = int(np.ceil(1.88+0.03*rx['NSymbBatch']))
 # -----------------------------------------------------------------------------
@@ -342,16 +376,10 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
 # -----------------------------------------------------------------------------
     if tx['PhiLaw']["kind"]     == 'func':
         tx["PhiLaw"]['CFO']     = paramPHI[nphi]                               # [Hz]
-        tx["PhiLaw"]['End']     = Ph_End                                       # [rad]
+        tx["PhiLaw"]['End']     = Ph_End_cfo                                       # [rad]
         
     elif tx['PhiLaw']["kind"]   == 'Rwalk':
         tx["dnu"]               = paramPHI[nphi]                               # [Hz]
-        
-    if CFO_or_dnu == 'dnu':
-        Nf_Ph      = list(((Ph_End/2)**2/rx['NSymbFrame']*tx['Rs']/Dnus).astype(int))
-    else:
-        Nf_Ph      = [int(Ph_End*tx['Rs']/2/pi/rx['NSymbFrame']/tx["PhiLaw"]['CFO'])]
-        
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
@@ -359,57 +387,49 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
         fibre['vsop']                   = paramPOL[0][npol]
         fibre["ThetasLaw"]['fpol']      = paramPOL[1][npol]
         fibre["ThetasLaw"]['theta_std'] = paramPOL[2][npol]
-
 # -----------------------------------------------------------------------------
 
     rx['SNRdB']                         = paramSNR[nsnr]
     tx, fibre, rx                        = set_Nsymbols(tx,fibre,rx)
 
 
-    if 'theta' in Nf_lim.lower():
+    if 'th' in Nf_lim.lower():
         rx['NFrames'] = rx["FrameChannel"] + Nf_Th[npol]
     else:
         rx['NFrames'] = rx["FrameChannel"] + Nf_Ph[nphi]
 
-    tx, rx                              = set_Batches_Frames(tx,rx)        
+    tx, rx                              = set_Batches_Frames(tx,rx)
 
     if SoPFO_or_fpol == 'fpol':
         ExpectT = sqrt(2/pi)*fibre['vsop']*sqrt(rx['NFramesChannel'])*rx['NSymbFrame']/tx['Rs']
     else:
         ExpectT = 2*pi*(paramPOL[0][npol]/Rs)*rx['NSymbFrame']*rx['NFramesChannel']
-        
-    if CFO_or_dnu == 'dnu':
-        ExpectP = 2*sqrt(rx['NFramesChannel']*rx['NSymbFrame']*tx['dnu']/tx['Rs'])
-    else:
-        ExpectP = 2*pi*(paramPHI[0]/Rs)*rx['NSymbFrame']*rx['NFramesChannel']
-        
-    print(f"\n Rs       = {Rs*1e-9}"+
-          f"\n rxmimo   = {rxmimo}"+
-          f"\n NF       = {rx['NFramesChannel']}"+
-          f"\n NSbF     = {rx['NSymbFrame']*1e-3}"+
-          f"\n E-theta  = {ExpectT}"+
-          f"\n E-phi    = {ExpectP}"+
-          f"\n\n VSOP      = {fibre['vsop']*1e-6}" if SoPFO_or_fpol.lower() == 'fpol'
-                                      else f"\n SoPFO = {paramPOL[npol]}"+
-          f"\n DNU      = {tx['dnu']*1e-6}" if CFO_or_dnu.lower() == 'dnu'
-                                      else f"\n DNU = {paramPHI[nphi]}")
-        
+
+    if not server:
+        if CFO_or_dnu == 'dnu':
+            ExpectP = 2*sqrt(rx['NFramesChannel']*rx['NSymbFrame']*tx['dnu']/tx['Rs'])
+        else:
+            ExpectP = 2*pi*(paramPHI[nphi]/Rs)*rx['NSymbFrame']*rx['NFramesChannel']
+
+        print(f"\n Rs       = {Rs*1e-9}")
+        print(f" rxmimo   = {rxmimo}")
+        print(f" NF       = {rx['NFramesChannel']}")
+        print(f" NSbF     = {rx['NSymbFrame']*1e-3}")
+        print(f" E-theta  = {ExpectT}")
+        print(f" E-phi    = {ExpectP}")
+        print(f" VSOP     = {fibre['vsop']*1e-6}" if SoPFO_or_fpol.lower() == 'fpol'
+                                          else f" SoPFO = {paramPOL[0][npol]}")
+        print(f" DNU      = {tx['dnu']*1e-6}\n" if CFO_or_dnu.lower() == 'dnu'
+                                          else f" DNU      = {paramPHI[nphi]}\n")
+
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,gen_xml,nrea)
 
     seed_id                             = (nrea+randint(0,10))*(npol+randint(0,10))*(nsnr+randint(0,10))
-    
+
     if server:
         try:
             tx,fibre,rx                 = processing(tx,fibre,rx,saving,seed_id)
             misc.save2mat(tx,fibre,rx,saving)
-                
-            if tx['flag_phase_noise'] == 0:
-                if rx['mimo'].lower() != "vae":
-                    plot.y2_axes(saving,"iteration",'Thetas','SER',['svg'])
-                else:
-                    plot.y3_axes(saving,"iteration",'Thetas','SNR','SER',['svg'])
-            else:
-                plot.y3_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
 
         except:
             tmp_fn  = 'fail_'+saving['filename'][20:-1]+'.log'
@@ -419,9 +439,17 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
             f.close()
 
     else:
-        tx,fibre,rx                         = processing(tx,fibre,rx,saving,seed_id)
+        tx,fibre,rx = processing(tx,fibre,rx,saving,seed_id)
         misc.save2mat(tx,fibre,rx,saving)
 
+        if plot_th and plot_ph:
+            plot.y3_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
+
+        elif plot_th and not plot_ph:
+            plot.y2_axes(saving,"iteration",'Thetas','SER',['svg'])
+
+        elif not plot_th and plot_ph:
+            plot.y2_axes(saving,"iteration",'Phis','SER',['svg'])
 
     return tx,fibre,rx
 
@@ -434,13 +462,12 @@ for nsnr in range(len(paramSNR)):
 
     for nrea in range(Nrea):
         print(f"nrea = {nrea}")
-            
+
         for npol in range(len(paramPOL[0])):
             for nphi in range(len(paramPHI)):
 
                 tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx)
 
-                        
 cuda.empty_cache()
 
 
@@ -453,10 +480,6 @@ if sort_files:
     path = PWD(show=False)+f'/data-{Date[2:]}'
     misc.remove_n_characters_from_filenames(path, 20)
     misc.organise_files(path)
-    
-    
-    
-
 
 # =============================================================================
 # 
