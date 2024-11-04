@@ -3,7 +3,7 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.3
+#   Version         : 2.1.0
 #   Date            : 2024-10-11
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
@@ -40,6 +40,8 @@
 #   2.0.2 (2024-10-07) - set_NSymbols: import from processing.init_processing
 #                           symbols and frames management: processing (1.3.11)
 #   2.0.3 (2024-10-11) - set_NSymbols: show scaling only if applied
+#   2.1.0 (2024-11-03) - [NEW] set_Batches_Frames: set_Nsymbols split into 2
+#                           aong with main (3.0.0)
 #
 # ----- MAIN IDEA -----
 #   Library for Digital Signal Processing at the Transmitter side in (optical)
@@ -108,6 +110,7 @@ from lib_maths import get_power as power
 # - pilot_generation        (1.1.0) --- called in : transmitter
 # - pilot_insertion         (1.2.0) --- called in : transmitter
 # - set_Nsymbols                    --- called in : main.process_data
+# - set_Batches_Frames       (1.)
 # - shaping_filter                  --- called in : transmitter
 # - transmitter                     --- called in : processing.processing
 # =============================================================================
@@ -864,19 +867,14 @@ def pilot_insertion(tx,rx,what_pilots_k,*varargin):
 #%%
 def set_Nsymbols(tx,fibre,rx):
 
-    # number of symbols having the same polarisation state
-    # if fibre['fpol'] != 0:
-    #     rx["NSymbFrame"]    = int(fibre['DeltaThetaC']**2/4*tx['Rs']/fibre['fpol'])
-    # else:
-    #     rx["NSymbFrame"]    = 10000
+    if 'NSymbTaps' not in tx:
+        tx['NSymbTaps']     = 7
     
-    # # number of symbols having more or less the same phase
-    # if tx['dnu'] != 0:
-    #     rx["NSymbBatch"]    = int(tx['DeltaPhiC']**2/4*tx['Rs']/tx['dnu'])
-    # else:
-    #     rx['NSymbBatch']    = 100
-    
-        
+    if tx['Rs'] == 64e9:
+        rx["SymbScale"]     = 100
+    else:
+        rx["SymbScale"]     = 150
+
     tx['NSymbFrame']        = rx["NSymbFrame"]
     tx["NSymbConv"]         = rx["NSymbFrame"]+tx['NSymbTaps']+1
     tx["Nsamp_up"]          = tx["Nsps"]*(tx["NSymbConv"]-1)+1
@@ -1007,7 +1005,27 @@ def set_Nsymbols(tx,fibre,rx):
     
     if rx['mimo'].lower() != "vae":
         rx['NSymbEq']       -= rx['NSymbCut_tot']-1
+    
+    if not tx['server']:
+        print('======= set-Nsymbols sum up =======')
+        print('------- general:')
+        print('symb scale           = {}'.format(rx["SymbScale"])) if flag_scale else None
+        print('Npol = NsymbFrame    = {}'.format(rx["NSymbFrame"]))
+        print('Nphi = NSymbBatch    = {}'.format(rx["NSymbBatch"]))
+        print('NSymb_Added_Net      = {}'.format(Nsymb_added_net))
+        print('NsampTaps            = {}'.format(tx["NsampTaps"]))
+        
+        # spaces such as the printed lines on the shell are aligned
+        if rx['mode'].lower() != "blind":
+            print('\n------- if header:')
+            print(f"NSymbs_pilots        = {NSymbs_pilots}")
 
+        print('===================================')
+
+    return tx, fibre, rx
+
+#%%
+def set_Batches_Frames(tx,rx):
 
     rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
     rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']
@@ -1023,43 +1041,11 @@ def set_Nsymbols(tx,fibre,rx):
     tx['Nsamptraining']     = tx['NsampTot']-tx['NsampChannel']
     tx['PolPhi_ratio']      = rx["NSymbFrame"]/rx["NSymbBatch"]
     
-###############################################################################
-############################# displaying results ##############################
-###############################################################################
-    
-    # if flag != 0:
-    # tx['dnu']           = int(tx['DeltaPhiC']**2 * tx['Rs']/4/rx["NSymbBatch"]/rx["SymbScale"])
-    # fibre['fpol']       = int(fibre['DeltaThetaC']**2 * tx['Rs']/4/rx["NSymbFrame"]/rx["SymbScale"])
-    
-    if not tx['server']:
-        print('======= set-Nsymbols sum up =======')
-        print('------- general:')
-        print('symb scale           = {}'.format(rx["SymbScale"])) if flag_scale else None
-        print('Npol = NsymbFrame    = {}'.format(rx["NSymbFrame"]))
-        print('Nphi = NSymbBatch    = {}'.format(rx["NSymbBatch"]))
-        print('NSymb_Added_Net      = {}'.format(Nsymb_added_net))
-        print('Npol/Nphi            = {}'.format(tx['PolPhi_ratio']))
-        print('NsampTaps            = {}'.format(tx["NsampTaps"]))
-        
-        # spaces such as the printed lines on the shell are aligned
-        if rx['mode'].lower() != "blind":
-            print('\n------- if header:')
-            print(f"NSymbs_pilots        = {NSymbs_pilots}")
-    
-            # print('Nsymb_data_Batch         = {}'.format(rx["NSymb_data_Batch"]))
-            # print('NSymb_pilots_tot_Batch   = {}'.format(rx['NSymb_pilots_tot_Batch']))
-            # print('NSymb_overhead_percent   = {}'.format(rx['NSymb_overhead_percent']))
-            # print('Effective baud rate      = {}'.format(rx['Rs_eff']))
-    
-        # print('\n------- physics:')
-        # print("fpol                 = {}".format(fibre['fpol']))
-        # print('dnu                  = {}'.format(tx['dnu']))
-        print('===================================')
 
     tx              = misc.sort_dict_by_keys(tx)
-    fibre           = misc.sort_dict_by_keys(fibre)
     rx              = misc.sort_dict_by_keys(rx)
-    return tx,fibre,rx
+
+    return tx, rx
 
 
 

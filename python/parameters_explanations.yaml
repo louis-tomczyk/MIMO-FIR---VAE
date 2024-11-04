@@ -100,3 +100,15 @@
 # tx['pilots_info']       = [['cpr','rand',"batchwise","polwise","4QAM",3,0]]    #ok
 # tx['pilots_info']       = [['cpr','cazac',"","","",64]]                        #ok
 # -----------------------------------------------------------------------------
+
+
+
+
+# if 'fibre_fpol' in locals():
+#     # if want to fix by fequency of SoP change [Hz]
+#     fibre['fpol']                   = fibre_fpol
+#     var_pol                         = (2*pi)**2*fibre['fpol']/(2*pi*tx['Rs'])*rx['NSymbFrame']
+#     fibre['vsop']                   = np.sqrt(var_pol)*tx['Rs']/rx['NSymbFrame']
+
+# else:
+# if want to fix by speed of SoP change [rad/s]

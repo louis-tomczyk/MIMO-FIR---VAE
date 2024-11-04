@@ -461,7 +461,7 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                       '--- loss     = %.1f'     % lossk,
                       '--- SNRdB    = %.2f'     % SNRdBk,
                       '--- Theta    = %.2f'     % (thetak*180/np.pi),
-                      '--- std(Phi) = %.1f'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
+                      '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
                       '--- <SER>    = %.2e'     % SERmeank,
                       '--- dt       = %.2e'     % dt \
                           if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
@@ -483,7 +483,7 @@ def print_results(loss, frame, tx, fibre, rx, saving):
                 print("frame %d" % frame,
                       '--- loss     = %.3e'     % lossk,
                       '--- Theta    = %.2f'     % (thetak*180/np.pi),
-                      '--- std(Phi) = %.1f'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
+                      '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
                       '--- <SER>    = %.2e'     % SERmeank,
                       '--- dt       = %.2e'     % dt \
                           if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\

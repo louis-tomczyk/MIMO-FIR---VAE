@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.2.2
-#   Date            : 2024-10-15
+#   Version         : 3.0.0
+#   Date            : 2024-11-03
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -45,6 +45,15 @@
 #   2.2.1  (2024-10-13) - fail_log
 #   2.2.2  (2024-10-15) - moving to parameters_explanations.yaml params
 #                           details (entropy tables, pilots management,..)
+#   2.2.3  (2024-10-21) - right relationship between fpol/vsop
+#   2.2.4  (2024-10-26) - NframesTrain optional
+#   2.3.0  (2024-10-31) - managing the NSbB with respect to SNR, Rs
+#                       - NFramesChannel with respect to Rs, rxmimo, such that
+#                           exepcted abs angle unchanged
+# ---------------------
+#   3.0.0  (2024-11-03) - changing the slightly the structure: Number of frames
+#                           set by the targeted final angle/phase, along with
+#                           txdsp (2.4.0)
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -81,8 +90,11 @@ import numpy            as np
 import lib_misc         as misc
 import lib_plot         as plot
 
+
 from processing         import processing
 from lib_txdsp          import set_Nsymbols
+from lib_txdsp          import set_Batches_Frames
+from lib_misc           import show_dict
 
 from lib_matlab         import PWD
 from lib_matlab         import clc
@@ -90,16 +102,20 @@ from torch              import cuda
 from datetime           import date
 from random             import randint
 
+from numpy              import floor
+from numpy              import sqrt
+
 pi = np.pi
 clc()
 np.set_printoptions(linewidth=160)
 
 
-if "infres" in PWD(show = False):
+if "infres" in PWD(show = False).lower():
     server  = 1                                                                   # if = 1, cancels all the checks
 else:
     server  = 0
 
+server      = 0
 gen_xml     = 0
 sort_files  = 1
 
@@ -107,38 +123,81 @@ sort_files  = 1
 #%% ===========================================================================
 # --- MAIN parameters
 # =============================================================================
-Nrea        = 1
-paramSNR    = [25]
-Rs          = 128e9                                         # [Baud] Symbol rate
-paramNSbB   = [400]
-rxmimo      = "vae"
-fibre_vsop  = 1*1e4 # [rad/s]
-# fibre_fpol  = 2.487
-CFO_or_dnu      = 'CFO'
-paramPHI        = [10*1e4]#,5e3,1e4,5e4,1e5]                   # [Hz]
-NframesTrain    = 5
-NframesChannel  = 3
+Nrea                    = 1
+paramSNR                = [25]
+Rs                      = 128e9                                         # [Baud] Symbol rate
+rxmimo                  = "vae"
+rxmode                  = "pilots"
+
+CFO_or_dnu              = 'dnu'
+SoPFO_or_fpol           = 'SoPFO'
+
+Ph_End                  = pi/2
+Th_End                  = pi/2
+Nf_lim                  = 'th-cfo'             # {phi-dnu,phi-cfo,theta-lin,theta-fpol}
+
+
+if SoPFO_or_fpol.lower() == 'fpol':
+    Vsop                = np.array([1])*1e4                       # [rad/s]
+else:
+    SoPFO               = np.array([100])*1e4
+
+if CFO_or_dnu.lower() == 'dnu':
+    Dnus                = np.array([5*1e3])                 # [Hz]
+else:
+    CFO                 = np.array([1])*1e4
+
+# paramNSbB               = [250]
+# NframesTrain            = 10
+# NSbF                    = 1e4
+# NSbB                    = 250
+
+
+# R                       = int(Rs/(64e9))    # Rs' = R*Rs
+# if rxmimo == "cma":
+#     N                   = 0.5               # {1   == same mimo,
+# else:
+#     N                   = 1                 #  1/2 == VAE to CMA,
+                                            #  2   == CMA to VAE}
+                                            
+# NFramesChannel0         = 25
+# NFramesChannel          = int((R/N)**2 *NFramesChannel0)
+
+
+
 
 #%% ===========================================================================
 # --- PARAMETERS ---
 # =============================================================================
 
-date                            = date.today().strftime("%Y-%m-%d")
-tx,fibre,rx,saving              = misc.init_dict(server)
+Date                     = date.today().strftime("%Y-%m-%d")
+tx,fibre,rx,saving       = misc.init_dict(server)
 
 ###############################################################################
 ################################ TRANSMITTER ##################################
 ###############################################################################
 
+tx['SNRdB']             = 50
+tx['Rs']                = Rs
 
-tx['SNRdB']                     = 50
-tx['Rs']                        = Rs
+
+tx["mod"]               = '64QAM'                                      # {4,16,64}QAM
+tx["nu"]                = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
 
 
-tx["mod"]                       = '64QAM'                                      # {4,16,64}QAM
-tx["nu"]                        = 0.0254                                       # for PCS: exp(-nu*|x|^2)/...
+if 'NSbF' not in locals():
+    if rxmimo == 'vae':
+        rx["NSymbFrame"]        = int(2e4)
+    else:
+        rx["NSymbFrame"]        = int(1e4)
+else:
+    rx["NSymbFrame"]            = int(NSbF)
 
-rx["NSymbFrame"]        = int(20000)
+if rxmimo == 'vae':
+    if 'NSbB' not in locals():
+        rx["NSymbBatch"]    = int(250)
+    else:
+        rx['NSymbBatch']    = NSbB
 
 tx['pilots_info']       = [['cpr','rand',"same","same","4QAM",10,0]]
 
@@ -153,33 +212,29 @@ tx['pn_filt_par']       = {
         'adaptative'    : 0                                                    # {1 == yes, 0 ==  no}
 }
 
-
-
 tx['get_exec_time']     = ['frame',[]]
+
 ###############################################################################
 ################################## RECEIVER ###################################
 ###############################################################################
 
-tx['flag_phase_noise']  = 1
+if 'CFO' in locals() or 'Dnus' in locals():
+    tx['flag_phase_noise']  = 1
+else:
+    tx['flag_phase_noise']  = 0
+    
 rx["mimo"]              = rxmimo                                                # {cma,vae}
-rx['mode']              = "blind"                                             # {blind, pilots}
 
+if 'rxmode' not in locals():
+    rx['mode']          = "blind"                                             # {blind, pilots}
+else:
+    rx['mode']          = rxmode 
+    
 if rxmimo == "vae":
     rx['mode']          = "blind"                                             # {blind, pilots}
     
-paramFIRlen             = [7]
-
-
-tx['NSymbTaps']         = paramFIRlen[0]
-
-if tx['Rs'] == 64e9:
-    # rx["FrameChannel"]  = 10
-    rx["SymbScale"]     = 100
-else:
-    # rx["FrameChannel"]  = 10
-    rx["SymbScale"]     = 150
-    
-rx["FrameChannel"]  = NframesTrain
+if 'NframesTrain' in locals():
+    rx["FrameChannel"]      = NframesTrain
 
 
 ###############################################################################
@@ -188,32 +243,27 @@ rx["FrameChannel"]  = NframesTrain
 
 # -----------------------------------------------------------------------------
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
-# if polarisation linewdith --- [[std],[NFramesChannel]]
 
-
-if 'fibre_fpol' in locals():
-    # if want to fix by fequency of SoP change [Hz]
-    fibre['fpol']                   = fibre_fpol    
-    var_pol                         = (2*pi)**2*fibre['fpol']/(2*pi*tx['Rs'])*rx['NSymbFrame']
-    fibre['vsop']                   = np.sqrt(var_pol)/rx['NSymbFrame']*tx['Rs']
-else:
-    # if want to fix by speed of SoP change [rad/s]
-    fibre['vsop']                   = fibre_vsop
-    fibre['fpol']                   = rx['NSymbFrame']/(2*pi*tx['Rs'])*fibre['vsop']**2 #[Hz]
-    var_pol                         = (2*pi)**2*fibre['fpol']/(2*pi*tx['Rs'])*rx['NSymbFrame']
-
-tmp_pol                         = list(np.array([np.sqrt(var_pol)]))
-tmp_nfms                        = list((np.array([NframesChannel])/1).astype(int))
-paramPOL                        = np.array([tmp_pol,tmp_nfms])
-
-if len(paramPOL) == 2:
+if SoPFO_or_fpol == 'fpol':
     fibre['ThetasLaw']["kind"]      = 'Rwalk'
     fibre["ThetasLaw"]['law']       = 'gauss'
     fibre["ThetasLaw"]['theta_in']  = 0*pi/180                                  # [rad]
+
+    Fpols                           = rx['NSymbFrame']*Vsop**2/(2*pi*tx['Rs'])      # [Hz]
+    Std_Pol                         = sqrt((2*pi)**2*Fpols/(2*pi*tx['Rs']))               # [rad²]
+    Nf_Th                           = (sqrt(pi/2/rx['NSymbFrame'])*(tx['Rs']/Vsop*Th_End)**2).astype(int)
+    paramPOL                        = [list(Vsop),list(Fpols),list(Std_Pol)]
+
 else:
     fibre['ThetasLaw']["kind"]      = 'func'
     fibre['ThetasLaw']["law"]       = 'lin'
+    fibre["ThetasLaw"]['Start']     = 0
+    fibre["ThetasLaw"]['End']       = Th_End
+    Nf_Th                           = Th_End*tx['Rs']/2*pi*SoPFO*rx['NSymbFrame']
+    paramPOL                        = [list(SoPFO)]
     
+    # keep the double list format
+
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
@@ -223,13 +273,15 @@ if CFO_or_dnu == 'CFO':
     tx['PhiLaw']["kind"]    = 'func'
     tx['PhiLaw']["law"]     = 'lin'
     tx["PhiLaw"]['Start']   = 0*pi/180                                                  # [rad]
-    
-else:
-    tx['PhiLaw']["kind"]        = 'Rwalk'
-    tx['PhiLaw']["law"]         = 'linewidth'
 
-    
-    
+    paramPHI                = list(CFO)
+
+else:
+    rx['CFO']               = 0
+    tx['PhiLaw']["kind"]    = 'Rwalk'
+    tx['PhiLaw']["law"]     = 'linewidth'
+
+    paramPHI                = list(Dnus)
 
 # -----------------------------------------------------------------------------
 
@@ -246,67 +298,130 @@ beta2                           = -wavelength**2/2/pi/c*fibre['D_SI']          #
 fibre['DistRes_SI']             = nSymbResCD**2/(tx["Rs"]**2)/abs(beta2)/2/pi  # [m]
 fibre['DistProp_SI']            = 1e4                                          # [m]
 
-fibre['tauCD']                  = np.sqrt(2*pi*fibre['DistRes_SI']*abs(beta2)) # differential group delay [s]
-fibre['tauPMD']                 = fibre['PMD_SI']*np.sqrt(fibre['DistProp_SI'])# PMD induced delay [s]
+fibre['tauCD']                  = sqrt(2*pi*fibre['DistRes_SI']*abs(beta2))     # differential group delay [s]
+fibre['tauPMD']                 = fibre['PMD_SI']*sqrt(fibre['DistProp_SI'])    # PMD induced delay [s]
 # -----------------------------------------------------------------------------
 
-# {>0,<1e-2} {cma ~ 1e-5, vae é 5e-4}
+# check 'learning rate tuning cma' for curves
 
-if rx['mimo'].lower() == "cma":
-    rx['lr']        = 100*1e-7
+if 'lr' not in locals():
+    if rx['mimo'].lower() == "cma":
+        rx['lr']    = 1e-6
+    else:
+        rx['lr']    = 750e-6
 else:
-    rx['lr']        = 750*1e-6
+    rx['lr']        = lr
+    
+
+    
+    
+    
 
 #%% ===========================================================================
 # --- FUNCTIONS ---
 # =============================================================================
-def process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx):
+def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
 
-    if len(paramPOL) == 3:      # linear evolution
-        RangeTheta                  = paramPOL[1,npol] - paramPOL[0,npol]
-        Sth                         = paramPOL[2,npol]
+# -----------------------------------------------------------------------------
+# check 'learning rate tuning cma' for curves
+    if rxmimo == 'vae':
+        if 'NframesTrain' not in locals():
+            if paramSNR[nsnr]   < 20 and tx['Rs'] > 100:
+                rx['FrameChannel']  = int(np.ceil(13.12+0.07*rx['NSymbBatch']))
+                
+            elif paramSNR[nsnr] < 20 and tx['Rs'] < 100:
+                rx['FrameChannel']  = int(np.ceil(10.88+0.07*rx['NSymbBatch']))
+                
+            elif paramSNR[nsnr] > 20 and tx['Rs'] > 100:
+                rx['FrameChannel']  = int(np.ceil(-0.12+0.03*rx['NSymbBatch']))
+                
+            elif paramSNR[nsnr] > 20 and tx['Rs'] < 100:
+                rx['FrameChannel']  = int(np.ceil(1.88+0.03*rx['NSymbBatch']))
+# -----------------------------------------------------------------------------
 
-        deltaN_Channel              = int(np.floor(RangeTheta/Sth))-rx["FrameChannel"]
-        NFrames_Channel             = rx["FrameChannel"]+deltaN_Channel
-        Sth                         = (paramPOL[1,npol]-paramPOL[0,npol])/NFrames_Channel
-        fibre["ThetasLaw"]['Start'] = (paramPOL[0,npol])*pi/180
-        fibre["ThetasLaw"]['End']   = (paramPOL[1,npol])*pi/180
-        
-    else:
-        NFrames_Channel                 = int(paramPOL[-1][npol])
-        fibre["ThetasLaw"]['theta_std'] = paramPOL[0][npol]
-        fibre["ThetasLaw"]['fpol']      = paramPOL[0][npol]
-
-    rx["NFrames"]                       = rx["FrameChannel"] + NFrames_Channel
-
-
-
-
-    rx['SNRdB']                         = paramSNR[nsnr]                                                   # {>0}
-    tx,fibre, rx                        = set_Nsymbols(tx,fibre,rx)
-
+# -----------------------------------------------------------------------------
     if tx['PhiLaw']["kind"]     == 'func':
-        tx["PhiLaw"]['CFO']     = paramPHI[nphi]                                                      # [Hz]
-        tx["PhiLaw"]['End']     = 2*pi*rx['NBatchesChannel']*rx['NSymbBatch']*paramPHI[nphi]/tx['Rs']# [rad]
+        tx["PhiLaw"]['CFO']     = paramPHI[nphi]                               # [Hz]
+        tx["PhiLaw"]['End']     = Ph_End                                       # [rad]
         
     elif tx['PhiLaw']["kind"]   == 'Rwalk':
-        tx["dnu"]                       = paramPHI[nphi]                       # [Hz]
+        tx["dnu"]               = paramPHI[nphi]                               # [Hz]
+        
+    if CFO_or_dnu == 'dnu':
+        Nf_Ph      = list(((Ph_End/2)**2/rx['NSymbFrame']*tx['Rs']/Dnus).astype(int))
+    else:
+        Nf_Ph      = [int(Ph_End*tx['Rs']/2/pi/rx['NSymbFrame']/tx["PhiLaw"]['CFO'])]
+        
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+    if SoPFO_or_fpol == 'fpol':
+        fibre['vsop']                   = paramPOL[0][npol]
+        fibre["ThetasLaw"]['fpol']      = paramPOL[1][npol]
+        fibre["ThetasLaw"]['theta_std'] = paramPOL[2][npol]
+
+# -----------------------------------------------------------------------------
+
+    rx['SNRdB']                         = paramSNR[nsnr]
+    tx, fibre, rx                        = set_Nsymbols(tx,fibre,rx)
+
+
+    if 'theta' in Nf_lim.lower():
+        rx['NFrames'] = rx["FrameChannel"] + Nf_Th[npol]
+    else:
+        rx['NFrames'] = rx["FrameChannel"] + Nf_Ph[nphi]
+
+    tx, rx                              = set_Batches_Frames(tx,rx)        
+
+    if SoPFO_or_fpol == 'fpol':
+        ExpectT = sqrt(2/pi)*fibre['vsop']*sqrt(rx['NFramesChannel'])*rx['NSymbFrame']/tx['Rs']
+    else:
+        ExpectT = 2*pi*(paramPOL[0][npol]/Rs)*rx['NSymbFrame']*rx['NFramesChannel']
+        
+    if CFO_or_dnu == 'dnu':
+        ExpectP = 2*sqrt(rx['NFramesChannel']*rx['NSymbFrame']*tx['dnu']/tx['Rs'])
+    else:
+        ExpectP = 2*pi*(paramPHI[0]/Rs)*rx['NSymbFrame']*rx['NFramesChannel']
+        
+    print(f"\n Rs       = {Rs*1e-9}"+
+          f"\n rxmimo   = {rxmimo}"+
+          f"\n NF       = {rx['NFramesChannel']}"+
+          f"\n NSbF     = {rx['NSymbFrame']*1e-3}"+
+          f"\n E-theta  = {ExpectT}"+
+          f"\n E-phi    = {ExpectP}"+
+          f"\n\n VSOP      = {fibre['vsop']*1e-6}" if SoPFO_or_fpol.lower() == 'fpol'
+                                      else f"\n SoPFO = {paramPOL[npol]}"+
+          f"\n DNU      = {tx['dnu']*1e-6}" if CFO_or_dnu.lower() == 'dnu'
+                                      else f"\n DNU = {paramPHI[nphi]}")
         
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,gen_xml,nrea)
 
-    seed_id                             = (nrea+randint(0,10))*(npol+randint(0,10))*(nSbB+randint(0,10))*(nSbB+randint(0,10))*(nsnr+randint(0,10))
-    tx,fibre,rx                         = processing(tx,fibre,rx,saving,seed_id)
-
-    misc.save2mat(tx,fibre,rx,saving)
-
-    if not server:
-        if tx['flag_phase_noise'] == 0:
-            if rx['mimo'].lower() != "vae":
-                plot.y2_axes(saving,"iteration",'Thetas','SER',['svg'])
+    seed_id                             = (nrea+randint(0,10))*(npol+randint(0,10))*(nsnr+randint(0,10))
+    
+    if server:
+        try:
+            tx,fibre,rx                 = processing(tx,fibre,rx,saving,seed_id)
+            misc.save2mat(tx,fibre,rx,saving)
+                
+            if tx['flag_phase_noise'] == 0:
+                if rx['mimo'].lower() != "vae":
+                    plot.y2_axes(saving,"iteration",'Thetas','SER',['svg'])
+                else:
+                    plot.y3_axes(saving,"iteration",'Thetas','SNR','SER',['svg'])
             else:
-                plot.y3_axes(saving,"iteration",'Thetas','SNR','SER',['svg'])
-        else:
-            plot.y3_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
+                plot.y3_axes(saving,"iteration",'Thetas','Phis','SER',['svg'])
+
+        except:
+            tmp_fn  = 'fail_'+saving['filename'][20:-1]+'.log'
+            f       = open(tmp_fn, "a")
+
+            f.write(saving['filename'][24:-1])
+            f.close()
+
+    else:
+        tx,fibre,rx                         = processing(tx,fibre,rx,saving,seed_id)
+        misc.save2mat(tx,fibre,rx,saving)
+
 
     return tx,fibre,rx
 
@@ -319,42 +434,36 @@ for nsnr in range(len(paramSNR)):
 
     for nrea in range(Nrea):
         print(f"nrea = {nrea}")
-
-        for nSbB in range(len(paramNSbB)):
-            # print(f"nSbB = {paramNSbB[nSbB]}")
-
-            rx['NSymbBatch']    = paramNSbB[nSbB]
-            rx['FrameChannel']  = int(np.ceil(paramNSbB[nSbB]/37.5))
             
-            for npol in range(len(paramPOL[0])):
-                for nphi in range(len(paramPHI)):
+        for npol in range(len(paramPOL[0])):
+            for nphi in range(len(paramPHI)):
 
+                tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx)
 
-                    if server:
-                        try:
-                            tx,fibre,rx     = process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx)
-                        except:
-
-                            text    = f'failed SNR = {paramSNR[nsnr]} Nrea = {nrea} NSbB = {paramNSbB[nSbB]} POL = {paramPOL[npol]} PHI = {paramPHI[nphi]}' 
-                            tmp_fn  = saving['filename'][0:20]+'fail.log'
-                            f       = open(tmp_fn, "a")
-
-                            f.write(text)
-                            f.close()
-                            
-                    else:
-                        tx,fibre,rx     = process_data(nrea,npol,nphi,nSbB,nsnr,tx,fibre,rx)
                         
 cuda.empty_cache()
+
 
 
 #%%
 
 if sort_files:
-    misc.move_files_to_folder(int(date[2:4]))
+    misc.move_files_to_folder(int(Date[2:4]))
     misc.merge_data_folders(saving)
-
-    path = PWD(show=False)+f'/data-{date[2:]}'
+    path = PWD(show=False)+f'/data-{Date[2:]}'
     misc.remove_n_characters_from_filenames(path, 20)
-
     misc.organise_files(path)
+    
+    
+    
+
+
+# =============================================================================
+# 
+# Simsarian OCF     2017    4  krad/s
+# Ogaki     OFC     2003    25 deg/min  aerian and burried
+# Barcik    FOAN    2019    4  krad     lab, piezo, mechanical
+# Charlton  OE      2017    5  Mrad/s   aerial and burried
+# Pittala   ICP     2018    8  Mrad/s   lab, thunder
+# 
+# =============================================================================
