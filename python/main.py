@@ -132,38 +132,49 @@ Rs                      = 64e9          # [Baud] Symbol rate
 rxmimo                  = "vae"         # {cma, vae}
 rxmode                  = "pilots"      # {blind, pilots}
 
-CFO_or_dnu              = 'CFO'         # {CFO, dnu, none}
-SoPFO_or_fpol           = 'none'        # {SoPFO, fpol, none}
-Nf_lim                  = 'ph-cfo'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
+CFO_or_dnu              = 'dnu'         # {CFO, dnu, none}
+SoPlin_or_fpol          = 'vsop'        # {SoPlin, fpol, none}
+Nf_lim                  = 'ph-dnu'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
 
 # -----------------------------------------------------------------------------
-if SoPFO_or_fpol.lower() != 'none' and SoPFO_or_fpol.lower() == 'fpol':
-    Vsop                = np.array([eps])                               # [rad/s]
-    Th_End_vsop         = eps
-    SoPFO               = 0
+if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
+    Vsop        = np.array([5])*1e4                               # [rad/s]
+    Th_End      = 5e-2              # (NF > x) <=> Th_End > sqrt(2x/pi) * NSbF*V/Rs
+    SoPlin      = np.array([1])
+    plot_th     = 1
+    
+elif SoPlin_or_fpol.lower() == 'soplin':
+    SoPlin       = np.array([5])*1e4
+    Th_End      = pi/2
+    Vsop        = np.array([1])
+    plot_th     = 1
+    
+elif SoPlin_or_fpol.lower() == 'none':
+    SoPlin       = np.array([1])
+    Th_End      = 0
+    Vsop        = np.array([1])
+    plot_th     = 0
 
-elif SoPFO_or_fpol.lower() != 'none' and SoPFO_or_fpol.lower() == 'sopfo':
-    SoPFO               = np.array([eps])
-    Th_End_fo           = eps
-    Vsop                = 0
-
-else:
-    Vsop, SoPFO = [eps,eps]
 # -----------------------------------------------------------------------------
-if CFO_or_dnu.lower() != "none" and CFO_or_dnu.lower() == 'dnu':
-    Dnus                = np.array([eps])                               # [Hz]
-    Ph_End_dnu          = eps
-    CFO                 = 0
+if CFO_or_dnu.lower() == 'dnu':
+    Dnus        = np.array([5])*1e4                               # [Hz]
+    Ph_End      = 1e-5
+    CFO         = np.array([1])
+    plot_ph     = 1
 
-elif CFO_or_dnu.lower() != "none" and CFO_or_dnu.lower() == 'cfo':
-    CFO                 = np.array([5])*1e4
-    Ph_End_cfo          = pi/2
-    Dnus                = 0
-
-else:
-    Dnus, CFO = [eps,eps]
+elif CFO_or_dnu.lower() == 'cfo':
+    CFO         = np.array([5])*1e4
+    Ph_End      = pi/2
+    Dnus        = np.array([1])
+    plot_ph     = 1
+    
+elif CFO_or_dnu.lower() == "none":
+    CFO         = np.array([1])
+    Ph_End      = 0
+    Dnus        = np.array([1])
+    plot_ph     = 0
 # -----------------------------------------------------------------------------
-
+# keep [1] to avoid divisions by zero
 
 # paramNSbB               = [250]
 # NframesTrain            = 10
@@ -258,7 +269,7 @@ if 'NframesTrain' in locals():
 # -----------------------------------------------------------------------------
 # if linear variations -------- [[theta_start],[theta_end],[slope]]
 
-if SoPFO_or_fpol == 'fpol':
+if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
     fibre['ThetasLaw']["kind"]      = 'Rwalk'
     fibre["ThetasLaw"]['law']       = 'gauss'
     fibre["ThetasLaw"]['theta_in']  = 0*pi/180                                  # [rad]
@@ -266,17 +277,17 @@ if SoPFO_or_fpol == 'fpol':
     Fpols                           = rx['NSymbFrame']*Vsop**2/(2*pi*tx['Rs'])      # [Hz]
     Std_Pol                         = sqrt((2*pi)**2*Fpols/(2*pi*tx['Rs']))               # [rad²]
 
-    Nf_Th                           = (pi/2*(tx['Rs']*Th_End_vsop/Vsop/rx['NSymbFrame'])**2).astype(int)
+    Nf_Th                           = list((pi/2*(tx['Rs']*Th_End/Vsop/rx['NSymbFrame'])**2).astype(int))
     paramPOL                        = [list(Vsop),list(Fpols),list(Std_Pol)]
 
-elif SoPFO_or_fpol == 'sopfo':
+elif SoPlin_or_fpol.lower() == 'soplin':
     fibre['ThetasLaw']["kind"]      = 'func'
     fibre['ThetasLaw']["law"]       = 'lin'
     fibre["ThetasLaw"]['Start']     = 0
-    fibre["ThetasLaw"]['End']       = Th_End_fo
-    fibre["ThetasLaw"]['SoPFO']     = SoPFO
-    Nf_Th                           = Th_End_fo*tx['Rs']/(2*pi*SoPFO*rx['NSymbFrame'])
-    paramPOL                        = [list(SoPFO)]
+    fibre["ThetasLaw"]['End']       = Th_End
+    fibre["ThetasLaw"]['SoPlin']    = SoPlin
+    Nf_Th                           = list((Th_End*tx['Rs']/(2*pi*SoPlin*rx['NSymbFrame'])).astype(int))
+    paramPOL                        = list([SoPlin])
 
     # keep the double list format
 
@@ -285,22 +296,22 @@ else:
     fibre['ThetasLaw']["law"]       = 'lin'
     fibre["ThetasLaw"]['Start']     = 0
     fibre["ThetasLaw"]['End']       = 0
-    fibre["ThetasLaw"]['SoPFO']     = 0
+    fibre["ThetasLaw"]['SoPlin']    = 0
     Nf_Th                           = 0
-    paramPOL                        = [[0]]
+    paramPOL                        = list([0])
 
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
 
-if CFO_or_dnu == 'CFO':
+if CFO_or_dnu.lower() == 'cfo':
     rx['CFO']               = 1
     tx['PhiLaw']["kind"]    = 'func'
     tx['PhiLaw']["law"]     = 'lin'
     tx["PhiLaw"]['Start']   = 0*pi/180                                                  # [rad]
 
     paramPHI                = list(CFO)
-    Nf_Ph                   = list((Ph_End_cfo*tx['Rs']/2/pi/rx['NSymbFrame']/CFO).astype(int))
+    Nf_Ph                   = list((Ph_End*tx['Rs']/2/pi/rx['NSymbFrame']/CFO).astype(int))
 
 else:
     rx['CFO']               = 0
@@ -308,7 +319,7 @@ else:
     tx['PhiLaw']["law"]     = 'linewidth'
 
     paramPHI                = list(Dnus)
-    Nf_Ph                   = list(((Ph_End_dnu/2)**2/rx['NSymbFrame']*tx['Rs']/Dnus).astype(int))
+    Nf_Ph                   = list(((Ph_End/2)**2/rx['NSymbFrame']*tx['Rs']/Dnus).astype(int))
 
 # -----------------------------------------------------------------------------
 
@@ -338,17 +349,6 @@ if 'lr' not in locals():
         rx['lr']    = 750e-6
 else:
     rx['lr']        = lr
-    
-    
-if SoPFO == eps or Vsop == eps:
-    plot_th = 0
-else:
-    plot_th = 1
-    
-if CFO[0] == eps or Dnus == eps:
-    plot_ph = 0
-else:
-    plot_ph = 1
 
 
 #%% ===========================================================================
@@ -376,14 +376,14 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
 # -----------------------------------------------------------------------------
     if tx['PhiLaw']["kind"]     == 'func':
         tx["PhiLaw"]['CFO']     = paramPHI[nphi]                               # [Hz]
-        tx["PhiLaw"]['End']     = Ph_End_cfo                                       # [rad]
+        tx["PhiLaw"]['End']     = Ph_End                                       # [rad]
         
     elif tx['PhiLaw']["kind"]   == 'Rwalk':
         tx["dnu"]               = paramPHI[nphi]                               # [Hz]
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
-    if SoPFO_or_fpol == 'fpol':
+    if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
         fibre['vsop']                   = paramPOL[0][npol]
         fibre["ThetasLaw"]['fpol']      = paramPOL[1][npol]
         fibre["ThetasLaw"]['theta_std'] = paramPOL[2][npol]
@@ -392,7 +392,6 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
     rx['SNRdB']                         = paramSNR[nsnr]
     tx, fibre, rx                        = set_Nsymbols(tx,fibre,rx)
 
-
     if 'th' in Nf_lim.lower():
         rx['NFrames'] = rx["FrameChannel"] + Nf_Th[npol]
     else:
@@ -400,7 +399,7 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
 
     tx, rx                              = set_Batches_Frames(tx,rx)
 
-    if SoPFO_or_fpol == 'fpol':
+    if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
         ExpectT = sqrt(2/pi)*fibre['vsop']*sqrt(rx['NFramesChannel'])*rx['NSymbFrame']/tx['Rs']
     else:
         ExpectT = 2*pi*(paramPOL[0][npol]/Rs)*rx['NSymbFrame']*rx['NFramesChannel']
@@ -417,10 +416,12 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
         print(f" NSbF     = {rx['NSymbFrame']*1e-3}")
         print(f" E-theta  = {ExpectT}")
         print(f" E-phi    = {ExpectP}")
-        print(f" VSOP     = {fibre['vsop']*1e-6}" if SoPFO_or_fpol.lower() == 'fpol'
-                                          else f" SoPFO = {paramPOL[0][npol]}")
-        print(f" DNU      = {tx['dnu']*1e-6}\n" if CFO_or_dnu.lower() == 'dnu'
-                                          else f" DNU      = {paramPHI[nphi]}\n")
+        print(f" VSOP     = {fibre['vsop']*1e-6}" \
+              if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop'
+              else f" SoPlin   = {paramPOL[0][npol]}")
+        print(f" DNU      = {tx['dnu']*1e-6}\n" \
+              if CFO_or_dnu.lower() == 'dnu'
+              else f" DNU      = {paramPHI[nphi]}\n")
 
     saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,gen_xml,nrea)
 

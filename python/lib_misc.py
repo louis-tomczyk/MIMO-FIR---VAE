@@ -637,11 +637,11 @@ def init_dict(server):
     if server:
         tx["server"]        = 1
         rx['server']        = 1
-        saving['server']    = 1
+        saving['server']    = 0
     else:
         tx["server"]        = 0
         rx['server']        = 0
-        saving['server']    = 0        
+        saving['server']    = 1        
 
     tx      = sort_dict_by_keys(tx)
     fibre   = sort_dict_by_keys(fibre)
@@ -1058,7 +1058,7 @@ def save2mat(tx,fibre,rx,saving):
                 'rx_mode'           : rx['mode'],
                 'vsop'              : fibre['vsop'] if fibre['ThetasLaw']['kind'].lower() == 'rwalk'\
                                         else np.nan,
-                'SoPFO'             : fibre['ThetasLaw']["SoPFO"] if fibre['ThetasLaw']['kind'].lower() == 'func'\
+                'SoPlin'            : fibre['ThetasLaw']["SoPlin"] if fibre['ThetasLaw']['kind'].lower() == 'func'\
                                         else np.nan,
                 }
     
