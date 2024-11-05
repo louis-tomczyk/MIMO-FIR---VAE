@@ -87,7 +87,7 @@ pi = np.pi
 #%%
 def gen_phase_noise(tx,rx,*varargin):
 
-    if tx['flag_phase'] == 1:
+    if tx['flag_phase_noise'] == 1:
             
         if 'PhiLaw' not in tx:
             tx["PhiLaw"] = dict()

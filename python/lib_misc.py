@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.1.3
-#   Date            : 2024-10-11
+#   Version         : 2.1.4
+#   Date            : 2024-11-05
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -58,7 +58,10 @@
 #   2.1.2 (2024-10-09) - create_xml_file: vsop rounding
 #   2.1.3 (2024-10-11) - create_xml_file: vsop/CFO rounding + creation or not
 #                           xml file
-# 
+#   2.1.4 (2024-11-05) - save2mat: adding vsop and SoPLin
+#                      - init_dict: saving["server"] corrected
+#                      - tx['flag_phase_noise] -> tx['flag_phase]
+#
 # ----- MAIN IDEA -----
 #   Miscellaneous functions for logistics
 # 
@@ -287,7 +290,7 @@ def create_xml_file(tx,fibre,rx,saving,gen,*varargin):
     else:
         TX      = ["mod", "Nsps", "Rs","NsampTaps",'SNRdB']
         
-    if tx['flag_phase_noise']:
+    if tx['flag_phase']:
         if tx['PhiLaw']["kind"] == "Rwalk":
             TX.append('dnu')
         else:
@@ -376,7 +379,7 @@ def create_xml_file(tx,fibre,rx,saving,gen,*varargin):
     if tx["nu"] != 0:
         TXpar.insert(1, round(tx['nu'],3))
 
-    if tx['flag_phase_noise'] == 1:
+    if tx['flag_phase'] == 1:
         if tx["PhiLaw"]["kind"] == "func":
             if tx["PhiLaw"]["law"] == "lin":
                 saving_list.insert(6,'PhEnd')
@@ -1044,12 +1047,12 @@ def save2mat(tx,fibre,rx,saving):
                 'FrameChannel'      : rx["FrameChannel"],
                 'NBatchesFrame'     : rx['NBatchFrame'],
                 'NBatchesChannel'   : rx['NBatchesChannel'],
-                'Phis_gnd'          : tx["PhaseNoise_unique"] if tx['flag_phase_noise'] else np.nan,
+                'Phis_gnd'          : tx["PhaseNoise_unique"] if tx['flag_phase'] else np.nan,
                 'SNRdBs'            : rx["SNRdBs"],
                 'SER_means'         : rx["SERs"],
                 'SER_valid'         : rx["SER_valid"],
                 'Var_est'           : rx["Pnoise_est"],
-                'flag_phase_noise'  : tx['flag_phase_noise'],
+                'flag_phase_noise'  : tx['flag_phase'],
                 'PhaseNoise_est_cpr': rx['PhaseNoise_pilots'] if rx['mode'].lower() == "pilots"\
                                             else np.nan,
                 'ThLaw'             : fibre["ThetasLaw"]['law'],

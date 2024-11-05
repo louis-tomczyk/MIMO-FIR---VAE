@@ -107,7 +107,6 @@ from numpy              import floor
 from numpy              import sqrt
 
 pi      = np.pi
-eps     = np.spacing(1)
 clc()
 np.set_printoptions(linewidth=160)
 
@@ -127,14 +126,21 @@ get_time    = 0
 # --- MAIN parameters
 # =============================================================================
 Nrea                    = 1
-paramSNR                = [25]
-Rs                      = 64e9          # [Baud] Symbol rate
-rxmimo                  = "vae"         # {cma, vae}
+paramSNR                = [21]          # {21-cma, 17-vae}
+Rs                      = 128e9          # [Baud] Symbol rate
+rxmimo                  = "cma"         # {cma, vae}
 rxmode                  = "pilots"      # {blind, pilots}
 
-CFO_or_dnu              = 'dnu'         # {CFO, dnu, none}
-SoPlin_or_fpol          = 'vsop'        # {SoPlin, fpol, none}
-Nf_lim                  = 'ph-dnu'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
+CFO_or_dnu              = 'CFO'         # {CFO, dnu, none}
+SoPlin_or_fpol          = 'soplin'        # {SoPlin, fpol, none}
+Nf_lim                  = 'th-lin'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
+NFramesChannel          = 50
+
+# paramNSbB               = [250]
+# NframesTrain            = 10
+# NSbF                    = 1e4
+# NSbB                    = 250
+
 
 # -----------------------------------------------------------------------------
 if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
@@ -144,8 +150,8 @@ if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
     plot_th     = 1
     
 elif SoPlin_or_fpol.lower() == 'soplin':
-    SoPlin       = np.array([5])*1e4
-    Th_End      = pi/2
+    SoPlin      = np.array([5])*1e4
+    Th_End      = 0
     Vsop        = np.array([1])
     plot_th     = 1
     
@@ -163,7 +169,7 @@ if CFO_or_dnu.lower() == 'dnu':
     plot_ph     = 1
 
 elif CFO_or_dnu.lower() == 'cfo':
-    CFO         = np.array([5])*1e4
+    CFO         = np.array([5,1,0.5,0.1])*1e4
     Ph_End      = pi/2
     Dnus        = np.array([1])
     plot_ph     = 1
@@ -171,15 +177,12 @@ elif CFO_or_dnu.lower() == 'cfo':
 elif CFO_or_dnu.lower() == "none":
     CFO         = np.array([1])
     Ph_End      = 0
-    Dnus        = np.array([1])
+    Dnus        = np.array([0.1])
     plot_ph     = 0
 # -----------------------------------------------------------------------------
 # keep [1] to avoid divisions by zero
 
-# paramNSbB               = [250]
-# NframesTrain            = 10
-# NSbF                    = 1e4
-# NSbB                    = 250
+
 
 
 
@@ -242,11 +245,10 @@ else:
 ###############################################################################
 
 
-if 'CFO' in locals() or 'Dnus' in locals():
-    tx['flag_phase_noise']  = 1
+if CFO_or_dnu.lower() != 'none':
+    tx['flag_phase']  = 1
 else:
-    tx['flag_phase_noise']  = 0
-
+    tx['flag_phase']  = 0
 
 rx["mimo"]                  = rxmimo                                                # {cma,vae}
 
@@ -286,8 +288,8 @@ elif SoPlin_or_fpol.lower() == 'soplin':
     fibre["ThetasLaw"]['Start']     = 0
     fibre["ThetasLaw"]['End']       = Th_End
     fibre["ThetasLaw"]['SoPlin']    = SoPlin
-    Nf_Th                           = list((Th_End*tx['Rs']/(2*pi*SoPlin*rx['NSymbFrame'])).astype(int))
-    paramPOL                        = list([SoPlin])
+    Nf_Th                           = ((Th_End*tx['Rs']/(2*pi*SoPlin*rx['NSymbFrame'])).astype(int))
+    paramPOL                        = [[SoPlin]]
 
     # keep the double list format
 
@@ -298,7 +300,7 @@ else:
     fibre["ThetasLaw"]['End']       = 0
     fibre["ThetasLaw"]['SoPlin']    = 0
     Nf_Th                           = 0
-    paramPOL                        = list([0])
+    paramPOL                        = [[0]]
 
 # -----------------------------------------------------------------------------
 
@@ -354,8 +356,11 @@ else:
 #%% ===========================================================================
 # --- FUNCTIONS ---
 # =============================================================================
-def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
+def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx,*varargin):
 
+    if len(varargin) != 0:
+        NFramesChannel = varargin[0]
+        
 # -----------------------------------------------------------------------------
 # check 'learning rate tuning cma' for curves
     if rxmimo == 'vae':
@@ -371,6 +376,8 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
 
             elif paramSNR[nsnr] > 20 and tx['Rs'] < 100:
                 rx['FrameChannel']  = int(np.ceil(1.88+0.03*rx['NSymbBatch']))
+    else:
+        rx['FrameChannel'] = 1
 # -----------------------------------------------------------------------------
 
 # -----------------------------------------------------------------------------
@@ -389,15 +396,21 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
         fibre["ThetasLaw"]['theta_std'] = paramPOL[2][npol]
 # -----------------------------------------------------------------------------
 
+# -----------------------------------------------------------------------------
     rx['SNRdB']                         = paramSNR[nsnr]
-    tx, fibre, rx                        = set_Nsymbols(tx,fibre,rx)
+    tx, fibre, rx                       = set_Nsymbols(tx,fibre,rx)
 
-    if 'th' in Nf_lim.lower():
-        rx['NFrames'] = rx["FrameChannel"] + Nf_Th[npol]
+    if 'NFramesChannel' not in locals():
+        if 'th' in Nf_lim.lower():
+            rx['NFrames'] = rx["FrameChannel"] + Nf_Th[npol]
+        else:
+            rx['NFrames'] = rx["FrameChannel"] + Nf_Ph[nphi]
     else:
-        rx['NFrames'] = rx["FrameChannel"] + Nf_Ph[nphi]
+        rx['NFrames'] = rx['FrameChannel'] + NFramesChannel
 
     tx, rx                              = set_Batches_Frames(tx,rx)
+# -----------------------------------------------------------------------------
+
 
     if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
         ExpectT = sqrt(2/pi)*fibre['vsop']*sqrt(rx['NFramesChannel'])*rx['NSymbFrame']/tx['Rs']
@@ -423,13 +436,13 @@ def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx):
               if CFO_or_dnu.lower() == 'dnu'
               else f" DNU      = {paramPHI[nphi]}\n")
 
-    saving["filename"]                  = misc.create_xml_file(tx,fibre,rx,saving,gen_xml,nrea)
-
-    seed_id                             = (nrea+randint(0,10))*(npol+randint(0,10))*(nsnr+randint(0,10))
+# -----------------------------------------------------------------------------
+    saving["filename"]  = misc.create_xml_file(tx,fibre,rx,saving,gen_xml,nrea)
+    seed_id             = (nrea+randint(0,10))*(npol+randint(0,10))*(nsnr+randint(0,10))
 
     if server:
         try:
-            tx,fibre,rx                 = processing(tx,fibre,rx,saving,seed_id)
+            tx,fibre,rx  = processing(tx,fibre,rx,saving,seed_id)
             misc.save2mat(tx,fibre,rx,saving)
 
         except:
@@ -467,8 +480,11 @@ for nsnr in range(len(paramSNR)):
         for npol in range(len(paramPOL[0])):
             for nphi in range(len(paramPHI)):
 
-                tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx)
-
+                if 'NFramesChannel' not in locals():
+                    tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx)
+                else:
+                    tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx,NFramesChannel)
+                    
 cuda.empty_cache()
 
 

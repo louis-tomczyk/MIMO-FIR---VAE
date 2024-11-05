@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.0
-#   Date            : 2024-07-12
+#   Version         : 2.0.1
+#   Date            : 2024-11-05
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -38,6 +38,9 @@
 #                      - [REMOVED] fir_3Dto2D, fir_2Dto2D, moved to lib_maths
 #                      - def plot_<my_function> -> def <my_function>
 # 
+#   2.0.0 (2024-11-05) - y1_axes: close fig is server
+#                      - y2_axes: semilogy, right closing condition
+#
 # ----- MAIN IDEA -----
 #   Library for plotting functions in (optical) telecommunications
 #
@@ -670,6 +673,8 @@ def y1_axes(saving,xaxis,yaxis,extensions,*varargin):
             output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
             plt.savefig(output_file, bbox_inches='tight')
             
+        if not saving['server']:
+            plt.close(fig)
 
 #%%
 
@@ -762,7 +767,7 @@ def y2_axes(saving,xaxis,yaxis_left,yaxis_right,extensions,*varargin):
             output_file = os.path.splitext(csv_file)[0] + '.'+ extensions
             plt.savefig(output_file, bbox_inches='tight')
 
-        if saving['server']:
+        if not saving['server']:
             plt.close(fig)
             
         

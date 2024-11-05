@@ -4,7 +4,7 @@
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
 #   Version         : 2.1.0
-#   Date            : 2024-10-11
+#   Date            : 2024-11-03
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -134,7 +134,7 @@ def transmitter(tx,rx,*varargin):
     if rx["Frame"] >= rx["FrameChannel"]:
         tx      = txhw.load_ase(tx,rx)
 
-        if tx['flag_phase_noise']:
+        if tx['flag_phase']:
             tx      = txhw.load_phase_noise(tx,rx)#'pn const','pn time trace')     # uncomment to check
 
     
@@ -1025,7 +1025,7 @@ def set_Nsymbols(tx,fibre,rx):
     return tx, fibre, rx
 
 #%%
-def set_Batches_Frames(tx,rx):
+def set_Batches_Frames(tx,rx, *varargin):
 
     rx['NBatchFrame']       = int(rx['NSymbFrame']/rx['NSymbBatch'])
     rx['NsampFrame']        = rx["NsampBatch"]*rx['NBatchFrame']

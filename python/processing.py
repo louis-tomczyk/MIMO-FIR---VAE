@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.11
-#   Date            : 2024-10-07
+#   Version         : 1.3.12
+#   Date            : 2024-11-05
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -58,8 +58,10 @@
 #   1.3.9 (2024-07-24) - print_results: server management
 #   1.3.10(2024-10-03) - seed management for random generation, along with main
 #                           (2.0.4)
-#   1.3.11(2024-10-7) -  init_processing SYMBOLS AND SAMPLES MANAGEMENT moved
+#   1.3.11(2024-10-07) - init_processing SYMBOLS AND SAMPLES MANAGEMENT moved
 #                           to txdsp.set_Nsymbols, txdsp (2.0.2)
+#   1.3.12(2024-11-05) - print_result: tx['get_time'] instead of 'get_exec_time
+#                         tx['flag_phase_noise] -> tx['flag_phase]
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -173,7 +175,7 @@ def init_processing(tx, fibre, rx, saving, device):
         
     rx['save_channel_frame'] = 1
     
-    if tx['flag_phase_noise']:
+    if tx['flag_phase']:
         rx['save_channel_batch'] = 1
         
     else:
@@ -352,7 +354,7 @@ def init_processing(tx, fibre, rx, saving, device):
                                         rx['NFrames']),dtype = np.float32)
 
 
-    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+    if 'get_exec_time' in tx:
         tx['get_exec_time'].append(np.zeros((1,rx['NFrames'])))
         tx['get_exec_time'][1] = time.time()
         
@@ -399,10 +401,10 @@ def init_train(tx, rx, frame):
 def print_results(loss, frame, tx, fibre, rx, saving):
 
     
-    # if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
-    #     dt = time.time()-tx['get_exec_time'][1]
-    #     tx['get_exec_time'][1] = time.time()
-    #     tx['get_exec_time'][2][0,rx['Frame']] = dt
+    if tx['get_time']:
+        dt = time.time()-tx['get_exec_time'][1]
+        tx['get_exec_time'][1] = time.time()
+        tx['get_exec_time'][2][0,rx['Frame']] = dt
 
     SER_valid   = rx["SER_valid"]
     SERs        = rx["SERs"]
@@ -454,55 +456,55 @@ def print_results(loss, frame, tx, fibre, rx, saving):
         thetak = 0
 
 
-    if not tx['server']:
-        if rx["mimo"].lower() == 'vae':
-            if tx['flag_phase_noise'] == 1:
-                print("frame %d" % frame,
-                      '--- loss     = %.1f'     % lossk,
-                      '--- SNRdB    = %.2f'     % SNRdBk,
-                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
-                      '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
-                      '--- <SER>    = %.2e'     % SERmeank,
-                      # '--- dt       = %.2e'     % dt \
-                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                      #     else None
-                      )
-            else:
-                print("frame %d" % frame,
-                      '--- loss     = %.1f'     % lossk,
-                      '--- SNRdB    = %.2f'     % SNRdBk,
-                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
-                      '--- <SER>    = %.2e'     % SERmeank,
-                      # '--- dt       = %.2e'     % dt \
-                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                      #     else None
-                      )
+    # if not tx['server']:
+    #     if rx["mimo"].lower() == 'vae':
+    #         if tx['flag_phase'] == 1:
+    #             print("frame %d" % frame,
+    #                   '--- loss     = %.1f'     % lossk,
+    #                   '--- SNRdB    = %.2f'     % SNRdBk,
+    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
+    #                   '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
+    #                   '--- <SER>    = %.2e'     % SERmeank,
+    #                    '--- dt       = %.2e'    % dt \
+    #                        if tx['get_time'] \
+    #                        else None
+    #                   )
+    #         else:
+    #             print("frame %d" % frame,
+    #                   '--- loss     = %.1f'     % lossk,
+    #                   '--- SNRdB    = %.2f'     % SNRdBk,
+    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
+    #                   '--- <SER>    = %.2e'     % SERmeank,
+    #                    '--- dt       = %.2e'    % dt \
+    #                        if tx['get_time'] \
+    #                        else None
+    #                   )
                 
-        else:
-            if tx['flag_phase_noise'] == 1:
-                print("frame %d" % frame,
-                      '--- loss     = %.3e'     % lossk,
-                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
-                      '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
-                      '--- <SER>    = %.2e'     % SERmeank,
-                      # '--- dt       = %.2e'     % dt \
-                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                      #     else None
-                      )
-            else:
-                print("frame %d" % frame,
-                      '--- loss     = %.3e'     % lossk,
-                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
-                      '--- <SER>    = %.2e'     % SERmeank,
-                      # '--- dt       = %.2e'     % dt \
-                      #     if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame'\
-                      #     else None
-                      )
+    #     else:
+    #         if tx['flag_phase'] == 1:
+    #             print("frame %d" % frame,
+    #                   '--- loss     = %.3e'     % lossk,
+    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
+    #                   '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
+    #                   '--- <SER>    = %.2e'     % SERmeank,
+    #                    '--- dt       = %.2e'    % dt \
+    #                        if tx['get_time'] \
+    #                        else None
+    #                   )
+    #         else:
+    #             print("frame %d" % frame,
+    #                   '--- loss     = %.3e'     % lossk,
+    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
+    #                   '--- <SER>    = %.2e'     % SERmeank,
+    #                    '--- dt       = %.2e'    % dt \
+    #                        if tx['get_time'] \
+    #                        else None
+    #                   )
     
     
-    if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
-        dt      = np.array(tx['get_exec_time'][2][0,:rx['Frame']+1]).reshape((-1,1))
-        array   = np.concatenate((array,dt),axis = 1)
+    # if tx['get_time']:
+    #     dt      = np.array(tx['get_exec_time'][2][0,:rx['Frame']+1]).reshape((-1,1))
+    #     array   = np.concatenate((array,dt),axis = 1)
 
     return array
 
@@ -516,28 +518,28 @@ def save_data(tx, fibre, rx, saving, array):
     thetas      = list((Thetas_IN+Thetas_OUT)*180/np.pi)
     Thetas      = misc.list2vector(thetas)
     
-    if not tx['flag_phase_noise']:
+    if not tx['flag_phase']:
         array2          = np.concatenate((array, Thetas), axis=1)
-    elif tx['flag_phase_noise']:
+    elif tx['flag_phase']:
         Phis            = tx['PhaseNoise_unique'][:,rx['NBatchFrame']-1].reshape((-1,1))*180/pi
         array2          = np.concatenate((array, Thetas, Phis), axis=1)
 
 
     if rx["mimo"].lower() == "vae":
-        if tx['flag_phase_noise'] == 0:
+        if tx['flag_phase'] == 0:
             save_tmp = ["iteration","loss", "SNR", "SER", "Thetas"]
         else:
             save_tmp = ["iteration","loss", "SNR", "SER", "Thetas","Phis"]
             
-        if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+        if 'get_exec_time' in tx:
                 save_tmp.insert(4,"dt")
     else:
-        if tx['flag_phase_noise'] == 0:
+        if tx['flag_phase'] == 0:
             save_tmp = ["iteration","loss", "SER", "Thetas"]
         else:
             save_tmp = ["iteration","loss", "SER", "Thetas","Phis"]
 
-        if 'get_exec_time' in tx and tx['get_exec_time'][0].lower() == 'frame':
+        if 'get_exec_time' in tx:
                 save_tmp.insert(3,"dt")
     
     misc.array2csv(array2,saving["filename"],save_tmp)

@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.0.2
-#   Date            : 2024-07-24
+#   Version         : 2.0.3
+#   Date            : 2024-11-05
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -78,6 +78,7 @@
 #   2.0.1 (2024-07-16) - CPR_pilots,remove_symbols, find_shift: managing offset
 #                           for pilots
 #   2.0.2 (2024-07-24) - server management
+#   2.0.3 (2024-11-05) - tx['flag_phase_noise'] -> tx['flag_phase']
 #
 # ----- MAIN IDEA -----
 #   Library for decision functions in (optical) telecommunications
@@ -249,7 +250,7 @@ def compensate_and_truncate(tx,rx,*varargin):
 #%%
 def CPR_pilots(tx,rx,*varargin):
     
-    if tx['flag_phase_noise'] == 0 or rx['mode'].lower() == "blind":
+    if tx['flag_phase'] == 0 or rx['mode'].lower() == "blind":
         rx['sig_cpr_real'] = rx['sig_mimo_cut_real']
         return rx
     
@@ -486,7 +487,7 @@ def CPR_pilots(tx,rx,*varargin):
 #%%
 def decision(tx, rx, *varargin):           
 
-    if tx['flag_phase_noise'] == 0:
+    if tx['flag_phase'] == 0:
         rx["sig_eq_real"] = rx["sig_mimo_cut_real"]
     else:
         rx["sig_eq_real"] = rx["sig_cpr_real"]

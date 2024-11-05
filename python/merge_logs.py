@@ -67,7 +67,7 @@ import csv
 # --- PARAMETERS ---
 # =============================================================================
 
-
+'''
 Merged      = '0_tmp_merged_fail.log'
 Corrected   = '1_tmp_corrected_fail.log'
 Converted   = '2_tmp_converted_file.csv'
@@ -75,8 +75,8 @@ Sorted      = '3_tmp_sorted_fail.csv'
 Removed     = '4_tmp_removed_col.csv'
 Renamed     = 'logs.csv'
 
-log_dir = '/home/louis/Documents/6_TélécomParis/3_Codes/0_louis/2_VAE/server/tmp'
-
+log_dir = '/home/louis/Documents/6_TélécomParis/3_Codes/0_louis/2_VAE/python'
+'''
 
 #%%
 # [C1]
@@ -131,7 +131,7 @@ def convert_log_to_csv(input_file, output_file):
     with open(input_file, 'r') as infile, open(output_file, 'w') as outfile:
         for line in infile:
             # Supprimer les espaces inutiles et remplacer les "=" et " " par des virgules
-            csv_line = line.replace(' = ', ',').replace(' ', ',').replace('[', '').replace(']', '')
+            csv_line = line.replace(' = ', ',').replace(' - ', ',').replace('[', '').replace(']', '').replace(' ',',')
             outfile.write(csv_line)
             
 #%%
@@ -141,8 +141,11 @@ def sort_csv(input_file, output_file):
         rows = list(reader)  # Convertir les lignes en liste
 
         # Trier par SNR (colonne 2), puis Nrea (colonne 4), puis NSbB (colonne 6), etc.
-        sorted_rows = sorted(rows, key=lambda row: (int(row[2]), int(row[4]), int(row[6]), 
-                                                    float(row[8]), float(row[10])))
+        sorted_rows = sorted(rows, key=lambda row: \
+                     (float(row[3]), int(row[5]), float(row[9]), 
+                      int(row[11]), int(row[13]),
+                      int(row[11]), int(row[13]), int(row[15]))
+                     )
 
     # Écrire les lignes triées dans un nouveau fichier CSV
     with open(output_file, 'w', newline='') as outfile:
@@ -183,10 +186,12 @@ def delete_tmp_files(files):
             print(f"file {file} does not exists")
 
 
+'''
 #%% ===========================================================================
 # --- MAIN ---
 # =============================================================================
      
+
 merge_logs(log_dir, Merged)
 correct_merged_log(Merged, Corrected)
 convert_log_to_csv(Corrected, Converted)
@@ -197,3 +202,4 @@ delete_tmp_files([Merged, Corrected, Converted, Sorted])
 
 
 
+'''
