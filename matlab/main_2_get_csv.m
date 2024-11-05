@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 2.1.0
-%   Date            : 2024-10-15
+%   Version         : 2.2.0
+%   Date            : 2024-11-05
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -19,6 +19,8 @@
 %   2024-10-13  (2.0.0) handling multiple parameters for the figure
 %                       selected_caracs -> caracs
 %   2024-10-15  (2.1.0) adding SNR in caracs, scales, legend
+%   2024-11-05  (2.2.0) adding AWGN
+%                       IMPORT_DATA (1.1.2) raise error if no files
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -36,20 +38,25 @@
 
 %% import data
 rst
-caps.log.Date = '24-10-14-16';
+caps.log.Date = '24-11-05';
 
 % caracs1     = {'NSbB',[50,75,100,125,150,175,200,225,250,300,400,500,750]};
 % caracs1     = {'NspT',[13,17,21,25,29]};
-caracs1     = {'CFO',[0.1,0.5,1,5,10]};
+caracs1     = {'Rs',128};
+caracs2     = {'SNR_dB',linspace(25,15,11)};
 % caracs1     = {'CFO',[0.1]};
-caracs2     = {'vsop',[1,10]};w
-caracs2b    = {'Rs',64};
+caracs2b     = {'SNRdB',50};
+caracs3     = {'NSbB',250};
+
 % caracs3     = {'ma g',[1,5,10,15,20,25]};
 % caracs3     = {'SNR_dB',linspace(8,25,18)};
-caracs3     = {'NSbB',[500,400,300,250,200,150,100,50]};
-entropy     = 5.72;
-SNR         = 25;
 
+entropy     = 5.72;
+% SNR         = [25,24,23,22,21,20,19,18,17,16,15];
+
+AWGN        = 1;
+Ftrain      = 10;
+algo        = 'vae';
 fec_limit   = 2.8e-2;
 time_est    = 0;
 % 7 = 3 caracs + ser + time conv + time frame + frame conv
@@ -72,11 +79,11 @@ for ncarac1 = 1:length(caracs1{2})
                 cd(strcat('../python/data-',caps.log.Date,"/csv"))
         
                 % change format %d to %.1f is not NSbB nor dnu
-                caracs         = [sprintf("%s %.1f",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space, if PhiEnd
-                                  sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));... % if vsop %d
+                caracs         = [sprintf("%s %d",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space, if PhiEnd
+                                  sprintf("%s %d",caracs2{1},caracs2{2}(ncarac2));... % if vsop %d
                                   sprintf("%s %d",caracs2b{1},caracs2b{2}(ncarac2b));...
-                                  sprintf("%s %d ",caracs3{1},caracs3{2}(ncarac3));...
-                                  sprintf("SNR_dB %d ",SNR);...
+                                  sprintf("%s %d",caracs3{1},caracs3{2}(ncarac3));...
+                                  sprintf("mimo %s",algo);...
                                             ];
     
                 [allData,caps]          = import_data({'.csv'},caps,caracs);
@@ -86,18 +93,25 @@ for ncarac1 = 1:length(caracs1{2})
                     matrix_tmp              = zeros(caps.log.Nfiles,8); % 8 if carac2b, 7 otherwise
                     location                = zeros(1,caps.log.Nfiles);
                     Niter                   = allData{1}.iteration(end);
-                    thetas                  = zeros(Niter,caps.log.Nfiles);
                     bers                    = zeros(Niter,caps.log.Nfiles);
-                    dt                      = zeros(Niter,caps.log.Nfiles);
-            
+                    if ~AWGN
+                        thetas              = zeros(Niter,caps.log.Nfiles);
+                    end
+                    if time_est
+                        dt                  = zeros(Niter,caps.log.Nfiles);
+                    end
                     if sum(contains(allData{1}.Properties.VariableNames,'Phis'))
                         phis                = zeros(Niter,caps.log.Nfiles);
                     end
 
                     for k = 1:caps.log.Nfiles
-                        tmp                 = allData{k}.Thetas == 0;
-                        FrameChannel        = length(allData{k}.Thetas(tmp));
-                        thetas(:,k)         = allData{k}.Thetas;
+                        if ~AWGN
+                            tmp             = allData{k}.Thetas == 0;
+                            FrameChannel    = length(allData{k}.Thetas(tmp));
+                            thetas(:,k)     = allData{k}.Thetas;
+                        else
+                            FrameChannel    = Ftrain+1;
+                        end
                         bers(:,k)           = allData{k}.SER/entropy;
                         
                         if time_est
@@ -165,7 +179,7 @@ for ncarac1 = 1:length(caracs1{2})
             if caps.log.Nfiles ~= 0
                 filename = char(caps.log.Fn{1});
                 writetable(T,filename)
-                clear T
+%                 clear T
             else
                 continue
             end
@@ -179,53 +193,61 @@ end
 
 f = figure;
 hold all
-xlabel('$\mathbf{N_{Symb,Batch}}$')
 grid on
-
-
 line_styles = {'-', '--', ':', '-.'};
 markers     = {'o', 's', 'd', '^', 'v', '>', '<', 'p', 'h', 'x'};
 
 
 set(gca, 'LineStyleOrder', {'-', '--', ':', '-.'}, 'NextPlot', 'add');
-xlim([25,525])
+if ~AWGN
+    xlabel('$\mathbf{N_{Symb,Batch}}$')
+    xlim([25,525])
+else
+    xlabel('$\mathbf{SNR~[dB]}$')
+    xlim([14.5,25.5])
+end
+if ~AWGN
+    ttRC    = strings(length(fieldnames(res)),3);
+    ttBER   = strings(length(fieldnames(res)),3);
+    
+    ttRC(:,1)    = "CR - ";
+    ttBER(:,1)   = "BER - ";
+end
 
-ttRC    = strings(length(fieldnames(res)),3);
-ttBER   = strings(length(fieldnames(res)),3);
+if ~AWGN
+    for j = 1:length(fieldnames(res))
 
-ttRC(:,1)    = "CR - ";
-ttBER(:,1)   = "BER - ";
+        line_style_idx  = mod(j-1, length(line_styles)) + 1;
+        marker_idx      = mod(j-1, length(markers)) + 1;
+    
+        T           = res.(sprintf('T%d',j));
+        what        = {char("SNR_dB")};%{'vsop','CFO'};
+        index       = zeros(1,length(what));
+        what_val    = zeros(1,length(what));
+        filename    = fn_keep{j};
 
-for j = 1:length(fieldnames(res))
+        for k = 1:length(what)
+    
+            index(k)       = findstr(filename,what{k});
+            
+            if strcmpi(what{k},'lr')
+                what_val(k) = str2double(filename(index(k)+length(what{k}):index(k)+6));
+                what_val(k) = what_val(k)/1e3;
+            else
+                is          = index(k)+length(what{k});
+                ie          = index(k)+length(what{k})+3;
+                what_val(k) = str2double(filename(is:ie));
+            end
+        end
 
-    line_style_idx  = mod(j-1, length(line_styles)) + 1;
-    marker_idx      = mod(j-1, length(markers)) + 1;
-
-    T           = res.(sprintf('T%d',j));
-    what        = {'vsop','CFO'};
-    index       = zeros(1,length(what));
-    what_val    = zeros(1,length(what));
-    filename    = fn_keep{j};
-
-    for k = 1:length(what)
-
-        index(k)       = findstr(filename,what{k});
-        
-        if strcmpi(what{k},'lr')
-            what_val(k) = str2double(filename(index(k)+length(what{k}):index(k)+6));
-            what_val(k) = what_val(k)/1e3;
-        else
-            what_val(k) = str2double(filename(index(k)+length(what{k}):index(k)+7));
+        for k = 1:length(what)
+            ttRC(j,k+1)   = sprintf('%s - %.1f',what{k},what_val(k));
+            ttBER(j,k+1)  = sprintf('%s - %.1f',what{k},what_val(k));
         end
     end
 
-    for k = 1:length(what)
-        ttRC(j,k+1)   = sprintf('%s - %.1f',what{k},what_val(k));
-        ttBER(j,k+1)  = sprintf('%s - %.1f',what{k},what_val(k));
-    end
-
-
     yyaxis left
+    ylim([1e-1,1.01])
         semilogy(T.NSbB,T.RateConv,...
             'color', 'k',...
             'LineStyle', line_styles{line_style_idx}, ...
@@ -235,12 +257,9 @@ for j = 1:length(fieldnames(res))
             'MarkerSize',15,...
             'LineWidth', k,...
             DisplayName=join(ttRC(j,:)));
-        ylabel('Success Rate (SR)',FontWeight='bold')
-    %     ylim([1e-1,1.01])
-    %     set(gca,'Yscale','log')
-
-        ylim([0,1.01])
-
+    ylabel('Success Rate (SR)',FontWeight='bold')
+    set(gca,'Yscale','log')
+    ylim([0,1.01])
 
     yyaxis right
         errorbar(T.NSbB,T.meanBER,T.stdBER,...
@@ -259,53 +278,68 @@ for j = 1:length(fieldnames(res))
         else
             ylim([1e-5,1])
         end
-        set(gca,'Yscale','log')
+else
+    errorbar(T.SNR_dB,T.meanBER,T.stdBER,...
+    'color', 'k',...
+    'MarkerFaceColor','k',...
+    'MarkerEdgeColor','k',...
+    'MarkerSize',15,...
+    'LineWidth', k)
+    ylim([1e-5,1e-1]*5)
+end
+set(gca,'Yscale','log')
 
+if ~AWGN
+    ax = gca;
+    ax.YAxis(1).Color = 'k';
+    ax.YAxis(2).Color = 'b';
+    
+    yyaxis left
+        h = plot([min(caracs3{2}),max(caracs3{2})],[1,1]*fec_limit, ...
+            '-r',LineWidth=5);
+end
+h = plot([15,25],[1,1]*fec_limit, ...
+    '-r',LineWidth=5);
+annotation('textbox',...
+[0.56,0.61,0.35,0.04],'Color',[1 0 0],...
+'String',{'$\mathbf{FEC~limit = 2.8\cdot 10^{-2}}$'},...
+'Interpreter','latex',...
+'FontWeight','bold',...
+'FontSize',20,...
+'FitBoxToText','off',...
+'EdgeColor','none');
+set(h,"DisplayName",'')
+
+if ~AWGN
+    lgd         = legend(Location="southoutside",NumColumns=2);
+    entries     = get(lgd, 'String');
+    newEntries  = entries(1:end-1);
+    set(lgd, 'String', newEntries);
 end
 
-
-ax = gca;
-ax.YAxis(1).Color = 'k';
-ax.YAxis(2).Color = 'b';
-
-yyaxis right
-    h = plot([min(caracs3{2}),max(caracs3{2})],[1,1]*fec_limit, ...
-        '-r',LineWidth=5);
-    annotation('textbox',...
-    [0.56,0.89,0.35,0.04],'Color',[1 0 0],...
-    'String',{'$\mathbf{FEC~limit = 2.8\cdot 10^{-2}}$'},...
-    'Interpreter','latex',...
-    'FontWeight','bold',...
-    'FontSize',20,...
-    'FitBoxToText','off',...
-    'EdgeColor','none');
-    set(h,"DisplayName",'')
-
-
-
+if AWGN
+    lgd = legend(sprintf("%s  - Rs %d [GBd]",algo,caracs1{2}));
+end
 box on
-lgd = legend(Location="southoutside",NumColumns=2);
-entries = get(lgd, 'String');
-newEntries = entries(1:end-1);
-set(lgd, 'String', newEntries);
 legend boxoff
 set(gcf, 'Position', [0.0198,0.0009,0.5255,0.8824])
+set(lgd,'Interpreter','latex')
 
+if ~AWGN
+    if SNR == 17 && caracs2b{2} == 64
+        title(lgd,'\textbf{@SNR = 17 [dB], $R_s =$ 64 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
+    
+    elseif SNR == 17 && caracs2b{2} == 128
+        title(lgd,'\textbf{@SNR = 17 [dB], $R_s =$ 128 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
+    
+    elseif SNR == 25 && caracs2b{2} == 64
+        title(lgd,'\textbf{@SNR = 25 [dB], $R_s =$ 64 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
+    
+    elseif SNR == 25 && caracs2b{2} == 128
+        title(lgd,'\textbf{@SNR = 25 [dB], $R_s =$ 128 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
 
-if SNR == 17 && caracs2b{2} == 64
-    title(lgd,'\textbf{@SNR = 17 [dB], $R_s =$ 64 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
-
-elseif SNR == 17 && caracs2b{2} == 128
-    title(lgd,'\textbf{@SNR = 17 [dB], $R_s =$ 128 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
-
-elseif SNR == 25 && caracs2b{2} == 64
-    title(lgd,'\textbf{@SNR = 25 [dB], $R_s =$ 64 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
-
-elseif SNR == 25 && caracs2b{2} == 128
-    title(lgd,'\textbf{@SNR = 25 [dB], $R_s =$ 128 [GBd], CFO $\times$ 10 [kHz], $v_{SoP} \times$ 10 [krad/s]}');
-
+    end
 end
-
 
 
 
@@ -317,7 +351,7 @@ saveas(f,[filename(1:end-3),'png'])
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----
-%   import_data                     (1.1.1)
+%   import_data                     (1.1.2)
 % ---------------------------------------------
 
 
@@ -364,6 +398,12 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
 
     % Sorting the files
     Nfiles  = length(filenames);
+
+    if Nfiles == 0 && ~isempty(varargin)
+        error(sprintf('\n\n\t\t\tno files found for: %s\n\n',join(varargin{1})))
+    elseif Nfiles == 0
+        error('no files found.')
+    end
     tmp     = strings(Nfiles,1);
 
     for k = 1:Nfiles

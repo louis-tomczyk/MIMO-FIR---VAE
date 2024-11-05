@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 2.2.0
-%   Date            : 2024-10-28
+%   Version         : 2.3.0
+%   Date            : 2024-11-05
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -14,7 +14,7 @@
 %   2023-10-09  (1.0.0)
 %   2024-03-04  (1.1.0) [NEW] plot poincare sphere
 %   2024-03-29  (1.1.1) data.FrameChannel -> data.FrameChannel
-%   2024-04-18  (1.1.3) import_data
+%   2024-04-18  (1.1.3) IMPORT_DATA
 %   2024-04-19  (1.1.4) <Err Theta>
 %   ------------------
 %   2024-07-06  (2.0.0) encapsulation into modules
@@ -23,17 +23,19 @@
 %   2024-07-10  (2.0.2) flexibility and naming standardisation
 %   2024-07-11  (2.0.3) cleaning caps structure 
 %   2024-07-12  (2.0.4) phase noise management --- for rx['mode'] = 'pilots'
-%                       import_data: caps structuring
+%                       IMPORT_DATA: caps structuring
 %   2024-07-16  (2.0.5) multiple files processing
-%   2024-07-19  (2.0.6) import_data: managing files not containing data
+%   2024-07-19  (2.0.6) IMPORT_DATA: managing files not containing data
 %   2024-07-23  (2.0.7) progression bar
-%   2024-07-25  (2.1.0) import_data (1.1.0): finner selection of files
+%   2024-07-25  (2.1.0) IMPORT_DATA (1.1.0): finner selection of files
 %                       wrong values saved in <Err *> corrected
 %   2024-07-26  (2.1.1) improved progression bar and selection of files
-%                       import_data (1.1.1): wrong loop conditin for finner
+%                       IMPORT_DATA (1.1.1): wrong loop conditin for finner
 %                           selection of files
 %   2024-10-10  (2.1.2) cleaning + carac5
 %   2024-10-28  (2.2.0) metrics.phis.ErrMedian(end) -> metrics.phis.ErrMedian(kdata)
+%   2024-11-05  (2.3.0) adding AWGN,
+%                       IMPORT_DATA (1.1.2) raise error if no file
 %
 % ----- MAIN IDEA -----
 %   See VAE ability to tract the State of Polarisation
@@ -55,12 +57,12 @@
 %% MAINTENANCE
 rst
 format long
-caps.log.Date = '24-10-14-16';
-caracs1   = {'CFO',[1]};         % {Nplts, dnu}
-caracs2   = {'vsop',1};       % {fpol, ThEnd}
+caps.log.Date = '24-11-05';
+caracs1   = {'NSbF',[10]};         % {Nplts, dnu}
+caracs2   = {'ThEnd',0};       % {fpol, ThEnd}
 % caracs3   = {'NSbB',[50,100,150,200,250,300,350,400,450,500]};
-caracs3   = {'NSbB',[500]};
-caracs4   = {'SNR_dB',[17]};
+caracs3   = {'NSbB',[250]};
+caracs4   = {'SNR_dB',[25,20]};
 caracs5   = {'Rs',[64]};
 
 caps.plot.fir           = 1;
@@ -72,7 +74,7 @@ caps.method.phis        = 'eig';
 caps.save.errs          = 1;
 caps.save.mean_errs     = 1;
 caps.what_carac         = caracs1{1};
-nrea                    = 10;
+nrea                    = 1;
 
 count = 0;
 for ncarac1 = 1:length(caracs1{2})
@@ -94,7 +96,7 @@ for ncarac1 = 1:length(caracs1{2})
                     caps.log.myInitPath     = pwd();
     
                     caracs         = [sprintf("%s %.1f",caracs1{1},caracs1{2}(ncarac1));... % if dnu add space
-                                      sprintf("%s %.1f",caracs2{1},caracs2{2}(ncarac2));...  % {%d ThEnd,%.1f fpol}
+                                      sprintf("%s %d",caracs2{1},caracs2{2}(ncarac2));...  % {%d ThEnd,%.1f fpol}
                                       sprintf("%s %d ",caracs3{1},caracs3{2}(ncarac3));...
                                       sprintf("%s %d",caracs4{1},caracs4{2}(ncarac4));...
                                       sprintf("%s %d",caracs5{1},caracs5{2}(ncarac5))];
@@ -186,10 +188,10 @@ for ncarac1 = 1:length(caracs1{2})
                             'mean','std','rms'});
 %                         writetable(single(Mthetas),str_tmp)
                         cd(caps.log.myInitPath)
-                        cd ../err/sum_up_theta
-                            writematrix(real(Mthetas),str_tmp)
-                        cd(caps.log.myInitPath)
-                        cd ../err/thetas
+%                         cd ../err/sum_up_theta
+%                             writematrix(real(Mthetas),str_tmp)
+%                         cd(caps.log.myInitPath)
+%                         cd ../err/thetas
 
                         if caps.phis_est
                             cd ../phis
@@ -208,9 +210,7 @@ for ncarac1 = 1:length(caracs1{2})
                             writematrix(Mphis,str_tmp)
                         end
                     end
-                    
-                    
-                    
+
                     cd(caps.log.myRootPath)
                 end
             end
@@ -223,7 +223,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----             
-%   import_data         (1.1.1)
+%   import_data         (1.1.2)
 % ---------------------------------------------
 
 function [allData, caps] = import_data(acceptedFormats,caps,varargin)
@@ -269,6 +269,12 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
 
     % Sorting the files
     Nfiles  = length(filenames);
+
+    if Nfiles == 0 && ~isempty(varargin)
+        error(sprintf('\n\n\t\t\tno files found for: %s\n\n',join(varargin{1})))
+    elseif Nfiles == 0
+        error('no files found.')
+    end
     tmp     = strings(Nfiles,1);
 
     for k = 1:Nfiles
@@ -333,6 +339,7 @@ function [allData, caps] = import_data(acceptedFormats,caps,varargin)
     caps.log.Fn         = allFilenames;
     caps.log.PathSave   = allPathnames;
     caps.log.Nfiles     = length(allData);
+
 end
 %-----------------------------------------------------
 
