@@ -456,55 +456,55 @@ def print_results(loss, frame, tx, fibre, rx, saving):
         thetak = 0
 
 
-    # if not tx['server']:
-    #     if rx["mimo"].lower() == 'vae':
-    #         if tx['flag_phase'] == 1:
-    #             print("frame %d" % frame,
-    #                   '--- loss     = %.1f'     % lossk,
-    #                   '--- SNRdB    = %.2f'     % SNRdBk,
-    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
-    #                   '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
-    #                   '--- <SER>    = %.2e'     % SERmeank,
-    #                    '--- dt       = %.2e'    % dt \
-    #                        if tx['get_time'] \
-    #                        else None
-    #                   )
-    #         else:
-    #             print("frame %d" % frame,
-    #                   '--- loss     = %.1f'     % lossk,
-    #                   '--- SNRdB    = %.2f'     % SNRdBk,
-    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
-    #                   '--- <SER>    = %.2e'     % SERmeank,
-    #                    '--- dt       = %.2e'    % dt \
-    #                        if tx['get_time'] \
-    #                        else None
-    #                   )
+    if not tx['server']:
+        if rx["mimo"].lower() == 'vae':
+            if tx['flag_phase'] == 1:
+                print("frame %d" % frame,
+                      '--- loss     = %.1f'     % lossk,
+                      '--- SNRdB    = %.2f'     % SNRdBk,
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
+                      '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :,rx['Frame']])*180/np.pi),
+                      '--- <SER>    = %.2e'     % SERmeank,
+                        '--- dt       = %.2e'    % dt \
+                            if tx['get_time'] \
+                            else None
+                      )
+            else:
+                print("frame %d" % frame,
+                      '--- loss     = %.1f'     % lossk,
+                      '--- SNRdB    = %.2f'     % SNRdBk,
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
+                      '--- <SER>    = %.2e'     % SERmeank,
+                        '--- dt       = %.2e'    % dt \
+                            if tx['get_time'] \
+                            else None
+                      )
                 
-    #     else:
-    #         if tx['flag_phase'] == 1:
-    #             print("frame %d" % frame,
-    #                   '--- loss     = %.3e'     % lossk,
-    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
-    #                   '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
-    #                   '--- <SER>    = %.2e'     % SERmeank,
-    #                    '--- dt       = %.2e'    % dt \
-    #                        if tx['get_time'] \
-    #                        else None
-    #                   )
-    #         else:
-    #             print("frame %d" % frame,
-    #                   '--- loss     = %.3e'     % lossk,
-    #                   '--- Theta    = %.2e'     % (thetak*180/np.pi),
-    #                   '--- <SER>    = %.2e'     % SERmeank,
-    #                    '--- dt       = %.2e'    % dt \
-    #                        if tx['get_time'] \
-    #                        else None
-    #                   )
+        else:
+            if tx['flag_phase'] == 1:
+                print("frame %d" % frame,
+                      '--- loss     = %.3e'     % lossk,
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
+                      '--- std(Phi) = %.1e'     % (np.std(tx["PhaseNoise"][0, :, rx["Frame"]])*180/np.pi),
+                      '--- <SER>    = %.2e'     % SERmeank,
+                        '--- dt       = %.2e'    % dt \
+                            if tx['get_time'] \
+                            else None
+                      )
+            else:
+                print("frame %d" % frame,
+                      '--- loss     = %.3e'     % lossk,
+                      '--- Theta    = %.2e'     % (thetak*180/np.pi),
+                      '--- <SER>    = %.2e'     % SERmeank,
+                        '--- dt       = %.2e'    % dt \
+                            if tx['get_time'] \
+                            else None
+                      )
     
     
-    # if tx['get_time']:
-    #     dt      = np.array(tx['get_exec_time'][2][0,:rx['Frame']+1]).reshape((-1,1))
-    #     array   = np.concatenate((array,dt),axis = 1)
+    if tx['get_time']:
+        dt      = np.array(tx['get_exec_time'][2][0,:rx['Frame']+1]).reshape((-1,1))
+        array   = np.concatenate((array,dt),axis = 1)
 
     return array
 

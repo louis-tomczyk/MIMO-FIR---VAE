@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.1.5
-#   Date            : 2024-07-10
+#   Version         : 1.1.6
+#   Date            : 2024-11-08
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -23,6 +23,7 @@
 #                        along with rxdsp (1.6.2), processing (1.3.2)
 #   1.1.5 (2024-07-10) - naming normalisation (*frame*-> *Frame*).
 #                        along with main (1.4.3)
+#   1.1.6 (2024-11-08) - Inf numpy
 #
 # ----- MAIN IDEA -----
 #   Library for CMA equalizer in (optical) telecommunications
@@ -64,7 +65,6 @@
 # =============================================================================
 
 import numpy as np
-from numpy.core.numeric import Inf
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -77,7 +77,8 @@ import lib_plot as plot
 from lib_matlab import clc
 import time
 
-pi = np.pi
+pi  = np.pi
+Inf = np.inf
 
 #%% ===========================================================================
 # --- CONTENTS

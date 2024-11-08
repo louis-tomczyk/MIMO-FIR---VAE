@@ -131,12 +131,12 @@ Rs                      = 64e9          # [Baud] Symbol rate
 rxmimo                  = "vae"         # {cma, vae}
 rxmode                  = "pilots"      # {blind, pilots}
 
-CFO_or_dnu              = 'CFO'         # {CFO, dnu, none}
-SoPlin_or_fpol          = 'soplin'        # {SoPlin, fpol, none}
-Nf_lim                  = 'ph-cfo'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
-NFramesChannel          = 50
+CFO_or_dnu              = 'none'         # {CFO, dnu, none}
+SoPlin_or_fpol          = 'fpol'      # {SoPlin, fpol, none}
+Nf_lim                  = 'th-fpol'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
 
-paramNSbB               = [450,400,350,300,250,200,150,100,50]
+# NFramesChannel          = 50          # uncomment for AWGN
+# paramNSbB               = [250]
 # NframesTrain            = 10
 # NSbF                    = 1e4
 # NSbB                    = 250
@@ -144,13 +144,13 @@ paramNSbB               = [450,400,350,300,250,200,150,100,50]
 
 # -----------------------------------------------------------------------------
 if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
-    Vsop        = np.array([5])*1e4                               # [rad/s]
-    Th_End      = 5e-2              # (NF > x) <=> Th_End > sqrt(2x/pi) * NSbF*V/Rs
+    Vsop        = np.array([100,50])*1e4                               # [rad/s]
+    Th_End      = 22.5*pi/180              # (NF > x) <=> Th_End > sqrt(2x/pi) * NSbF*V/Rs
     SoPlin      = np.array([1])
     plot_th     = 1
     
 elif SoPlin_or_fpol.lower() == 'soplin':
-    SoPlin      = np.array([1])*1e4
+    SoPlin      = np.array([1])
     Th_End      = 0
     Vsop        = np.array([1])
     plot_th     = 1
@@ -163,14 +163,14 @@ elif SoPlin_or_fpol.lower() == 'none':
 
 # -----------------------------------------------------------------------------
 if CFO_or_dnu.lower() == 'dnu':
-    Dnus        = np.array([10])*1e4                               # [Hz]
-    Ph_End      = 45*pi/180
+    Dnus        = np.array([5])*1e4                               # [Hz]
+    Ph_End      = 1e-5
     CFO         = np.array([1])
     plot_ph     = 1
 
 elif CFO_or_dnu.lower() == 'cfo':
     CFO         = np.array([1])*1e4
-    Ph_End      = 0
+    Ph_End      = pi/4
     Dnus        = np.array([1])
     plot_ph     = 1
     
@@ -356,12 +356,10 @@ else:
 #%% ===========================================================================
 # --- FUNCTIONS ---
 # =============================================================================
-def process_data(nsnr,nrea,nNSbB,npol,nphi,tx,fibre,rx,*varargin):
+def process_data(nrea,npol,nphi,nsnr,tx,fibre,rx,*varargin):
 
     if len(varargin) != 0:
         NFramesChannel = varargin[0]
-        
-    rx['NSymbBatch'] = paramNSbB[nNSbB]
         
 # -----------------------------------------------------------------------------
 # check 'learning rate tuning cma' for curves
@@ -373,10 +371,10 @@ def process_data(nsnr,nrea,nNSbB,npol,nphi,tx,fibre,rx,*varargin):
             elif paramSNR[nsnr] < 20 and tx['Rs'] < 100e9:
                 rx['FrameChannel']  = int(np.ceil(10.88+0.07*rx['NSymbBatch']))
 
-            elif paramSNR[nsnr] > 20 and tx['Rs'] > 100e9:
+            elif paramSNR[nsnr] >20 and tx['Rs'] > 100e9:
                 rx['FrameChannel']  = int(np.ceil(-0.12+0.03*rx['NSymbBatch']))
 
-            elif paramSNR[nsnr] > 20 and tx['Rs'] < 100e9:
+            elif paramSNR[nsnr] >20 and tx['Rs'] < 100e9:
                 rx['FrameChannel']  = int(np.ceil(1.88+0.03*rx['NSymbBatch']))
     else:
         rx['FrameChannel'] = 1
@@ -412,6 +410,7 @@ def process_data(nsnr,nrea,nNSbB,npol,nphi,tx,fibre,rx,*varargin):
 
     tx, rx                              = set_Batches_Frames(tx,rx)
 # -----------------------------------------------------------------------------
+
 
     if not server:
         if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
@@ -480,14 +479,13 @@ for nsnr in range(len(paramSNR)):
     for nrea in range(Nrea):
         print(f"nrea = {nrea}")
 
-        for nNSbB in range(len(paramNSbB)):
-            for npol in range(len(paramPOL[0])):
-                for nphi in range(len(paramPHI)):
-    
-                    if 'NFramesChannel' not in locals():
-                        tx,fibre,rx     = process_data(nsnr,nrea,nNSbB,npol,nphi,tx,fibre,rx)
-                    else:
-                        tx,fibre,rx     = process_data(nsnr,nrea,nNSbB,npol,nphi,tx,fibre,rx,NFramesChannel)
+        for npol in range(len(paramPOL[0])):
+            for nphi in range(len(paramPHI)):
+
+                if 'NFramesChannel' not in locals():
+                    tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx)
+                else:
+                    tx,fibre,rx     = process_data(nrea,npol,nphi,nsnr,tx,fibre,rx,NFramesChannel)
                     
 cuda.empty_cache()
 
