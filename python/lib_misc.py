@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 2.1.4
-#   Date            : 2024-11-05
+#   Version         : 2.1.6
+#   Date            : 2024-11-13
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -61,6 +61,9 @@
 #   2.1.4 (2024-11-05) - save2mat: adding vsop and SoPLin
 #                      - init_dict: saving["server"] corrected
 #                      - tx['flag_phase_noise] -> tx['flag_phase]
+#   2.1.5 (2024-11-10) - create_xml_file: vsop/CFO rounding
+#   2.1.6 (2024-11-13) - create_xml_file: dnu rounding
+#   2.1.7 (2024-11-16) - organise_files: xml and log files management
 #
 # ----- MAIN IDEA -----
 #   Miscellaneous functions for logistics
@@ -337,7 +340,7 @@ def create_xml_file(tx,fibre,rx,saving,gen,*varargin):
             CHANNEL.append('vsop')
             
             CHANNELpar.append(np.round(fibre["ThetasLaw"]['theta_in']*180/np.pi,0))
-            CHANNELpar.append(np.round(fibre['vsop']*1e-4,0))          #[Mrad/s]
+            CHANNELpar.append(int(fibre['vsop']*1e-4))    # [10x krad/s]
             
         
         if fibre["ThetasLaw"]["law"] == "tri":
@@ -372,7 +375,7 @@ def create_xml_file(tx,fibre,rx,saving,gen,*varargin):
                     int(tx["Rs"]*1e-9),
                     tx['NsampTaps'],
                     tx['SNRdB'],
-                    int(tx["dnu"]*1e-3) if tx['PhiLaw']["kind"] == "Rwalk"\
+                    round(tx["dnu"]*1e-4,1) if tx['PhiLaw']["kind"] == "Rwalk"\
                     else tx['PhiLaw']["law"],
                     ]
     
@@ -390,7 +393,7 @@ def create_xml_file(tx,fibre,rx,saving,gen,*varargin):
                 
                 Sph = (tx["PhiLaw"]['End']-tx["PhiLaw"]['Start'])/(rx['NFrames']-rx['FrameChannel']) # [rad]
                 TXpar.append(int(tx["PhiLaw"]['End']*180/pi))
-                TXpar.append(round(tx["PhiLaw"]['CFO']*1e-4,1))
+                TXpar.append(int(tx["PhiLaw"]['CFO']*1e-4))
     else:
         TXpar = TXpar[:-1]
     
@@ -831,26 +834,32 @@ def my_zeros_tensor(size,device='cpu',dtype=torch.float32,requires_grad=False):
 
 
 #%%
-def organise_files(directory):
+def organise_files(directory,gen_xml):
     # Define the main target directories
     figs_dir    = os.path.join(directory, 'figs')
     mat_dir     = os.path.join(directory, 'mat')
+    log_dir     = os.path.join(directory, 'log')
     csv_dir     = os.path.join(directory, 'csv')
-    xml_dir     = os.path.join(directory, 'xml')
     err_dir     = os.path.join(directory, 'err')
     err_dir_bt  = os.path.join(err_dir, 'betas')
     err_dir_th  = os.path.join(err_dir, 'thetas')
     err_dir_ph  = os.path.join(err_dir, 'phis')
-    
+    if gen_xml:
+        xml_dir     = os.path.join(directory, 'xml')
+        
     # Create the main target directories if they don't exist
     os.makedirs(figs_dir,   exist_ok=True)
     os.makedirs(mat_dir,    exist_ok=True)
     os.makedirs(csv_dir,    exist_ok=True)
-    os.makedirs(xml_dir,    exist_ok=True)
+    os.makedirs(log_dir,    exist_ok=True)
     os.makedirs(err_dir,    exist_ok=True)
     os.makedirs(err_dir_bt, exist_ok=True)
     os.makedirs(err_dir_th, exist_ok=True)
     os.makedirs(err_dir_ph, exist_ok=True)
+    if gen_xml:
+        os.makedirs(xml_dir,    exist_ok=True)
+
+
     
     # Create subdirectories for images
     python_dir      = os.path.join(figs_dir, 'python')
@@ -881,6 +890,9 @@ def organise_files(directory):
 
             elif filename.endswith('.xml'):
                 shutil.move(filepath, os.path.join(xml_dir, filename))
+                
+            elif filename.endswith('.log'):
+                shutil.move(filepath, os.path.join(log_dir, filename))
 
             elif filename.endswith('.csv'):
                 if 'err_bt' in filename.lower():

@@ -3,8 +3,8 @@
 #   Author          : louis tomczyk
 #   Institution     : Telecom Paris
 #   Email           : louis.tomczyk@telecom-paris.fr
-#   Version         : 1.3.12
-#   Date            : 2024-11-05
+#   Version         : 1.3.13
+#   Date            : 2024-11-16
 #   License         : GNU GPLv2
 #                       CAN:    commercial use - modify - distribute -
 #                               place warranty
@@ -62,6 +62,8 @@
 #                           to txdsp.set_Nsymbols, txdsp (2.0.2)
 #   1.3.12(2024-11-05) - print_result: tx['get_time'] instead of 'get_exec_time
 #                         tx['flag_phase_noise] -> tx['flag_phase]
+#   1.3.12(2024-11-15) - import alias of lib_matlab: mat-> mb
+#                         print_result: mat.linspace -> mb.linspace
 # 
 # ----- MAIN IDEA -----
 #   Simulation of an end-to-end linear optical telecommunication system
@@ -120,7 +122,7 @@ import lib_txdsp as txdsp
 import lib_txhw as txhw
 import lib_rxdsp as rxdsp
 import lib_plot as plot
-import lib_matlab as mat
+import lib_matlab as mb
 from lib_matlab import clc
 
 
@@ -443,7 +445,7 @@ def print_results(loss, frame, tx, fibre, rx, saving):
 
     Losses      = misc.list2vector(Losses)
     SERs        = misc.list2vector(SERs)
-    Iteration   = mat.linspace(1, len(Losses), len(Losses))
+    Iteration   = mb.linspace(1, len(Losses), len(Losses))
     
     if rx['mimo'].lower() == "vae":
         array   = np.concatenate((Iteration, Losses, SNRdBs, SERs), axis=1)

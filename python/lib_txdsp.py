@@ -825,7 +825,6 @@ def pilot_insertion(tx,rx,what_pilots_k,*varargin):
                 
         tx['Symb_{}_cplx'.format(pilots_function)] =\
             tx['pilots_{}_cplx_up'.format(pilots_function)][:,:,::tx['Nsps']]
-        # plot.constellations(tx['Symb_{}_cplx'.format(pilots_function)])
 
         if ('once' in pilots_function) or ('same' in pilots_changes):
             tx['{}_flag_all_same'.format(pilots_function)] = 1

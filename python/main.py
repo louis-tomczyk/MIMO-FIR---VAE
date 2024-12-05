@@ -116,7 +116,7 @@ if "infres" in PWD(show = False).lower():
 else:
     server  = 0
 
-server      = 0
+server      = 1
 gen_xml     = 0
 sort_files  = 1
 get_time    = 0
@@ -125,18 +125,18 @@ get_time    = 0
 #%% ===========================================================================
 # --- MAIN parameters
 # =============================================================================
-Nrea                    = 1
-paramSNR                = [17]          # {21-cma, 17-vae}
+Nrea                    = 5
+paramSNR                = [21,22]          # {21-cma, 17-vae}
 Rs                      = 64e9          # [Baud] Symbol rate
 rxmimo                  = "vae"         # {cma, vae}
 rxmode                  = "pilots"      # {blind, pilots}
 
 CFO_or_dnu              = 'CFO'         # {CFO, dnu, none}
-SoPlin_or_fpol          = 'soplin'        # {SoPlin, fpol, none}
-Nf_lim                  = 'ph-cfo'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
+SoPlin_or_fpol          = 'fpol'        # {SoPlin, fpol, none}
+Nf_lim                  = 'th-fpol'      # {ph-dnu, ph-cfo, th-lin, th-fpol}
 NFramesChannel          = 50
 
-paramNSbB               = [450,400,350,300,250,200,150,100,50]
+paramNSbB               = [250]
 # NframesTrain            = 10
 # NSbF                    = 1e4
 # NSbB                    = 250
@@ -144,8 +144,8 @@ paramNSbB               = [450,400,350,300,250,200,150,100,50]
 
 # -----------------------------------------------------------------------------
 if SoPlin_or_fpol.lower() == 'fpol' or SoPlin_or_fpol.lower() == 'vsop':
-    Vsop        = np.array([5])*1e4                               # [rad/s]
-    Th_End      = 5e-2              # (NF > x) <=> Th_End > sqrt(2x/pi) * NSbF*V/Rs
+    Vsop        = np.array([50,100,500,1000])*1e4                               # [rad/s]
+    Th_End      = pi/4              # (NF > x) <=> Th_End > sqrt(2x/pi) * NSbF*V/Rs
     SoPlin      = np.array([1])
     plot_th     = 1
     
@@ -202,7 +202,7 @@ tx['Rs']                = Rs
 
 
 tx["mod"]               = '64QAM' # {4,16,64}QAM
-tx["nu"]                = 0.0254  # for PCS: exp(-nu*|x|^2)/...
+tx["nu"]                = 0  # for PCS: exp(-nu*|x|^2)/...
 
 
 if 'NSbF' not in locals():
@@ -498,9 +498,9 @@ cuda.empty_cache()
 if sort_files:
     misc.move_files_to_folder(int(Date[2:4]))
     misc.merge_data_folders(saving)
-    path = PWD(show=False)+f'/data-{Date[2:]}'
+    path = PWD(show=False)+f'/data-{Date[2:]}'#f'/data-24-11-25'#
     misc.remove_n_characters_from_filenames(path, 20)
-    misc.organise_files(path)
+    misc.organise_files(path,gen_xml)
 
 # =============================================================================
 # 
