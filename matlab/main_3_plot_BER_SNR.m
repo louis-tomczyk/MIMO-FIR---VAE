@@ -31,8 +31,9 @@
 
 %% import data
 rst
-% caps.log.Date = '24-10-14';
-caps.log.myInitPath     = [pwd(),'/../data/data-JLT'];
+caps.log.Date = '24-11-05';
+% caps.log.myInitPath     = [pwd(),'/../data/data-JLT'];
+caps.log.myInitPath     = [pwd(),'/../python/data-24-11-05'];
 cd(caps.log.myInitPath)
 [allData,caps]          = import_data({'.csv'},caps);
 
