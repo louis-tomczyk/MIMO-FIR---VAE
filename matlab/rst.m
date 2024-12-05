@@ -3,14 +3,17 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 1.0.0
-%   Date            : 2024-07-09
+%   Version         : 1.1.1
+%   Date            : 2024-11-26
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
 %                       MUST:   share alike - include license
 %
 % ----- CHANGE LOG -----
+%   2024-07-09  (1.0.0)
+%   2024-11-08  (1.1.0) warning_nfiles
+%   2024-11-26  (1.1.1) warning_nfiles set to 1
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -45,6 +48,9 @@ addpath ./lib
 currentDate         = datetime('now');
 caps.log.Date       = datestr(currentDate, 'yy-mm-dd');
 caps.log.myRootPath = pwd();
+caps.log.warning_nfiles     = 1;
+caps.log.warning_no_files   = 0;
+
 
 
 
