@@ -1,3 +1,36 @@
+% ---------------------------------------------
+% ----- INFORMATIONS -----
+%   Author          : louis tomczyk
+%   Institution     : Telecom Paris
+%   Email           : louis.tomczyk@telecom-paris.fr
+%   Version         : 1.0.0
+%   Date            : 2024-11-13
+%   License         : cc-by-nc-sa
+%                       CAN:    modify - distribute
+%                       CANNOT: commercial use
+%                       MUST:   share alike - include license
+%
+% ----- MAIN IDEA -----
+%   Unwrap when Matlab unwrapping fails because angle shifts
+%   are below pi/2
+%
+% ----- INPUTS -----
+% ----- OUTPUTS -----
+% ----- EXAMPLE -----
+%    S = Jones2Stockes(J,{'track',k,'Nstates',Nstates});
+%
+% ----- BIBLIOGRAPHY -----
+%   Articles/Books
+%   Authors             :
+%   Title               :
+%   Jounal/Editor       :
+%   Volume - N°         : 
+%   Date                :
+%   DOI/ISBN            :
+%   Pages               :
+% ---------------------------------------------
+%%
+
 function y = handmade_unwrap(x,varargin)
 
     if ~isempty(varargin)
