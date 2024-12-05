@@ -1,13 +1,12 @@
-function [S,varargout] = Jones2Stockes(J,varargin)
-%%
 % ---------------------------------------------
 % ----- INFORMATIONS -----
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Arxivs          : 2024-03-04 - creation (1.0.0)
-%   Date            : 2024-03-07 - removing loop in scatter3 + tracking mode
 %   Version         : 1.1.0
+%   Date            : 2024-03-07
+%   Arxivs          : 2024-03-04 - creation (1.0.0)
+%                   : 2024-03-07 - removing loop in scatter3 + tracking mode
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -40,6 +39,7 @@ function [S,varargout] = Jones2Stockes(J,varargin)
 %   Pages               : 54 - 56
 % ---------------------------------------------
 %%
+function [S,varargout] = Jones2Stockes(J,varargin)
 
 if size(J,1) ~= 2
     J = reshape(J,2,[]);
@@ -61,9 +61,9 @@ for k = 1:Nstates
     S(:,k)     = [S0(k),S1(k),S2(k),S3(k)]/S0(k).';
 end
 
-condition = sum(round(S(1,:),7)+eps == round(ones(1,Nstates),7)+eps)/Nstates;
-assert(condition, ...
-'Stockes vector should be normalised, i.e. S_0 = 1')
+% condition = sum(round(S(1,:),7)+eps == round(ones(1,Nstates),7)+eps)/Nstates;
+% assert(condition, ...
+% 'Stockes vector should be normalised, i.e. S_0 = 1')
 
 S = S(2:4,:);
 

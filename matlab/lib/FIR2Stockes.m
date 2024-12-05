@@ -1,13 +1,10 @@
-function [S,f] = FIR2Stockes(FIR,varargin)
-%%
 % ---------------------------------------------
 % ----- INFORMATIONS -----
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Arxivs          : 
-%   Date            : 2024-03-08 - creation
-%   Version         : 1.0.0
+%   Version         : 1.1.0
+%   Date            : 2024-03-08
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -44,6 +41,7 @@ function [S,f] = FIR2Stockes(FIR,varargin)
 %   Pages               : 776-778
 % ---------------------------------------------
 %%
+function [S,f] = FIR2Stockes(FIR,varargin)
 
 [JH,~] = FIR2Jones(FIR);
 

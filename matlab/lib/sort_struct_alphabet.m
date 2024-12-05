@@ -1,14 +1,12 @@
-function myStruct = sort_struct_alphabet(myStruct)
-
 % ---------------------------------------------
 % ----- INFORMATIONS -----
-%   Function name   : TX - Transmitter
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
+%   Version         : 2.0.0
+%   Date            : 2024-02-19
 %   ArXivs          : 2023-08-30 (1.0.0)
-%   Date            : 2024-02-19: first structures, then others
-%   Version         : 2.0
+%                   : 2024-02-19 (2.0.0) first structures, then others
 %
 % ----- Main idea ----- 
 % ----- INPUTS -----
@@ -19,6 +17,9 @@ function myStruct = sort_struct_alphabet(myStruct)
 %
 % ----- BIBLIOGRAPHY -----
 % ---------------------------------------------
+
+function myStruct = sort_struct_alphabet(myStruct)
+
     nfields         = length(fieldnames(myStruct));
     index_structs   = zeros(1,nfields);
     fieldNames      = fieldnames(myStruct);

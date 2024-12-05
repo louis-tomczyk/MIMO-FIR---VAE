@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 1.1.0
-%   Date            : 2024-07-26
+%   Version         : 1.2.1
+%   Date            : 2024-12-01
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -21,6 +21,10 @@
 %   2024-07-25  (1.0.7) custom what_carac
 %   2024-07-26  (1.1.0) removed what_carac, along with main_0_python2matlab (2.1.1)
 %                       [REMOVED] nested functions
+%   2024-11-13  (1.1.1) handmade unwrapping field
+%   2024-11-26  (1.2.0) warning if no channel
+%   2024-12-01  (1.2.1) plot closing condition
+%
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
 % ----- OUTPUTS -----
@@ -52,12 +56,9 @@ data                    = sort_struct_alphabet(data);
 filename                = char(caps.log.Fn{caps.kdata});
 caps.log.filename       = ['matlab',filename(1:end-4)];
 
-if length(caps.log.Fn) > 1
+if ~isfield(caps.plot,'close')
     caps.plot.close     = 1;
-else
-    caps.plot.close     = 0;
 end
-
 
 caps.rx_mimo            = data.rx_mimo;
 caps.rx_mode            = data.rx_mode;
@@ -69,6 +70,11 @@ caps.NFrames.all        = double(data.NFrames);
 caps.NFrames.Channel    = caps.NFrames.all-caps.NFrames.Training;
 caps.NFrames.Channel    = caps.NFrames.all-caps.Frames.Channel;
 caps.Frames.array       = linspace(1,caps.NFrames.Channel,caps.NFrames.Channel);
+
+if caps.NFrames.Channel == 0
+    caps.log.warning_no_channel = 1;
+    fprintf('\t\t\t WARNING (extract_infos): no channel\n')
+end
 
 % batches
 caps.NBatches.Frame     = double(data.NBatchesFrame);
@@ -94,8 +100,6 @@ else
     caps.NBatches.Training  = caps.NBatches.FrameCut*caps.NFrames.Training;
 end
 
-
-
 if caps.phis_est
     caps.Batches.array      = linspace(1,caps.NBatches.Channel,caps.NBatches.Channel);
 else
@@ -112,9 +116,12 @@ caps.FIR.length             = double(data.NspTaps);
 caps.FIR.tap                = ceil(caps.FIR.length/2);
 caps.FIR.taps               = linspace(1,caps.FIR.length,caps.FIR.length)-caps.FIR.tap;
 
+caps.unwrap = 1;
 
 cd(caps.log.PathSave{1})
-caps = sort_struct_alphabet(caps);
+
+% caps = sort_struct_alphabet(caps);
+
 
 end
 

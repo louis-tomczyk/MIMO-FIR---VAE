@@ -3,9 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Arxivs          :
-%   Date            : 2024-07-15
-%   Version         : 1.0.4
+%   Version         : 1.1.4
+%   Date            : 2024-07-24
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -19,6 +18,7 @@
 %   2024-07-11  (1.0.2) phase noise management
 %   2024-07-12  (1.0.3) phase noise management --- for rx['mode'] = 'pilots'
 %   2024-07-15  (1.1.3) multiple files processing + poincare plotting without FIRgnd
+%   2024-07-15  (1.1.4) thetas.gnd updated with right value when theta_in ~= 0
 %
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -46,7 +46,9 @@
 
 function [thetas, phis] = extract_ground_truth(data,caps,thetas,phis)
     
-thetas.gnd  = data.thetas(caps.Frames.Channel+1:end,2)*180/pi;              % [deg]
+thetas_in   = data.thetas(caps.Frames.Channel+1:end,1)*180/pi;                  % [deg]
+thetas_out  = data.thetas(caps.Frames.Channel+1:end,2)*180/pi;                  % [deg]
+thetas.gnd  = thetas_in+thetas_out;                                             % [deg]
 
 if caps.phis_est
     if ~strcmpi(caps.rx_mode,'pilots')
@@ -83,9 +85,9 @@ if caps.plot.poincare
 
     J = zeros(2,caps.NFrames.Channel);
     for k = 1:caps.NFrames.Channel
-        m = k+caps.NFrames.Training;
-        THETA = data.thetas(m,2);
-        J(:,k) = [cos(THETA), sin(THETA)];
+        m       = k+caps.NFrames.Training;
+        THETA   = data.thetas(m,2);
+        J(:,k)  = [cos(THETA), -sin(THETA)];
     end
     
     params = {"marker"  ,'square'   ,...

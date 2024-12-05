@@ -1,7 +1,7 @@
 function [B,ndx,dbg] = sort_strings(A,rgx,varargin)
 
 	% -------------------------------------------------
-	%   LOUIS TOMCZYK comments --- 2024.05.30 --- 
+	%   louis tomczyk comments --- 2024.05.30 --- 
 	%   original function name: NATSORT
 	%   web address: mathworks.com/matlabcentral/fileexchange/47434-natural-order-filename-sort
 	% -------------------------------------------------

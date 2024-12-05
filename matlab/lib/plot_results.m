@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 1.2.0
-%   Date            : 2024-10-28
+%   Version         : 2.0.0
+%   Date            : 2024-12.01
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -20,6 +20,7 @@
 %   2024-07-16 (1.1.4)  multiple files processing
 %   2024-07-26 (1.1.5)  lighten the filenames + include estimation method
 %   2024-10-28 (1.2.0)  *plot_fir/plot_sop* (1.1.1) mean -> median
+%   2024-12-01 (2.0.0)  saving independently the plots
 % 
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
@@ -52,27 +53,53 @@ if ~isempty(varargin)
     phis.est    = varargin{1}.est;
 end
 
-
 H_ests_norm = prepare_plots(H_est);
+
+
+if caps.save.data
+
+    if ~isempty(varargin)
+        data.phis           = phis;
+    end
+    data.thetas         = thetas;
+    data.H_ests_norm    = H_ests_norm;
+    
+    cd(caps.log.myRootPath)
+    if ~isfolder("saved_data")
+        mkdir saved_data
+    end
+    cd saved_data/
+    caps.log.mySavePath = pwd();
+
+    caps.log.fname_save = strcat("saved_",caps.log.filename(7:end));
+    
+    save(strcat(caps.log.fname_save,'.mat'),"data")
+    cd(caps.log.myInitPath)
+
+end
+
 
 if caps.plot.fir
 
-    plot_fir(caps,H_ests_norm);
+    plot_fir(caps,H_ests_norm,caps.save.data);
     f = plot_SOP(caps,thetas,metrics);
 
     if ~isempty(varargin)
         f = plot_phi(caps,phis,metrics);
     end
 
-    cd ../figs/fir
-    exportgraphics(f,sprintf("%s.png",caps.log.filename))
-    cd(caps.log.myInitPath)
-    pause(0.25)
+    if ~caps.save.data
+        cd ../figs/fir
+        exportgraphics(f,sprintf("%s.png",caps.log.filename))
+        cd(caps.log.myInitPath)
+        pause(0.25)
+    end
 
-    if caps.plot.close
+    if caps.plot.close || caps.save.data
         close all
     end
-    
+
+
 end
 
 if caps.save.errs
@@ -92,6 +119,7 @@ if caps.save.errs
     end
 end
 
+
 cd(caps.log.myInitPath)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -99,9 +127,9 @@ cd(caps.log.myInitPath)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % ---------------------------------------------
 % ----- CONTENTS -----
-%   plot_fir            (1.1.0)
-%   plot_phi            (1.1.1)
-%   plot_SOP            (1.1.1)
+%   plot_fir            (1.2.0)
+%   plot_phi            (1.2.0)
+%   plot_SOP            (1.2.0)
 %   prepare_plots
 % ---------------------------------------------
 
@@ -124,53 +152,79 @@ H_ests_norm = H_ests_abs/norm_factor;
 % ---------------------------------------------
 
 
-function f = plot_fir(caps,H_ests_norm)
+function f = plot_fir(caps,H_ests_norm,varargin)
 
 f = figure(1);
-    subplot(2,2,1);
-        hold on
-        plot(caps.FIR.taps,abs(H_ests_norm(:,1)),LineWidth=5,Color='k')
-        plot(caps.FIR.taps,abs(H_ests_norm(:,4)),'--',color = ones(1,3)*0.83,LineWidth=2)
-        xlabel("filter taps")
-        ylabel("amplitude")
-        legend("$h_{11}$","$h_{22}$")
-        axis([-caps.FIR.length/2-1,caps.FIR.length/2+1,0,1])
+    if isempty(varargin) || varargin{1}==0
+        subplot(2,2,1);
+    end
 
-    subplot(2,2,2);
     hold on
-        plot(caps.FIR.taps,abs(H_ests_norm(:,2)),LineWidth=5,color = 'k')
-        plot(caps.FIR.taps,abs(H_ests_norm(:,3)),'--',color = ones(1,3)*0.83,LineWidth=2)
-        xlabel("filter taps")
-        legend("$h_{12}$","$h_{21}$")
-        axis([-caps.FIR.length/2-1,caps.FIR.length/2+1,0,1])
+    plot(caps.FIR.taps,abs(H_ests_norm(:,1)),LineWidth=5,Color='k')
+    plot(caps.FIR.taps,abs(H_ests_norm(:,4)),'--',color = ones(1,3)*0.83,LineWidth=2)
+    xlabel("filter taps")
+    ylabel("amplitude")
+    legend("$h_{11}$","$h_{22}$")
+    axis([-caps.FIR.length/2-1,caps.FIR.length/2+1,0,1])
+
+
+    if isempty(varargin) || varargin{1}==0
+        subplot(2,2,2);
+        hold on
+            plot(caps.FIR.taps,abs(H_ests_norm(:,2)),LineWidth=5,color = 'k')
+            plot(caps.FIR.taps,abs(H_ests_norm(:,3)),'--',color = ones(1,3)*0.83,LineWidth=2)
+            xlabel("filter taps")
+            legend("$h_{12}$","$h_{21}$")
+            axis([-caps.FIR.length/2-1,caps.FIR.length/2+1,0,1])
+    end
+
+    if ~isempty(varargin) && varargin{1}==1
+        cd(caps.log.mySavePath)
+        set(f,"Position",[0.0198,0.0009,0.5255,0.8824]);
+        saveas(f,strcat('FIR_',caps.log.fname_save,'.fig'))
+        saveas(f,strcat('FIR_',caps.log.fname_save,'.png'))
+        cd(caps.log.myInitPath)
+        close all
+    end
+
 % ---------------------------------------------
 
 
 
 function f = plot_SOP(caps,thetas,metrics)
 
-f = figure(1);
-if caps.phis_est
-    subplot(2,2,3)
+if ~caps.save.data
+    f = figure(1);
+    if caps.phis_est
+        subplot(2,2,3)
+    else
+        subplot(2,2,[3,4])
+    end
 else
-    subplot(2,2,[3,4])
+     f = figure("Position",[0.0198,0.0009,0.5255,0.8824]);
 end
 
 hold on
 if strcmpi(caps.plot.SOP.xlabel,'error per frame')
-    scatter(caps.Frames.array,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    scatter(caps.Frames.array,thetas.est-thetas.gnd,100,"filled", ...
+        MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("frame")
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
 elseif strcmpi(caps.plot.SOP.xlabel,'error per theta')
-    scatter(thetas.gnd,thetas.est-thetas.gnd,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+    scatter(thetas.gnd,thetas.est-thetas.gnd,100,"filled", ...
+        MarkerEdgeColor="k",MarkerFaceColor='k')
     xlabel("$\theta$ [deg]")
     ylabel("$\hat{\theta}-\theta$ [deg]")
 
 elseif strcmpi(caps.plot.SOP.xlabel,'comparison per frame')
-    plot(caps.Frames.array,thetas.gnd,'color',[1,1,1]*0.83, LineWidth=5)
-    scatter(caps.Frames.array,thetas.est,100,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
-    legend("ground truth","estimation",Location="northwest")
+    scatter(caps.Frames.array,thetas.est,100,"filled", ...
+        MarkerEdgeColor="k",MarkerFaceColor='k', ...
+        DisplayName="estimation")
+    plot(caps.Frames.array,thetas.gnd,'color',[1,1,1]*0.83, LineWidth=5, ...
+        DisplayName="ground truth")
+
+    legend(Location="northwest")
     xlabel("frame")
     ylabel("$\hat{\theta},\theta$ [deg]")
 end
@@ -178,6 +232,16 @@ end
 title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
       caps.method.thetas, caps.FIR.tap, ...
       metrics.thetas.ErrMedian,metrics.thetas.ErrStd))
+
+if caps.save.data
+    cd(caps.log.mySavePath)
+    saveas(f,strcat('SoP_',caps.log.fname_save,'.fig'))
+    saveas(f,strcat('SoP_',caps.log.fname_save,'.png'))
+    cd(caps.log.myInitPath)
+    f = clf();
+end
+
+
 % ---------------------------------------------
 
 
@@ -187,8 +251,10 @@ function f = plot_phi(caps,phis,metrics)
 
 f = figure(1);
 if caps.phis_est
-    subplot(2,2,4)
-    
+    if ~caps.save.data
+        subplot(2,2,4)
+    end
+
     hold on
     if strcmpi(caps.plot.phis.xlabel,'error per batch')
         scatter(caps.Batches.array,...
@@ -206,11 +272,24 @@ if caps.phis_est
     
     elseif strcmpi(caps.plot.phis.xlabel,'comparison per batch')
         scatter(caps.Batches.array,phis.est.channel(:,caps.plot.phis.pol),...
-                25,"filled",MarkerEdgeColor="k",MarkerFaceColor='k')
+                25,"filled",MarkerEdgeColor="k",MarkerFaceColor='k', ...
+                DisplayName="estimation")
         plot(caps.Batches.array, ...
              phis.gnd.channel, ...
-             'color',[1,1,1]*0.83, LineWidth=2)
-        legend("ground truth","estimation",Location="northwest")
+             'color',[1,1,1]*0.83, LineWidth=2, ...
+             DisplayName="ground truth")
+
+        if ~isempty(find(phis.gnd.channel>90, 1))
+            plot(caps.Batches.array,ones(caps.NBatches.Channel,1)*90,...
+                '-.k', LineWidth=1, ...
+                HandleVisibility="off")
+        elseif ~isempty(find(phis.gnd.channel<-90, 1))
+            plot(caps.Batches.array,-ones(caps.NBatches.Channel,1)*90,...
+                '-.k', LineWidth=1, ...
+                HandleVisibility="off")
+        end
+
+        legend(Location="northwest")
         xlabel("batch")
         ylabel("$\hat{\phi},\phi$ [deg]")
     end
@@ -218,6 +297,14 @@ if caps.phis_est
 title(sprintf("%s - tap = %d, Error to ground truth = %.2f +/- %.1f [deg]", ...
       caps.method.phis, caps.FIR.tap, ...
       metrics.phis.ErrMedian(caps.kdata),metrics.phis.ErrStd(caps.kdata)))
+end
+
+if caps.save.data
+    cd(caps.log.mySavePath)
+    saveas(f,strcat('Phi_',caps.log.fname_save,'.fig'))
+    saveas(f,strcat('Phi_',caps.log.fname_save,'.png'))
+    cd(caps.log.myInitPath)
+    f = clf();
 end
 
 % ---------------------------------------------

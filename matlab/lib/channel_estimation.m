@@ -3,8 +3,8 @@
 %   Author          : louis tomczyk
 %   Institution     : Telecom Paris
 %   Email           : louis.tomczyk@telecom-paris.fr
-%   Version         : 1.2.0
-%   Date            : 2024-09-26
+%   Version         : 2.0.0
+%   Date            : 2024-11-13
 %   License         : cc-by-nc-sa
 %                       CAN:    modify - distribute
 %                       CANNOT: commercial use
@@ -21,7 +21,9 @@
 %   2024-07-15  (1.1.3) multiple files processing
 %   2024-09-26  (1.2.0) extract_thetas_est (1.1.0): removing abs
 %                       to measure negative angles + cleaning
-% 
+% ----------------------
+%   2024-11-13  (2.0.0) [NEW] HANDMADE_UNWRAP for the phase
+%
 % ----- MAIN IDEA -----
 % ----- INPUTS -----
 % ----- OUTPUTS -----
@@ -46,7 +48,7 @@
 % ---------------------------------------------
 %%
 
-function [caps,thetas,phis, H_est, f, Sest,FIRest] = channel_estimation(data,caps)
+function [caps, thetas, phis, H_est, f, Sest, FIRest] = channel_estimation(data,caps)
 
 H_est           = zeros([2,2,caps.FIR.length]);
 thetas.est      = zeros([caps.NFrames.Channel-1,1]);
@@ -75,6 +77,9 @@ for k = 1:caps.NFrames.Channel
         end
     end
 end
+if caps.unwrap
+    thetas.est    = handmade_unwrap(thetas.est);
+end
 
 % handmade flattening
 if caps.phis_est
@@ -84,6 +89,10 @@ if caps.phis_est
         for k = 1:caps.NFrames.Channel
             phis.est.all(1+(k-1)*caps.NBatches.Frame:k*caps.NBatches.Frame,1) = tmp(:,k);
         end
+        if caps.unwrap
+            phis.est.all    = handmade_unwrap(phis.est.all);
+        end
+
     elseif strcmpi(caps.rx_mode, 'pilots')
         polH = squeeze(data.PhaseNoise_est_cpr(:,1,:));
         polV = squeeze(data.PhaseNoise_est_cpr(:,2,:));
@@ -108,12 +117,6 @@ if caps.phis_est
         phis.est            = rmfield(phis.est,'all');
     end
 end
-
-
-
-
-
-
 
 % to show the FIR filter of the last step
 
@@ -143,6 +146,7 @@ end
 %   extract_Hest
 %   extract_phis_est
 %   extract_thetas_est              (1.1.0)
+%   handmade_unwrap                 (2.0.0)
 % ---------------------------------------------
 
 
@@ -219,14 +223,39 @@ if caps.Frame > caps.Frames.Channel
     Hest        = H_est.batch(:,:,caps.FIR.tap);
     M           = Hest'*Hest;
     g0          = mean(trace(M));
-    phis_est    = 0.5*angle(det(Hest))*180/pi;
 
+    phis_est    = 0.5*angle(det(Hest));
+    phis_est    = phis_est*180/pi;
 else
     phis_est    = 0;
 
 end
 
 % ---------------------------------------------
+
+function y = handmade_unwrap(x)
+
+    ref         = 90;
+    xdiff       = diff(x);
+    index_jumps = find(abs(xdiff)>ref);
+    njumps      = length(index_jumps);
+
+    count       = 0;
+    y           = x;
+
+    while count < njumps
+        count       = count+1;
+        k           = index_jumps(count);
+        offset      = -2*ref*sign(x(k+1)-x(k));
+        if count == 1
+            y(k+1:end)  = x(index_jumps(count)+1:end)+offset;
+        else
+            y(k+1:end)  = y(index_jumps(count)+1:end)+offset;
+        end
+    end
+
+% ---------------------------------------------
+
 
 function [thetas_est, Hest_f] = extract_thetas_est(H_est,k,Hest_f,caps)
 
@@ -237,16 +266,19 @@ if strcmpi(caps.method.thetas,'fft')
     Hest_f(k,2,2,:) = fftshift(fft(H_est.frame(2,2,:)));
 
     H_f0        = squeeze(Hest_f(k,:,:,caps.FIR.tap));
-    thetas_est  = atan(H_f0(1,2)./H_f0(1,1))*180/pi;   % [deg]
+    thetas_est  = unwrap(real(atan(H_f0(1,2)./H_f0(1,1))))*180/pi;   % [deg]
 
 
 elseif strcmpi(caps.method.thetas,'mat')
     Hest        = H_est.frame(:,:,caps.FIR.tap);
 
-    Tr          = sum(eig(Hest));
-    D           = prod(eig(Hest));
-    C           = Tr/2/sqrt(D);
-    thetas_est  = acos(C)*180/pi;
+%     Tr          = sum(eig(Hest));
+%     D           = prod(eig(Hest));
+%     C           = Tr/2/sqrt(D);
+%     thetas_est  = real(acos(C)*180/pi);
+
+    tanTheta    = Hest(1,2)/Hest(1,1);
+    thetas_est  = real(atan(tanTheta)*180/pi);
 end
 % ---------------------------------------------
 
